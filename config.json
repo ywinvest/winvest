@@ -1,0 +1,26 @@
+{
+  "slack_webhook_url": "https://hooks.slack.com/services/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",
+  "local": {
+    "tickers": {
+      "^KS11": "KOSPI",
+      "^KQ11": "KOSDAQ",
+      "^KS200": "KOSPI200",
+      "091160.KS": "KODEX 반도체",
+      "305720.KS": "KODEX 2차전지",
+      "244580.KS": "KODEX 바이오"
+    }
+  },
+  "global": {
+    "tickers": {
+      "^IXIC": "NASDAQ",
+      "^DJI": "DOW",
+      "^GSPC": "S&P500",
+      "GC=F": "Gold",
+      "BTC-USD": "Bitcoin",
+      "SCHD": "SCHD",
+      "QQQ": "QQQ",
+      "QLD": "QLD",
+      "SPY": "SPY"
+    }
+  }
+}
