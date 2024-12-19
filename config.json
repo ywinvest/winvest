@@ -1,5 +1,5 @@
 {
-  "slack_webhook_url": "https://hooks.slack.com/services/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",
+  "slack_webhook_url": "https://hooks.slack.com/services/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",
   "local": {
     "tickers": {
       "^KS11": "KOSPI",
