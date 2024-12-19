@@ -1,0 +1,35 @@
+name: Run RSI Script
+
+on:
+  workflow_dispatch:
+  schedule:
+  # 매주 월~금 오전 8:40, 12:00, 오후 3:20 (UTC 기준 시간)
+  - cron: "40 23 * * 1-5" # 오전 8:40 (UTC+9)
+  - cron: "0 3 * * 1-5"   # 정오 12:00 (UTC+9)
+  - cron: "20 6 * * 1-5"  # 오후 3:20 (UTC+9)
+
+jobs:
+  run-rsi:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Python 설치
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.x"
+
+    # 레포지토리 클론
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # 의존성 설치
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # Python 스크립트 실행
+    - name: Run RSI script
+      run: |
+        python rsi.py
