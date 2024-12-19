@@ -1,3 +1,4 @@
 yfinance
 pandas_ta
 setuptools
+numpy<1.24
