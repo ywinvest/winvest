@@ -15,6 +15,8 @@
       "^IXIC": "NASDAQ",
       "^DJI": "DOW",
       "^GSPC": "S&P500",
+      "DX-Y.NYB": "Dollar Index",
+      "^TNX": "US 10-Year Treasury",
       "GC=F": "Gold",
       "BTC-USD": "Bitcoin",
       "SCHD": "SCHD",
