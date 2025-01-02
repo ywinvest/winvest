@@ -38,12 +38,12 @@ def fetch_rsi_and_change(ticker, period='14'):
     print(f"Error fetching RSI and change for {ticker}: {e}")
     return None, None, None
 
-def send_to_slack_combined(tickers_local, tickers_global, webhook_url):
+def send_to_slack_combined(tickers_korea, tickers_global, webhook_url):
   """
-  Send results for both Local and Global markets in a single Slack message with formatted text.
+  Send results for both Korea and Global markets in a single Slack message with formatted text.
 
   Parameters:
-      tickers_local (dict): Dictionary of local tickers and their names.
+      tickers_korea (dict): Dictionary of korea tickers and their names.
       tickers_global (dict): Dictionary of global tickers and their names.
       webhook_url (str): The Slack webhook URL.
   """
@@ -66,20 +66,20 @@ def send_to_slack_combined(tickers_local, tickers_global, webhook_url):
       # Sort by RSI (ascending)
       return sorted(results, key=lambda x: x[0])
 
-    # Process and sort local and global tickers
-    local_sorted = process_and_sort_tickers(tickers_local)
+    # Process and sort korea and global tickers
+    korea_sorted = process_and_sort_tickers(tickers_korea)
     global_sorted = process_and_sort_tickers(tickers_global)
 
     # Prepare Slack message
     message_lines = []
 
-    # Local Market section
-    message_lines.append(":round_pushpin: *Local Market*")
-    for _, line in local_sorted:
+    # Korea Market section
+    message_lines.append(":kr: *Korea Market*")
+    for _, line in korea_sorted:
       message_lines.append(line)
 
     # Global Market section
-    message_lines.append("\n:earth_africa: *Global Market*")
+    message_lines.append("\n:earth_americas: *Global Market*")
     for _, line in global_sorted:
       message_lines.append(line)
 
@@ -104,11 +104,11 @@ if __name__ == "__main__":
       config = json.load(config_file)
 
     slack_webhook_url = config["slack_webhook_url"]
-    local_tickers = config["local"]["tickers"]
+    korea_tickers = config["korea"]["tickers"]
     global_tickers = config["global"]["tickers"]
   except Exception as e:
     print(f"Error loading configuration file: {e}")
     exit(1)
 
   # Send combined Slack message
-  send_to_slack_combined(local_tickers, global_tickers, slack_webhook_url)
+  send_to_slack_combined(korea_tickers, global_tickers, slack_webhook_url)

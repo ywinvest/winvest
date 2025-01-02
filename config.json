@@ -1,6 +1,6 @@
 {
   "slack_webhook_url": "https://hooks.slack.com/services/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",
-  "local": {
+  "korea": {
     "tickers": {
       "^KS11": "KOSPI",
       "^KQ11": "KOSDAQ",
