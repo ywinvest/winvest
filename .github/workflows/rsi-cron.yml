@@ -30,6 +30,17 @@ jobs:
         pip install -r requirements.txt
 
     # Python 스크립트 실행
-    - name: Run RSI script
+    - name: Run RSI script (Global Market)
+      if: ${{ github.event.schedule == '20 23 * * 0-4' }}
       run: |
-        python rsi.py
+        python rsi.py --market global
+
+    - name: Run RSI script (Korea Market - 11:40)
+      if: ${{ github.event.schedule == '40 2 * * 1-5' }}
+      run: |
+        python rsi.py --market korea
+
+    - name: Run RSI script (Korea Market - 15:00)
+      if: ${{ github.event.schedule == '0 6 * * 1-5' }}
+      run: |
+        python rsi.py --market korea
