@@ -1,7 +1,7 @@
 {
   "slack_webhook_url": "https://hooks.slack.com/services/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",
   "slack_bot_token": "xoxb-8158672641796-8297894456224-XbrwKF5U9mV4x5kv67BTZZ7i",
-  "slack_channel": "rsi-dev",
+  "slack_channel": "rsi",
   "korea": {
     "name": "Korea Market",
     "icon": ":kr:",
