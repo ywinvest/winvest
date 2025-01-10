@@ -5,7 +5,6 @@ import pandas_ta as ta
 import requests
 import yfinance as yf
 
-
 def calculate_indicators(df, period='14'):
   try:
     if df.empty:
@@ -20,7 +19,6 @@ def calculate_indicators(df, period='14'):
   except Exception as e:
     print(f"Error calculating indicators: {e}")
     return None
-
 
 def process_and_sort_tickers(tickers):
   results = []
@@ -41,21 +39,17 @@ def process_and_sort_tickers(tickers):
       ticker_link = f"<https://finance.yahoo.com/quote/{ticker}|{name}>"
       change_value = float(latest_change)
       emoji = ":red_circle:" if change_value > 0 else ":large_blue_circle:"
-      results.append((float(latest_rsi),
-                      f"{emoji} `{change_value:+.2f}%` `{latest_rsi:.2f}` {candle_type} _{ticker_link}_"))
+      results.append((float(latest_rsi), f"{emoji} `{change_value:+.2f}%` `{latest_rsi:.2f}` {candle_type} _{ticker_link}_"))
     except Exception as e:
       print(f"Error processing {ticker}: {e}")
       ticker_link = f"<https://finance.yahoo.com/quote/{ticker}|{name}>"
-      results.append(
-          (float('inf'), f":grey_question: `N/A` `N/A` _{ticker_link}_"))
+      results.append((float('inf'), f":grey_question: `N/A` `N/A` _{ticker_link}_"))
 
   return sorted(results, key=lambda x: x[0])
 
-
-def send_to_slack_market(tickers, market_name, webhook_url, market_icon):
+def send_to_slack_market(sorted_tickers, name, webhook_url, icon):
   try:
-    sorted_tickers = process_and_sort_tickers(tickers)
-    message_lines = [f"{market_icon} *{market_name}*"]
+    message_lines = [f"{icon} *{name}*"]
     for _, line in sorted_tickers:
       message_lines.append(line)
     message_text = "\n".join(message_lines)
@@ -63,19 +57,15 @@ def send_to_slack_market(tickers, market_name, webhook_url, market_icon):
     response = requests.post(webhook_url, json=payload)
 
     if response.status_code == 200:
-      print(f"{market_name} message sent to Slack successfully.")
+      print(f"{name} message sent to Slack successfully.")
     else:
-      print(
-        f"Failed to send {market_name} message to Slack: {response.status_code}, {response.text}")
+      print(f"Failed to send {name} message to Slack: {response.status_code}, {response.text}")
   except Exception as e:
-    print(f"Error sending {market_name} message to Slack: {e}")
-
+    print(f"Error sending {name} message to Slack: {e}")
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(
-    description="Send RSI and market data to Slack")
-  parser.add_argument("--market", choices=["korea", "global"], required=True,
-                      help="Specify the market to process (korea or global)")
+  parser = argparse.ArgumentParser(description="Send RSI and market data to Slack")
+  parser.add_argument("--market", choices=["korea", "global"], required=True, help="Specify the market to process (korea or global)")
   args = parser.parse_args()
 
   try:
@@ -84,12 +74,15 @@ if __name__ == "__main__":
 
     slack_webhook_url = config["slack_webhook_url"]
 
-    if args.market == "korea":
-      tickers = config["korea"]["tickers"]
-      send_to_slack_market(tickers, "Korea Market", slack_webhook_url, ":kr:")
-    elif args.market == "global":
-      tickers = config["global"]["tickers"]
-      send_to_slack_market(tickers, "Global Market", slack_webhook_url,
-                           ":earth_americas:")
+    if args.market in config:
+      market_config = config[args.market]
+      tickers = market_config["tickers"]
+      name = market_config["name"]
+      icon = market_config["icon"]
+
+      sorted_tickers = process_and_sort_tickers(tickers)
+      send_to_slack_market(sorted_tickers, name, slack_webhook_url, icon)
+    else:
+      print(f"Market configuration for {args.market} not found.")
   except Exception as e:
     print(f"Error loading configuration file or sending message: {e}")

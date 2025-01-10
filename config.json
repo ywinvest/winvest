@@ -1,6 +1,8 @@
 {
   "slack_webhook_url": "https://hooks.slack.com/services/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",
   "korea": {
+    "name": "Korea Market",
+    "icon": ":kr:",
     "tickers": {
       "^KS11": "KOSPI",
       "^KQ11": "KOSDAQ",
@@ -11,6 +13,8 @@
     }
   },
   "global": {
+    "name": "Global Market",
+    "icon": ":earth_americas:",
     "tickers": {
       "^IXIC": "NASDAQ",
       "^DJI": "DOW",
