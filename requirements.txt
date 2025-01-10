@@ -1,4 +1,5 @@
 yfinance
 pandas_ta
 setuptools
+pykrx
 numpy~=1.24
