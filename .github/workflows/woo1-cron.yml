@@ -1,4 +1,4 @@
-name: Run RSI Script
+name: Run woo1 strategy
 
 on:
   workflow_dispatch:
@@ -27,6 +27,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run Woo1 strategy
+    - name: Run woo1 strategy
       run: |
         python woo1.py --market korea
