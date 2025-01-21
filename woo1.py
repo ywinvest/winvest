@@ -1,6 +1,8 @@
+import concurrent.futures
 import json
 import time
 from datetime import datetime, timedelta
+from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
@@ -25,38 +27,23 @@ def calculate_indicators(df):
   return df
 
 def filter_common_stocks(df):
-  return df[
-    (~df['Name'].str.contains('ETN|ETF|리츠|선박펀드', na=False)) # ETN, ETF, 리츠, 선박펀드 제외
-    & (~df['Name'].str.contains('우|2우|3우|우B|우C', na=False)) # 우선주 제외
-    & (~df['Name'].str.contains('스팩', na=False))              # 스팩 제외
-    # & (df['Marcap'] >= 500 * 1e8)                              # 시가총액 500억 이상
-    # & (df['Marcap'] < 10 * 1e12)                             # 시가총액 10조 미만
-    ]
+  # ETN, ETF, 리츠, 선박펀드, 우선주, 스팩 제외
+  exclude_pattern = r'ETN|ETF|리츠|선박펀드|우|2우|3우|우B|우C|스팩'
+  return df[~df['Name'].str.contains(exclude_pattern, na=False, regex=True)]
 
 def buy_condition(df):
-  # 각 조건 정의
-  condition1 = df['Close'] <= df['52WeekLow'] * 1.3
-  condition2 = df['Change'] >= 0
-  condition3 = df['High_Change'] >= 8
-  condition4 = df['Bullish']
-  condition5 = df['Volume_Change'] > 3 # 300% 초과
-  condition6 = df['Volume_Change'] < 1000 # 100,000% 미만
-  condition7 = df['Crossover_Count'] >= 2
-  condition8 = ~((df['Pre_Volume_Change'] > 3) & (df['Pre_Change'] > 0)) # 전봉 거래량 300% 초과 + 등락률 0% 초과 제외
-  condition9 = df['Close'] >= df['MA20']
-
-  # 모든 조건 결합
-  return (
-      condition1
-      & condition2
-      & condition3
-      & condition4
-      & condition5
-      # & condition6
-      & condition7
-      & condition8
-      & condition9
-  )
+  # 벡터화된 연산 사용
+  conditions = pd.Series(True, index=df.index)
+  conditions &= (df['Close'] <= df['52WeekLow'] * 1.3)
+  conditions &= (df['Change'] >= 0)
+  conditions &= (df['High_Change'] >= 8)
+  conditions &= (df['Bullish'])
+  conditions &= (df['Volume_Change'] > 3) # 300% 초과
+  conditions &= (df['Volume_Change'] < 1000) # 100,000% 미만
+  conditions &= (df['Crossover_Count'] >= 2)
+  conditions &= ~((df['Pre_Volume_Change'] > 3) & (df['Pre_Change'] > 0)) # 전봉 거래량 300% 초과 + 등락률 0% 초과 제외
+  conditions &= (df['Close'] >= df['MA20'])
+  return conditions
 
 def send_slack_message(token, channel, text):
   headers = {
@@ -102,53 +89,73 @@ def send_to_slack(result_data, token, channel):
   except Exception as e:
     print(f"Error sending Slack message: {e}")
 
+def process_stock(row, two_years_ago, today):
+  try:
+    ticker = row['Code']
+    name = row['Name']
+    marcap = row['Marcap']
+    market = row['Market']
+
+    df = fdr.DataReader(ticker, two_years_ago)
+    df = calculate_indicators(df)
+
+    buys = df[buy_condition(df)]
+    buys = buys[buys.index.date == today.date()]
+
+    if not buys.empty:
+      buys['Ticker'] = ticker
+      buys['Name'] = name
+      buys['Marcap'] = marcap
+      buys['Market'] = market
+      return buys
+    return None
+  except Exception as e:
+    print(f"Error processing {ticker}: {e}")
+    return None
+
+def parallel_process_stocks(all_stocks, two_years_ago, today):
+  process_func = partial(process_stock, two_years_ago=two_years_ago, today=today)
+  results = []
+
+  with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    futures = [executor.submit(process_func, row) for _, row in all_stocks.iterrows()]
+    for future in concurrent.futures.as_completed(futures):
+      result = future.result()
+      if result is not None:
+        results.append(result)
+
+  return pd.concat(results) if results else pd.DataFrame()
+
 if __name__ == "__main__":
   start_time = time.time()
   try:
+    # 설정 로드
     with open("config-woo1.json", "r") as config_file:
       config = json.load(config_file)
 
     slack_token = config["slack_bot_token"]
     slack_channel = config["slack_channel"]
 
-    kospi = fdr.StockListing('KOSPI')
-    kospi = kospi.tail(-100)
-    kosdaq = fdr.StockListing('KOSDAQ')
+    # 종목 리스트 가져오기 및 필터링
+    all_stocks = pd.concat([
+      filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
+      filter_common_stocks(fdr.StockListing('KOSDAQ'))
+    ], ignore_index=True)
 
-    kospi = filter_common_stocks(kospi)
-    kosdaq = filter_common_stocks(kosdaq)
-
-    # 3. 코스피/코스닥 종목 병합
-    all_stocks = pd.concat([kospi, kosdaq], ignore_index=True)
-
-    result_data = pd.DataFrame()
+    # 날짜 설정
     today = datetime.today()
-    yesterday = today - timedelta(days=1)
-    current_year = datetime.today().year
-    two_years_ago = current_year - 2
+    two_years_ago = today.year - 2
 
-    for _, row in all_stocks.iterrows():
-      ticker = row['Code']
-      name = row['Name']
-      marcap = row['Marcap']
-      market = row['Market']
-      df = fdr.DataReader(ticker, two_years_ago)
-      df = calculate_indicators(df)
+    # 병렬 처리로 데이터 분석
+    result_data = parallel_process_stocks(all_stocks, two_years_ago, today)
 
-      # 매수 조건에 해당하는 데이터 필터링
-      buys = df[buy_condition(df)]
-      buys = buys[buys.index.date == today.date()]
-      if not buys.empty:
-        buys['Ticker'] = ticker
-        buys['Name'] = name
-        buys['Marcap'] = marcap
-        buys['Market'] = market
-        result_data = pd.concat([result_data, buys])
-
+    # Slack 메시지 전송
     send_to_slack(result_data, slack_token, slack_channel)
-  except Exception as e:
-    print(f"Error loading configuration file or sending message: {e}")
 
-  end_time = time.time()
-  elapsed_time = end_time - start_time
-  print(f"총 소요시간: {elapsed_time:.2f}초")
+  except Exception as e:
+    print(f"Error in main execution: {e}")
+
+  finally:
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"총 소요시간: {elapsed_time:.2f}초")
