@@ -3,4 +3,5 @@ pandas_ta
 setuptools
 pykrx
 finance-datareader
+plotly
 numpy~=1.24
