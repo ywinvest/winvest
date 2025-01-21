@@ -7,7 +7,7 @@ on:
   - cron: "10 6 * * 1-5"  # 오후 3:10 (UTC+9)
 
 jobs:
-  run-rsi:
+  run-python:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,6 +27,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run woo1 strategy
+    - name: Run python script
       run: |
-        python woo1.py --market korea
+        python woo1.py
