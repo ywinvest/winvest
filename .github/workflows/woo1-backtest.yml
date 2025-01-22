@@ -1,4 +1,4 @@
-name: Run woo1 strategy
+name: Run woo1 backtest
 
 on:
   workflow_dispatch:
