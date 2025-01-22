@@ -29,7 +29,9 @@ def calculate_indicators(df):
 def filter_common_stocks(df):
   # ETN, ETF, 리츠, 선박펀드, 우선주, 스팩 제외
   exclude_pattern = r'ETN|ETF|리츠|선박펀드|우|2우|3우|우B|우C|스팩'
-  return df[~df['Name'].str.contains(exclude_pattern, na=False, regex=True)]
+  return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
+            # & (df['Name'].str.contains("나무기술", na=False, regex=True))
+            ]
 
 def buy_condition(df):
   # 벡터화된 연산 사용
@@ -45,47 +47,113 @@ def buy_condition(df):
   conditions &= (df['Close'] >= df['MA20'])
   return conditions
 
-def send_slack_message(token, channel, text):
+def create_rich_text_header(emoji, text):
+  return {
+    "type": "rich_text_section",
+    "elements": [
+      {
+        "type": "emoji",
+        "name": emoji,
+      },
+      {
+        "type": "text",
+        "text": text,
+        "style": {
+          "bold": True
+        }
+      }
+    ]
+  }
+
+def create_rich_text_item(text):
+  return {
+    "type": "rich_text_section",
+    "elements": [
+      {
+        "type": "text",
+        "text": text
+      }
+    ]
+  }
+
+def send_slack_message(blocks):
+  # 설정 로드
+  with open("config-woo1.json", "r") as config_file:
+    config = json.load(config_file)
+
+  slack_token = config["slack_bot_token"]
+  slack_channel = config["slack_channel"]
+
   headers = {
-    "Authorization": f"Bearer {token}",
+    "Authorization": f"Bearer {slack_token}",
     "Content-Type": "application/json"
   }
-  payload = {"channel": channel, "text": text}
+
+  payload = {
+    "channel": slack_channel,
+    "blocks": blocks
+  }
+
   response = requests.post(f"{SLACK_API_URL}/chat.postMessage", headers=headers, json=payload)
   response_data = response.json()
   if not response_data.get("ok"):
     raise Exception(f"Failed to send message: {response_data.get('error')}")
-  return response_data.get("ts")  # 메시지의 timestamp 반환
+  return response_data.get("ts")
 
-def send_to_slack(result_data, token, channel):
+def format_market_cap(marcap):
+  """시가총액을 조 또는 억 단위로 포맷팅"""
+  if marcap >= 1e12:  # 1조 이상
+    return f"{marcap/1e12:.1f}조"
+  else:  # 억 단위
+    return f"{marcap/1e8:.0f}억"
+
+def send_to_slack(result_data):
   try:
-    # 기본 메시지 헤더
-    header = f"🔍{today.year}년 {today.month}월 {today.day}일 매수 후보"
-
     if result_data.empty:
-      message = f"{header}\n• 오늘은 매수 후보가 없습니다."
-      send_slack_message(token, channel, message)
+      empty_message = create_rich_text_item("오늘은 매수 후보가 없습니다.", "", "")
+      send_slack_message(empty_message)
       print("No stocks match the buying conditions")
       return
 
-    # 결과를 High_Change를 기준으로 정렬
-    result_data = result_data.sort_values('High_Change', ascending=False)
+    # 결과를 Market과 High_Change를 기준으로 정렬
+    result_data = result_data.sort_values(['Market', 'High_Change'], ascending=[True, False])
 
-    # 메시지 생성
-    message_lines = [header]
+    # 시장별로 데이터 구성
+    rich_text_elements = []
+    for market, group in result_data.groupby('Market'):
+      rich_text_elements.append(create_rich_text_header(
+          "chart_with_upwards_trend", f" {today.year}년 {today.month}월 {today.day}일 {market} 매수 후보\n"
+      ))
+      # 리스트 아이템 추가
+      list_elements = []
+      for _, row in group.iterrows():
+        name = row['Name']
+        high_change = row['High_Change']
+        marcap = row['Marcap']
 
-    for _, row in result_data.iterrows():
-      ticker = row['Ticker']
-      name = row['Name']
-      market = row['Market']
-      high_change = row['High_Change']
+        # Rich Text 아이템 생성
+        item = create_rich_text_item(
+            f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%"
+        )
+        list_elements.append(item)
 
-      message_line = f"• {name}({market}) - 고가: {high_change:.2f}%"
-      message_lines.append(message_line)
+      rich_text_elements.append({
+        "type": "rich_text_list",
+        "style": "bullet",
+        "indent": 0,
+        "elements": list_elements
+      })
 
-    # 메시지 결합 및 전송
-    main_message = "\n".join(message_lines)
-    send_slack_message(token, channel, main_message)
+    blocks = [
+      {
+        "type": "rich_text",
+        "elements": rich_text_elements
+      }
+    ]
+
+    # Slack 메시지 전송
+    send_slack_message(blocks)
+
   except Exception as e:
     print(f"Error sending Slack message: {e}")
 
@@ -129,13 +197,6 @@ def parallel_process_stocks(all_stocks, two_years_ago, today):
 if __name__ == "__main__":
   start_time = time.time()
   try:
-    # 설정 로드
-    with open("config-woo1.json", "r") as config_file:
-      config = json.load(config_file)
-
-    slack_token = config["slack_bot_token"]
-    slack_channel = config["slack_channel"]
-
     # 종목 리스트 가져오기 및 필터링
     all_stocks = pd.concat([
       filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
@@ -150,7 +211,7 @@ if __name__ == "__main__":
     result_data = parallel_process_stocks(all_stocks, two_years_ago, today)
 
     # Slack 메시지 전송
-    send_to_slack(result_data, slack_token, slack_channel)
+    send_to_slack(result_data)
 
   except Exception as e:
     print(f"Error in main execution: {e}")
