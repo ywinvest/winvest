@@ -1,10 +1,13 @@
 import concurrent.futures
+import json
+import os
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
+import requests
 
 import woo1
 
@@ -230,6 +233,58 @@ def process_stock(row):
     print(f"Error processing {ticker}: {e}")
     return None
 
+def upload_to_github_releases(file_path, release_tag="v1.0.0"):
+  """
+  GitHub Releases 에 파일 업로드
+  Args:
+      file_path (str): 업로드할 파일 경로
+      release_tag (str): 릴리즈 태그 이름
+  """
+  # 설정 로드
+  with open("config-woo1.json", "r") as config_file:
+    config = json.load(config_file)
+
+  # GitHub 설정
+  token = config["github_token"]
+  api_url = config["github_api_url"]
+
+  # 파일 이름 추출
+  file_name = os.path.basename(file_path)
+
+  # 1. 릴리즈 생성
+  headers = {
+    "Authorization": f"Bearer {token}",
+    "Accept": "application/vnd.github.v3+json"
+  }
+  data = {
+    "tag_name": release_tag,
+    "name": release_tag,
+    "body": f"Uploading {file_name} via script",
+    "draft": False,
+    "prerelease": False
+  }
+
+  response = requests.post(api_url, headers=headers, json=data)
+  if response.status_code != 201:
+    raise Exception(f"Failed to create release: {response.json()}")
+
+  release = response.json()
+  upload_url = release["upload_url"].split("{")[0]  # 업로드 URL 추출
+
+  # 2. 파일 업로드
+  with open(file_path, "rb") as f:
+    file_data = f.read()
+  upload_headers = {
+    "Authorization": f"Bearer {token}",
+    "Content-Type": "text/csv"
+  }
+  upload_params = {"name": file_name}
+  upload_response = requests.post(upload_url, headers=upload_headers, params=upload_params, data=file_data)
+
+  if upload_response.status_code not in [200, 201]:
+    raise Exception(f"Failed to upload asset: {upload_response.json()}")
+
+  print(f"File '{file_name}' uploaded successfully to release '{release_tag}'.")
 
 if __name__ == "__main__":
   start_time = time.time()
@@ -243,9 +298,16 @@ if __name__ == "__main__":
       woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
     ], ignore_index=True)
 
+    result_file = "woo1_backtest_result.csv"
+
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks)
-    result_data.to_csv('filtered_stocks.csv', index=False, encoding='utf-8-sig')
+    result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
+
+    # 업로드 파일 경로
+    release_tag = datetime.now().strftime("%Y%m%d")
+    # 파일 업로드 실행
+    upload_to_github_releases(result_file, release_tag)
   except Exception as e:
     print(f"Error in main execution: {e}")
 
