@@ -139,10 +139,11 @@ def send_to_slack(result_data):
         name = row['Name']
         high_change = row['High_Change']
         marcap = row['Marcap']
+        volume_change = row['Volume_Change']
 
         # Rich Text 아이템 생성
         item = create_rich_text_item(
-            f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%"
+            f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%, 거래량: {volume_change * 100:.2f}%"
         )
         list_elements.append(item)
 
