@@ -110,8 +110,17 @@ def format_market_cap(marcap):
 def send_to_slack(result_data):
   try:
     if result_data.empty:
-      empty_message = create_rich_text_item("오늘은 매수 후보가 없습니다.", "", "")
-      send_slack_message(empty_message)
+      blocks = [
+        {
+          "type": "section",
+          "text": {
+            "type": "plain_text",
+            "text": "오늘은 매수 후보가 없습니다.",
+            "emoji": True
+          }
+        }
+      ]
+      send_slack_message(blocks)
       print("No stocks match the buying conditions")
       return
 
