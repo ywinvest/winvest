@@ -1,4 +1,4 @@
-name: Send woo1 signal
+name: woo1 - Send signal
 
 on:
   workflow_dispatch:

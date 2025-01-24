@@ -1,4 +1,4 @@
-name: Backtest woo1
+name: woo1 - Backtest
 
 on:
   workflow_dispatch:
