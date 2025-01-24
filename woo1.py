@@ -17,11 +17,11 @@ def calculate_indicators(df):
   df['MA60'] = df['Close'].rolling(window=60).mean()
   df['Bullish'] = df['Close'] > df['Open']
   df['Volume_Change'] = df['Volume'] / df['Volume'].shift(1)
+  df['High_Change'] = (df['High'] / df['Close'].shift(1) - 1) * 100
   df['Pre_Change'] = df['Change'].shift(1)
   # df['Pre_Bullish'] = df['Close'].shift(1) > df['Open'].shift(1)
   df['Pre_High_Change'] = df['High_Change'].shift(1)
   df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
-  df['High_Change'] = (df['High'] / df['Close'].shift(1) - 1) * 100
   df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window=364, min_periods=1).min()
