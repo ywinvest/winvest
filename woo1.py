@@ -19,6 +19,7 @@ def calculate_indicators(df):
   df['Volume_Change'] = df['Volume'] / df['Volume'].shift(1)
   df['Pre_Change'] = df['Change'].shift(1)
   # df['Pre_Bullish'] = df['Close'].shift(1) > df['Open'].shift(1)
+  df['Pre_High_Change'] = df['High_Change'].shift(1)
   df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
   df['High_Change'] = (df['High'] / df['Close'].shift(1) - 1) * 100
   df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
