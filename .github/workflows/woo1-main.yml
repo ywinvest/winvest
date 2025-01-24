@@ -1,4 +1,4 @@
-name: Run woo1 strategy
+name: Send woo1 signal
 
 on:
   workflow_dispatch:
