@@ -1,12 +1,13 @@
 import concurrent.futures
-import json
+import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 
 SLACK_API_URL = "https://slack.com/api"
 
@@ -79,19 +80,21 @@ def create_rich_text_item(text):
 
 def send_slack_message(blocks):
   # 설정 로드
-  with open("config-woo1.json", "r") as config_file:
-    config = json.load(config_file)
+  # with open("config-woo1.json", "r") as config_file:
+  #   config = json.load(config_file)
 
-  slack_token = config["slack_bot_token"]
-  slack_channel = config["slack_channel"]
+  # slack_token = config["slack_bot_token"]
+  # slack_channel = config["slack_channel"]
+  bot_token = os.getenv("SLACK_BOT_TOKEN")
+  channel = os.getenv("SLACK_CHANNEL")
 
   headers = {
-    "Authorization": f"Bearer {slack_token}",
+    "Authorization": f"Bearer {bot_token}",
     "Content-Type": "application/json"
   }
 
   payload = {
-    "channel": slack_channel,
+    "channel": channel,
     "blocks": blocks
   }
 
@@ -207,6 +210,10 @@ def parallel_process_stocks(all_stocks, two_years_ago, today):
 
 if __name__ == "__main__":
   start_time = time.time()
+
+  # .env 파일 로드
+  load_dotenv()
+
   try:
     # 종목 리스트 가져오기 및 필터링
     all_stocks = pd.concat([

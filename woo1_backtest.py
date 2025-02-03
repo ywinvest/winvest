@@ -1,5 +1,4 @@
 import concurrent.futures
-import json
 import os
 import time
 from datetime import datetime, timedelta
@@ -8,6 +7,7 @@ from functools import partial
 import FinanceDataReader as fdr
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 
 import woo1
 
@@ -241,12 +241,14 @@ def upload_to_github_releases(file_path, release_tag="v1.0.0"):
       release_tag (str): 릴리즈 태그 이름
   """
   # 설정 로드
-  with open("config-woo1.json", "r") as config_file:
-    config = json.load(config_file)
+  # with open("config-woo1.json", "r") as config_file:
+  #   config = json.load(config_file)
 
   # GitHub 설정
-  token = config["github_token"]
-  api_url = config["github_api_url"]
+  # token = config["github_token"]
+  # api_url = config["github_api_url"]
+  token = os.getenv("GITHUB_TOKEN")
+  api_url = os.getenv("GITHUB_API_URL")
 
   # 파일 이름 추출
   file_name = os.path.basename(file_path)
@@ -288,6 +290,10 @@ def upload_to_github_releases(file_path, release_tag="v1.0.0"):
 
 if __name__ == "__main__":
   start_time = time.time()
+
+  # .env 파일 로드
+  load_dotenv()
+
   try:
     # delisting = fdr.StockListing('KRX-DELISTING') # 3천+ 종목 - 상장폐지 종목 전체
     # admin = fdr.StockListing('KRX-ADMIN') # 50+ 종목 - KRX 관리종목

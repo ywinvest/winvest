@@ -28,5 +28,8 @@ jobs:
         pip install -r requirements.txt
 
     - name: Run python script
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
       run: |
         python woo1.py
