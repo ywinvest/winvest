@@ -24,6 +24,25 @@ def sell_condition_full(df):
 def sell_condition_stop_loss(df):
   return df['Close'] < df['MA20']
 
+def calculate_trading_days(df, start_date, end_date):
+  """
+  실제 거래일 기준으로 보유기간을 계산하는 함수
+
+  Args:
+      df (pandas.DataFrame): 주가 데이터
+      start_date (datetime): 시작일
+      end_date (datetime): 종료일
+
+  Returns:
+      int: 실제 거래일 수
+  """
+  if pd.isna(end_date):
+    return None
+
+  # start_date와 end_date 사이의 실제 거래일만 필터링
+  trading_days = df.loc[start_date:end_date].index
+  return len(trading_days) - 1  # 매수일 제외
+
 def parallel_process_stocks(all_stocks):
   process_func = partial(process_stock)
   results = []
@@ -213,7 +232,7 @@ def process_stock(row):
 
         # 보유기간 계산 (영업일 기준)
         if partial_sell_date:
-          buys.loc[buy_date, 'Partial_Holding_Days'] = len(pd.bdate_range(buy_date, partial_sell_date))
+          buys.loc[buy_date, 'Partial_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
         else:
@@ -221,7 +240,7 @@ def process_stock(row):
           buys.loc[buy_date, 'Partial_Return'] = None
 
         if full_sell_date:
-          buys.loc[buy_date, 'Full_Holding_Days'] = len(pd.bdate_range(buy_date, full_sell_date))
+          buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, full_sell_date)
           # 전량매도 수익률 계산 (%)
           buys.loc[buy_date, 'Full_Return'] = ((full_sell_price / buy_price) - 1)
         else:
