@@ -266,8 +266,8 @@ def upload_to_github_releases(file_path, release_tag="v1.0.0"):
   # GitHub 설정
   # token = config["github_token"]
   # api_url = config["github_api_url"]
-  token = os.getenv("GITHUB_TOKEN")
-  api_url = os.getenv("GITHUB_API_URL")
+  token = os.getenv("RELEASE_TOKEN")
+  api_url = os.getenv("RELEASE_API_URL")
 
   # 파일 이름 추출
   file_name = os.path.basename(file_path)
