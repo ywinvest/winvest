@@ -151,6 +151,15 @@ def process_stock(row):
           elif not partial_sell_date and not full_sell_date:
             remaining_data = subsequent_data.loc[next_date + timedelta(days=1):]
 
+            # 매수일로부터 22일 후의 날짜 계산
+            max_hold_date = None
+            trading_days = 0
+            for date in remaining_data.index:
+              trading_days += 1
+              if trading_days >= 21:
+                max_hold_date = date
+                break
+
             # 각 조건이 처음 발생하는 날짜 찾기
             target_open_sell = remaining_data[remaining_data['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
             target_high_sell = remaining_data[(remaining_data['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (remaining_data['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
@@ -164,7 +173,8 @@ def process_stock(row):
             # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
             valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
                           [(d, 'high') for d in [high_sell_date] if d is not None] + \
-                          [(d, 'stop') for d in [stop_loss_date] if d is not None]
+                          [(d, 'stop') for d in [stop_loss_date] if d is not None] + \
+                          [(d, 'max_hold') for d in [max_hold_date] if d is not None]
 
             if valid_dates:
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
@@ -177,6 +187,12 @@ def process_stock(row):
                 # 고가 5% 이상 시 5%에 부분매도
                 partial_sell_date = earliest_date
                 partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              elif condition == 'max_hold':
+                # 25일 보유 제한에 도달 시 전량 매도
+                partial_sell_date = earliest_date
+                partial_sell_price = remaining_data.loc[earliest_date, 'Close']
+                full_sell_date = earliest_date
+                full_sell_price = remaining_data.loc[earliest_date, 'Close']
               else:  # condition == 'stop'
                 # 손절 시 종가에 전량 매도
                 partial_sell_date = earliest_date
