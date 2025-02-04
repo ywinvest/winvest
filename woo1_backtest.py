@@ -6,6 +6,7 @@ from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
+import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
 
@@ -66,6 +67,8 @@ def process_stock(row):
   marcap = None
   if hasattr(row, 'Marcap'):
     marcap = row['Marcap']
+
+  market = row['Market']
   try:
     # 종목 데이터 가져오기
     df = fdr.DataReader(ticker, "2004")
@@ -251,9 +254,14 @@ def process_stock(row):
           buys.loc[buy_date, 'Partial_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
+          if market == 'KOSPI':
+            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
+          elif market == 'KOSDAQ':
+            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[partial_sell_date, 'RSI']
         else:
           buys.loc[buy_date, 'Partial_Holding_Days'] = None
           buys.loc[buy_date, 'Partial_Return'] = None
+          buys.loc[buy_date, 'Index_RSI'] = None
 
         if full_sell_date:
           buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, full_sell_date)
@@ -338,6 +346,12 @@ if __name__ == "__main__":
       woo1.filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
       woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
     ], ignore_index=True)
+
+    kospi = fdr.DataReader('KS11')
+    kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
+
+    kosdaq = fdr.DataReader('KQ11')
+    kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
 
     result_file = "woo1_backtest_result.csv"
 
