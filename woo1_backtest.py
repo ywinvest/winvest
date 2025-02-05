@@ -69,6 +69,7 @@ def process_stock(row):
     marcap = row['Marcap']
 
   market = row['Market']
+  market_data = kospi if market == 'KOSPI' else kosdaq
   try:
     # 종목 데이터 가져오기
     df = fdr.DataReader(ticker, "2004")
@@ -162,16 +163,46 @@ def process_stock(row):
               if trading_days >= 21:
                 max_hold_date = date
                 break
+            def find_valid_stop_loss(data, initial_date=None):
+                # 스톱로스 조건에 해당하는 데이터 찾기
+                stop_loss = data[(data['Close'] < df.loc[buy_date, 'Open']) &
+                                 (data['Close'] < data['MA20'])]
+
+                if stop_loss.empty:
+                  return None
+
+                # 초기 스톱로스 날짜
+                stop_date = stop_loss.index[0] if initial_date is None else initial_date
+
+                while stop_date and stop_date in market_data.index:
+                  current_rsi = market_data.loc[stop_date, 'RSI']
+
+                  # RSI가 30 초과면 현재 스톱로스 날짜 반환
+                  if current_rsi > 30:
+                    return stop_date
+
+                  # RSI가 30 이하면 다음 거래일부터의 데이터로 새로운 스톱로스 날짜 찾기
+                  next_day_data = data.loc[stop_date + timedelta(days=1):]
+                  next_stop_loss = next_day_data[(next_day_data['Close'] < df.loc[buy_date, 'Open']) &
+                                                 (next_day_data['Close'] < next_day_data['MA20'])]
+
+                  if next_stop_loss.empty:
+                    return None
+
+                  stop_date = next_stop_loss.index[0]
+
+                return None
 
             # 각 조건이 처음 발생하는 날짜 찾기
             target_open_sell = remaining_data[remaining_data['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
             target_high_sell = remaining_data[(remaining_data['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (remaining_data['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
-            stop_loss = remaining_data[(remaining_data['Close'] < df.loc[buy_date, 'Open']) & (remaining_data['Close'] < remaining_data['MA20'])]
+            # stop_loss = remaining_data[(remaining_data['Close'] < df.loc[buy_date, 'Open']) & (remaining_data['Close'] < remaining_data['MA20'])]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
             open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
             high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
-            stop_loss_date = stop_loss.index[0] if not stop_loss.empty else None
+            # stop_loss_date = stop_loss.index[0] if not stop_loss.empty else None
+            stop_loss_date = find_valid_stop_loss(remaining_data)
 
             # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
             valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
@@ -254,10 +285,7 @@ def process_stock(row):
           buys.loc[buy_date, 'Partial_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
-          if market == 'KOSPI':
-            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
-          elif market == 'KOSDAQ':
-            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[partial_sell_date, 'RSI']
+          buys.loc[buy_date, 'Index_RSI'] = market_data.loc[partial_sell_date, 'RSI']
         else:
           buys.loc[buy_date, 'Partial_Holding_Days'] = None
           buys.loc[buy_date, 'Partial_Return'] = None
