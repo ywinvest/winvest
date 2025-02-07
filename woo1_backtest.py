@@ -84,11 +84,21 @@ def process_stock(row):
         subsequent_data = df.loc[buy_date + timedelta(days=1):]
 
         buy_price = df.loc[buy_date, 'Buy']
+        change = df.loc[buy_date, 'Change']
+        high_change = df.loc[buy_date, 'High_Change']
+        diff_close_high_change = high_change/100 - change
 
         partial_sell_date = None
         full_sell_date = None
         partial_sell_price = None
         full_sell_price = None
+
+        partial_target_return = PARTIAL_TARGET_RETURN
+
+        if diff_close_high_change >= 0.1:
+          partial_target_return = 1.1
+        else:
+          partial_target_return = 1.07
 
         if not subsequent_data.empty:
           # 매수 다음 거래일 조건 확인
@@ -102,7 +112,7 @@ def process_stock(row):
             full_sell_date = next_date
             full_sell_price = next_day['Open']
           # 시가가 5% 이상 형성되면 시가에 부분매도
-          elif next_day['Open'] >= buy_price * PARTIAL_TARGET_RETURN:
+          elif next_day['Open'] >= buy_price * partial_target_return:
             partial_sell_date = next_date
             partial_sell_price = next_day['Open']
 
@@ -118,13 +128,13 @@ def process_stock(row):
             # 고가가 10% 이상이면 5%에 부분매도 및 10%에 전량매도
             if next_day['High'] >= buy_price * FULL_TARTET_RETURN:
               partial_sell_date = next_date
-              partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              partial_sell_price = buy_price * partial_target_return
               full_sell_date = next_date
               full_sell_price = buy_price * FULL_TARTET_RETURN
             # 고가가 5% 이상이면 5%에 부분매도
-            elif next_day['High'] >= buy_price * PARTIAL_TARGET_RETURN:
+            elif next_day['High'] >= buy_price * partial_target_return:
               partial_sell_date = next_date
-              partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              partial_sell_price = buy_price * partial_target_return
 
           # 다음 거래일에 부분매도만 성공 시
           if partial_sell_date and not full_sell_date:
@@ -164,8 +174,8 @@ def process_stock(row):
                 break
 
             # 각 조건이 처음 발생하는 날짜 찾기
-            target_open_sell = remaining_data[remaining_data['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
-            target_high_sell = remaining_data[(remaining_data['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (remaining_data['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
+            target_open_sell = remaining_data[remaining_data['Open'] >= buy_price * partial_target_return]
+            target_high_sell = remaining_data[(remaining_data['Open'] < buy_price * partial_target_return) & (remaining_data['High'] >= buy_price * partial_target_return)]
             stop_loss = remaining_data[(remaining_data['Close'] < df.loc[buy_date, 'Open']) & (remaining_data['Close'] < remaining_data['MA20'])]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
@@ -189,7 +199,7 @@ def process_stock(row):
               elif condition == 'high':
                 # 고가 5% 이상 시 5%에 부분매도
                 partial_sell_date = earliest_date
-                partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+                partial_sell_price = buy_price * partial_target_return
               elif condition == 'max_hold':
                 # 25일 보유 제한에 도달 시 전량 매도
                 partial_sell_date = earliest_date
