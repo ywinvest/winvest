@@ -100,7 +100,7 @@ def process_stock(row):
         elif diff_close_high_change <= 0.02:
           partial_target_return = 1.09
         else:
-          partial_target_return = 1.08
+          partial_target_return = 1.07
 
         if not subsequent_data.empty:
           # 매수 다음 거래일 조건 확인
