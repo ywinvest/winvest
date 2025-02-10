@@ -98,7 +98,7 @@ def process_stock(row):
         if diff_close_high_change >= 0.16:
           partial_target_return = 1.09
         elif diff_close_high_change > 0 and diff_close_high_change <= 0.02:
-          partial_target_return = 1.10
+          partial_target_return = 1.09
         else:
           partial_target_return = 1.08
 
