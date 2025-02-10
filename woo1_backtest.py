@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 import woo1
 
-PARTIAL_TARGET_RETURN = 1.08
+PARTIAL_TARGET_RETURN = 1.085
 FULL_TARTET_RETURN = 1.10
 
 # 매도 조건 함수들
@@ -95,12 +95,12 @@ def process_stock(row):
 
         partial_target_return = PARTIAL_TARGET_RETURN
 
-        if diff_close_high_change >= 0.16:
-          partial_target_return = 1.09
-        elif diff_close_high_change <= 0.02:
-          partial_target_return = 1.09
-        else:
-          partial_target_return = 1.07
+        # if diff_close_high_change >= 0.16:
+        #   partial_target_return = 1.09
+        # elif diff_close_high_change <= 0.02:
+        #   partial_target_return = 1.09
+        # else:
+        #   partial_target_return = 1.07
 
         if not subsequent_data.empty:
           # 매수 다음 거래일 조건 확인
