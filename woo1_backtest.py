@@ -167,17 +167,20 @@ def process_stock(row):
             target_open_sell = remaining_data[remaining_data['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
             target_high_sell = remaining_data[(remaining_data['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (remaining_data['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
             stop_loss = remaining_data[(remaining_data['Close'] < df.loc[buy_date, 'Open']) & (remaining_data['Close'] < remaining_data['MA20']) & ~remaining_data['Bullish']]
+            ma20_break = remaining_data[remaining_data['Close'] < remaining_data['MA20']]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
             open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
             high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
             stop_loss_date = stop_loss.index[0] if not stop_loss.empty else None
+            ma20_break_date = ma20_break.index[0] if not ma20_break.empty else None
 
             # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
             valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
                           [(d, 'high') for d in [high_sell_date] if d is not None] + \
                           [(d, 'stop') for d in [stop_loss_date] if d is not None] + \
-                          [(d, 'max_hold') for d in [max_hold_date] if d is not None]
+                          [(d, 'max_hold') for d in [max_hold_date] if d is not None] + \
+                          [(d, 'ma20_break') for d in [ma20_break_date] if d is not None]
 
             if valid_dates:
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
@@ -196,6 +199,36 @@ def process_stock(row):
                 partial_sell_price = remaining_data.loc[earliest_date, 'Close']
                 full_sell_date = earliest_date
                 full_sell_price = remaining_data.loc[earliest_date, 'Close']
+              elif condition == 'ma20_break':
+                remaining_data2 = subsequent_data.loc[ma20_break_date + timedelta(days=1):]
+                open_sell = remaining_data2[remaining_data2['Open'] >= buy_price]
+                high_sell = remaining_data2[(remaining_data2['Open'] < buy_price) & (remaining_data2['High'] >= buy_price)]
+                open_sell_date = open_sell.index[0] if not open_sell.empty else None
+                high_sell_date = high_sell.index[0] if not high_sell.empty else None
+
+                valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
+                              [(d, 'high') for d in [high_sell_date] if d is not None] + \
+                              [(d, 'stop') for d in [stop_loss_date] if d is not None] + \
+                              [(d, 'max_hold') for d in [max_hold_date] if d is not None]
+                if valid_dates:
+                  earliest_date, condition = min(valid_dates, key=lambda x: x[0])
+
+                  if condition == 'open':
+                    partial_sell_date = earliest_date
+                    partial_sell_price = remaining_data2.loc[earliest_date, 'Open']
+                  elif condition == 'high':
+                    partial_sell_date = earliest_date
+                    partial_sell_price = buy_price
+                  elif condition == 'max_hold':
+                    partial_sell_date = earliest_date
+                    partial_sell_price = remaining_data2.loc[earliest_date, 'Close']
+                    full_sell_date = earliest_date
+                    full_sell_price = remaining_data2.loc[earliest_date, 'Close']
+                  elif condition == 'stop':
+                    partial_sell_date = earliest_date
+                    partial_sell_price = remaining_data2.loc[earliest_date, 'Close']
+                    full_sell_date = earliest_date
+                    full_sell_price = remaining_data2.loc[earliest_date, 'Close']
               else:  # condition == 'stop'
                 # 손절 시 종가에 전량 매도
                 partial_sell_date = earliest_date
