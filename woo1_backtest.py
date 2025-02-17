@@ -58,6 +58,151 @@ def parallel_process_stocks(all_stocks):
   return pd.concat(results) if results else pd.DataFrame()
 
 def process_stock(row):
+  ticker = row['Code']
+  name = row['Name']
+  marcap = row['Marcap']
+  market = row['Market']
+  try:
+    # 종목 데이터 가져오기
+    df = fdr.DataReader(ticker, "2004")
+    df = woo1.calculate_indicators(df)
+
+    # 매수 조건에 해당하는 데이터 필터링
+    buys = df[woo1.buy_condition(df)]
+    buys = buys[~buys.index.year.isin([2004])]  # 2004년 데이터 제외
+
+    if not buys.empty:
+      for buy_date in buys.index:
+        df['Buy'] = buys.loc[buy_date, 'Close']
+        subsequent_data = df.loc[buy_date + timedelta(days=1):]
+
+        buy_price = df.loc[buy_date, 'Buy']
+
+        partial_sell_date = None
+        full_sell_date = None
+        partial_sell_price = None
+        full_sell_price = None
+
+        if not subsequent_data.empty:
+          # 매수 다음 거래일 조건 확인
+          next_day = subsequent_data.iloc[0]
+          next_date = next_day.name
+
+          # 시가가 PARTIAL_TARGET_RETURN 이상 형성되면 시가에 부분매도 및 전량매도
+          if next_day['Open'] >= buy_price * PARTIAL_TARGET_RETURN:
+            partial_sell_date = next_date
+            partial_sell_price = next_day['Open']
+            full_sell_date = next_date
+            full_sell_price = next_day['Open']
+
+          # 시가에 매도 실패 시
+          if not partial_sell_date and not full_sell_date:
+            # 고가가 PARTIAL_TARGET_RETURN 이상이면 PARTIAL_TARGET_RETURN 에 부분매도
+            if next_day['High'] >= buy_price * PARTIAL_TARGET_RETURN:
+              partial_sell_date = next_date
+              partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              full_sell_date = next_date
+              full_sell_price = buy_price * PARTIAL_TARGET_RETURN
+
+          # 첫날 매도 실패 시
+          if not partial_sell_date and not full_sell_date:
+            remaining_data = subsequent_data.loc[next_date + timedelta(days=1):]
+
+            # 매수일로부터 22일 후의 날짜 계산
+            max_hold_date = None
+            trading_days = 0
+            for date in remaining_data.index:
+              trading_days += 1
+              if trading_days >= 21:
+                max_hold_date = date
+                break
+
+            # 각 조건이 처음 발생하는 날짜 찾기
+            target_open_sell = remaining_data[remaining_data['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
+            target_high_sell = remaining_data[(remaining_data['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (remaining_data['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
+            stop_loss = remaining_data[(remaining_data['Close'] < df.loc[buy_date, 'Open']) & (remaining_data['Close'] < remaining_data['MA20'])]
+
+            # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
+            open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
+            high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
+            stop_loss_date = stop_loss.index[0] if not stop_loss.empty else None
+
+            # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
+            valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
+                          [(d, 'high') for d in [high_sell_date] if d is not None] + \
+                          [(d, 'stop') for d in [stop_loss_date] if d is not None] + \
+                          [(d, 'max_hold') for d in [max_hold_date] if d is not None]
+
+            if valid_dates:
+              earliest_date, condition = min(valid_dates, key=lambda x: x[0])
+
+              if condition == 'open':
+                # 시가 5% 이상 시 시가에 부분매도
+                partial_sell_date = earliest_date
+                partial_sell_price = remaining_data.loc[earliest_date, 'Open']
+                full_sell_date = earliest_date
+                full_sell_price = remaining_data.loc[earliest_date, 'Open']
+              elif condition == 'high':
+                # 고가 5% 이상 시 5%에 부분매도
+                partial_sell_date = earliest_date
+                partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+                full_sell_date = earliest_date
+                full_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              elif condition == 'max_hold':
+                # 25일 보유 제한에 도달 시 전량 매도
+                partial_sell_date = earliest_date
+                partial_sell_price = remaining_data.loc[earliest_date, 'Close']
+                full_sell_date = earliest_date
+                full_sell_price = remaining_data.loc[earliest_date, 'Close']
+              else:  # condition == 'stop'
+                # 손절 시 종가에 전량 매도
+                partial_sell_date = earliest_date
+                partial_sell_price = remaining_data.loc[earliest_date, 'Close']
+                full_sell_date = earliest_date
+                full_sell_price = remaining_data.loc[earliest_date, 'Close']
+            else:
+              print(f"{name} no sell condition met. {buy_date}, {buy_price}")
+        else:
+          print(f"{name} buy in {buy_date}")
+        # 매도 정보를 해당 행에 추가
+        buys.loc[buy_date, 'Ticker'] = ticker
+        buys.loc[buy_date, 'Name'] = name
+        buys.loc[buy_date, 'Marcap'] = marcap
+        buys.loc[buy_date, 'Buy_Date'] = buy_date
+        buys.loc[buy_date, 'Buy_Price'] = buy_price
+        buys.loc[buy_date, 'Partial_Sell_Date'] = partial_sell_date
+        buys.loc[buy_date, 'Partial_Sell_Price'] = partial_sell_price
+        buys.loc[buy_date, 'Full_Sell_Date'] = full_sell_date
+        buys.loc[buy_date, 'Full_Sell_Price'] = full_sell_price
+
+        # 보유기간 계산 (영업일 기준)
+        if partial_sell_date:
+          buys.loc[buy_date, 'Partial_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
+          # 부분매도 수익률 계산 (%)
+          buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
+          if market == 'KOSPI':
+            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
+          elif market == 'KOSDAQ':
+            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[partial_sell_date, 'RSI']
+        else:
+          buys.loc[buy_date, 'Partial_Holding_Days'] = None
+          buys.loc[buy_date, 'Partial_Return'] = None
+          buys.loc[buy_date, 'Index_RSI'] = None
+
+        if full_sell_date:
+          buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, full_sell_date)
+          # 전량매도 수익률 계산 (%)
+          buys.loc[buy_date, 'Full_Return'] = ((full_sell_price / buy_price) - 1)
+        else:
+          buys.loc[buy_date, 'Full_Holding_Days'] = None
+          buys.loc[buy_date, 'Full_Return'] = None
+      return buys
+    return None
+  except Exception as e:
+    print(f"Error processing {ticker}: {e}")
+    return None
+
+def process_stock_complex(row):
   ticker = None
   if hasattr(row, 'Code'):
     ticker = row['Code']
