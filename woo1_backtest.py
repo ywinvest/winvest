@@ -120,7 +120,7 @@ def process_stock(row):
             # 각 조건이 처음 발생하는 날짜 찾기
             target_open_sell = remaining_data[remaining_data['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
             target_high_sell = remaining_data[(remaining_data['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (remaining_data['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
-            stop_loss = remaining_data[(remaining_data['Close'] < df.loc[buy_date, 'Open']) & (remaining_data['Close'] < remaining_data['MA20'])]
+            stop_loss = remaining_data[(remaining_data['Close'] < df.loc[buy_date, 'Open']) & (remaining_data['Close'] < remaining_data['MA20']) & ~remaining_data['Bullish']]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
             open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
