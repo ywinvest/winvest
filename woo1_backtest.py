@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 import woo1
 
-PARTIAL_TARGET_RETURN = 1.08
+PARTIAL_TARGET_RETURN = 1.085
 FULL_TARTET_RETURN = 1.10
 
 # 매도 조건 함수들
