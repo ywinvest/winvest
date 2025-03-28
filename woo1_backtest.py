@@ -211,8 +211,10 @@ def process_stock(row):
         # 보유기간 계산 (영업일 기준)
         if partial_sell_date:
           buys.loc[buy_date, 'Partial_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
+          buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
+          buys.loc[buy_date, 'Full_Return'] = ((partial_sell_price / buy_price) - 1)
           if market == 'KOSPI':
             buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
           elif market == 'KOSDAQ':
@@ -220,15 +222,10 @@ def process_stock(row):
         else:
           buys.loc[buy_date, 'Partial_Holding_Days'] = None
           buys.loc[buy_date, 'Partial_Return'] = None
-          buys.loc[buy_date, 'Index_RSI'] = None
-
-        if full_sell_date:
-          buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
-          # 전량매도 수익률 계산 (%)
-          buys.loc[buy_date, 'Full_Return'] = ((full_sell_price / buy_price) - 1)
-        else:
           buys.loc[buy_date, 'Full_Holding_Days'] = None
           buys.loc[buy_date, 'Full_Return'] = None
+          buys.loc[buy_date, 'Index_RSI'] = None
+
       return buys
     return None
   except Exception as e:
