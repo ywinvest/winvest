@@ -192,7 +192,7 @@ def process_stock(row):
             #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
 
         if not partial_sell_date:
-          final_data = df.loc[buy_date + timedelta(days=22)]
+          final_data = df.loc[buy_date + timedelta(days=22):]
           if not final_data.empty:
             final_date = final_data.index[0] if not final_data.empty else None
 
