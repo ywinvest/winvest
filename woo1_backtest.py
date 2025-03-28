@@ -190,12 +190,16 @@ def process_stock(row):
                 partial_sell_price = data_6_22.loc[earliest_date, 'Close']
             # else:
             #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
+
         if not partial_sell_date:
           final_data = df.loc[buy_date + timedelta(days=22)]
-          final_date = final_data.index[0] if not final_data.empty else None
+          if not final_data.empty:
+            final_date = final_data.index[0] if not final_data.empty else None
 
-          partial_sell_date = final_date
-          partial_sell_price = final_data.loc[final_date, 'Close']
+            partial_sell_date = final_date
+            partial_sell_price = final_data.loc[final_date, 'Close']
+          else:
+            print(f"{name} no sell condition met. {buy_date}, {buy_price}")
 
         # 매도 정보를 해당 행에 추가
         buys.loc[buy_date, 'Ticker'] = ticker
@@ -211,9 +215,8 @@ def process_stock(row):
         # 보유기간 계산 (영업일 기준)
         if partial_sell_date:
           buys.loc[buy_date, 'Partial_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
-          buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
-          # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
+          buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           buys.loc[buy_date, 'Full_Return'] = ((partial_sell_price / buy_price) - 1)
           if market == 'KOSPI':
             buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
