@@ -141,7 +141,7 @@ def process_stock(row):
 
         # 6~22일차 (T+6~T+22)
         if not partial_sell_date:
-          data_6_22 = df.iloc[buy_date_idx + 6:buy_date_idx + 22]
+          data_6_22 = df.iloc[buy_date_idx + 6:buy_date_idx + 23]
 
           if not data_6_22.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
