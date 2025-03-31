@@ -104,7 +104,7 @@ def process_stock(row):
 
         # 2~22일차 (T+2~T+22)
         if not partial_sell_date:
-          data_2_22 = df.iloc[buy_date_idx + 2:buy_date_idx + 22]
+          data_2_22 = df.iloc[buy_date_idx + 2:buy_date_idx + 23]
 
           if not data_2_22.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
@@ -121,21 +121,17 @@ def process_stock(row):
             valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
                           [(d, 'high') for d in [high_sell_date] if d is not None] + \
                           [(d, 'stop') for d in [stop_loss_date] if d is not None]
-                          # [(d, 'max_hold') for d in [max_hold_date] if d is not None]
 
             if valid_dates:
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
 
               if condition == 'open':
-                # 시가 5% 이상 시 시가에 부분매도
                 partial_sell_date = earliest_date
                 partial_sell_price = data_2_22.loc[earliest_date, 'Open']
               elif condition == 'high':
-                # 고가 5% 이상 시 5%에 부분매도
                 partial_sell_date = earliest_date
                 partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
               else:  # condition == 'stop'
-                # 손절 시 종가에 전량 매도
                 partial_sell_date = earliest_date
                 partial_sell_price = data_2_22.loc[earliest_date, 'Close']
 
