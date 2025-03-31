@@ -102,15 +102,15 @@ def process_stock(row):
         else:
           print(f"{name} buy in {buy_date}")
 
-        # 2~22일차 (T+2~T+22)
+        # 2~5일차 (T+2~T+5)
         if not partial_sell_date:
-          data_2_22 = df.iloc[buy_date_idx + 2:buy_date_idx + 22]
+          data_2_5 = df.iloc[buy_date_idx + 2:buy_date_idx + 5]
 
-          if not data_2_22.empty:
+          if not data_2_5.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
-            target_open_sell = data_2_22[data_2_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
-            target_high_sell = data_2_22[(data_2_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_2_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
-            stop_loss = data_2_22[(data_2_22['Close'] < df.loc[buy_date, 'Open']) & (data_2_22['Close'] < data_2_22['MA20']) & ~data_2_22['Bullish']]
+            target_open_sell = data_2_5[data_2_5['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
+            target_high_sell = data_2_5[(data_2_5['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_2_5['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
+            stop_loss = data_2_5[(data_2_5['Close'] < df.loc[buy_date, 'Open']) & (data_2_5['Close'] < data_2_5['MA20']) & ~data_2_5['Bullish']]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
             open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
@@ -129,7 +129,7 @@ def process_stock(row):
               if condition == 'open':
                 # 시가 5% 이상 시 시가에 부분매도
                 partial_sell_date = earliest_date
-                partial_sell_price = data_2_22.loc[earliest_date, 'Open']
+                partial_sell_price = data_2_5.loc[earliest_date, 'Open']
               elif condition == 'high':
                 # 고가 5% 이상 시 5%에 부분매도
                 partial_sell_date = earliest_date
@@ -137,7 +137,44 @@ def process_stock(row):
               else:  # condition == 'stop'
                 # 손절 시 종가에 전량 매도
                 partial_sell_date = earliest_date
-                partial_sell_price = data_2_22.loc[earliest_date, 'Close']
+                partial_sell_price = data_2_5.loc[earliest_date, 'Close']
+
+        # 6~22일차 (T+6~T+22)
+        if not partial_sell_date:
+          data_6_22 = df.iloc[buy_date_idx + 6:buy_date_idx + 22]
+
+          if not data_6_22.empty:
+            # 각 조건이 처음 발생하는 날짜 찾기
+            target_open_sell = data_6_22[data_6_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
+            target_high_sell = data_6_22[(data_6_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_6_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
+            stop_loss = data_6_22[(data_6_22['Close'] < df.loc[buy_date, 'Open']) & (data_6_22['Close'] < data_6_22['MA20']) & ~data_6_22['Bullish']]
+
+            # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
+            open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
+            high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
+            stop_loss_date = stop_loss.index[0] if not stop_loss.empty else None
+
+            # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
+            valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
+                          [(d, 'high') for d in [high_sell_date] if d is not None] + \
+                          [(d, 'stop') for d in [stop_loss_date] if d is not None]
+            # [(d, 'max_hold') for d in [max_hold_date] if d is not None]
+
+            if valid_dates:
+              earliest_date, condition = min(valid_dates, key=lambda x: x[0])
+
+              if condition == 'open':
+                # 시가 5% 이상 시 시가에 부분매도
+                partial_sell_date = earliest_date
+                partial_sell_price = data_6_22.loc[earliest_date, 'Open']
+              elif condition == 'high':
+                # 고가 5% 이상 시 5%에 부분매도
+                partial_sell_date = earliest_date
+                partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              else:  # condition == 'stop'
+                # 손절 시 종가에 전량 매도
+                partial_sell_date = earliest_date
+                partial_sell_price = data_6_22.loc[earliest_date, 'Close']
 
         # 22일차 (T+22)
         if not partial_sell_date:
