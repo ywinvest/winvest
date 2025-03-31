@@ -104,7 +104,7 @@ def process_stock(row):
 
         # 2~5일차 (T+2~T+5)
         if not partial_sell_date:
-          data_2_5 = df.iloc[buy_date_idx + 2:buy_date_idx + 5]
+          data_2_5 = df.iloc[buy_date_idx + 2:buy_date_idx + 6]
 
           if not data_2_5.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
