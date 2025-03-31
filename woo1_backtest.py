@@ -143,7 +143,7 @@ def process_stock(row):
         if buy_date_idx + 5 < len(df):
           day5_close = df.iloc[buy_date_idx + 5]['Close']
           if day5_close < buy_price:
-            adjusted_partial_target = buy_price
+            adjusted_partial_target = buy_price * 1.04
           else:
             adjusted_partial_target = buy_price * PARTIAL_TARGET_RETURN
         else:
