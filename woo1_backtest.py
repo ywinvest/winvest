@@ -139,14 +139,24 @@ def process_stock(row):
                 partial_sell_date = earliest_date
                 partial_sell_price = data_2_5.loc[earliest_date, 'Close']
 
+        # 목표 수익률 조정
+        if buy_date_idx + 5 < len(df):
+          day5_close = df.iloc[buy_date_idx + 5]['Close']
+          if day5_close < buy_price:
+            adjusted_partial_target = buy_price
+          else:
+            adjusted_partial_target = buy_price * PARTIAL_TARGET_RETURN
+        else:
+          adjusted_partial_target = buy_price * PARTIAL_TARGET_RETURN
+
         # 6~22일차 (T+6~T+22)
         if not partial_sell_date:
           data_6_22 = df.iloc[buy_date_idx + 6:buy_date_idx + 23]
 
           if not data_6_22.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
-            target_open_sell = data_6_22[data_6_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
-            target_high_sell = data_6_22[(data_6_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_6_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
+            target_open_sell = data_6_22[data_6_22['Open'] >= buy_price * adjusted_partial_target]
+            target_high_sell = data_6_22[(data_6_22['Open'] < buy_price * adjusted_partial_target) & (data_6_22['High'] >= buy_price * adjusted_partial_target)]
             stop_loss = data_6_22[(data_6_22['Close'] < df.loc[buy_date, 'Open']) & (data_6_22['Close'] < data_6_22['MA20']) & ~data_6_22['Bullish']]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
@@ -170,7 +180,7 @@ def process_stock(row):
               elif condition == 'high':
                 # 고가 5% 이상 시 5%에 부분매도
                 partial_sell_date = earliest_date
-                partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+                partial_sell_price = buy_price * adjusted_partial_target
               else:  # condition == 'stop'
                 # 손절 시 종가에 전량 매도
                 partial_sell_date = earliest_date
