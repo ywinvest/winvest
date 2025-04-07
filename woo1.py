@@ -25,7 +25,7 @@ def calculate_indicators(df):
   df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
   df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
-  df['52WeekLow'] = df['Low'].rolling(window=364, min_periods=1).min()
+  df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
   return df
 
 def filter_common_stocks(df):
