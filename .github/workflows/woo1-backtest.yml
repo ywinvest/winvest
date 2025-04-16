@@ -36,8 +36,14 @@ jobs:
         pip install -r requirements.txt
 
     - name: Run python script
-      env:
-        RELEASE_API_URL: ${{ vars.RELEASE_API_URL }}
-        RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+#      env:
+#        RELEASE_API_URL: ${{ vars.RELEASE_API_URL }}
+#        RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
         python woo1_backtest.py
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: woo1_backtest_result
+        path: ./woo1_backtest_result.csv
