@@ -41,3 +41,9 @@ jobs:
         RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
         python woo1_backtest.py
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: woo1_backtest_result
+        path: ./woo1_backtest_result.csv

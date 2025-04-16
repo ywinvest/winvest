@@ -1,0 +1,32 @@
+{
+  "slack_webhook_url": "https://hooks.slack.com/services/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",
+  "korea": {
+    "name": "Korea Market",
+    "icon": ":kr:",
+    "tickers": {
+      "^KS11": "KOSPI",
+      "^KQ11": "KOSDAQ",
+      "^KS200": "KOSPI200",
+      "091160.KS": "KODEX 반도체",
+      "305720.KS": "KODEX 2차전지",
+      "244580.KS": "KODEX 바이오"
+    }
+  },
+  "global": {
+    "name": "Global Market",
+    "icon": ":earth_americas:",
+    "tickers": {
+      "^IXIC": "NASDAQ",
+      "^DJI": "DOW",
+      "^GSPC": "S&P500",
+      "DX-Y.NYB": "Dollar Index",
+      "^TNX": "US 10-Year Treasury",
+      "GC=F": "Gold",
+      "BTC-USD": "Bitcoin",
+      "SCHD": "SCHD",
+      "QQQ": "QQQ",
+      "QLD": "QLD",
+      "SPY": "SPY"
+    }
+  }
+}
