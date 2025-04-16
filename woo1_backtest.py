@@ -485,9 +485,9 @@ if __name__ == "__main__":
     result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
 
     # 업로드 파일 경로
-    release_tag = f"woo1-{datetime.now().strftime("%Y%m%d")}"
+    # release_tag = f"woo1-{datetime.now().strftime("%Y%m%d")}"
     # 파일 업로드 실행
-    upload_to_github_releases(result_file, release_tag)
+    # upload_to_github_releases(result_file, release_tag)
   except Exception as e:
     print(f"Error in main execution: {e}")
 
