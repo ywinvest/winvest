@@ -3,31 +3,33 @@ name: woo1 - Send signal
 on:
   workflow_dispatch:
   schedule:
-  # 매주 월~금 오후 3:10 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
-  - cron: "10 6 * * 1-5"  # 오후 3:10 (UTC+9)
+  # 매주 월~금 오후 3:05 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
+  - cron: "05 6 * * 1-5"  # 오후 3:10 (UTC+9)
 
 jobs:
   run-python:
     runs-on: ubuntu-latest
 
     steps:
-    # Python 설치
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
-
     # 레포지토리 클론
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
+    # Python 설치
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+        python-version: "3.x"
+        cache: "pip"
+        cache-dependency-path: "requirements.txt"
+
+    # - name: Cache pip dependencies
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: ~/.cache/pip
+    #     key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+    #     restore-keys: |
+    #       ${{ runner.os }}-pip-
 
     # 의존성 설치
     - name: Install dependencies
