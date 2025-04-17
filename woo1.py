@@ -1,7 +1,7 @@
 import concurrent.futures
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 
 import FinanceDataReader as fdr
@@ -174,14 +174,14 @@ def send_to_slack(result_data):
   except Exception as e:
     print(f"Error sending Slack message: {e}")
 
-def process_stock(row, two_years_ago, today):
+def process_stock(row, start, today):
   try:
     ticker = row['Code']
     name = row['Name']
     marcap = row['Marcap']
     market = row['Market']
 
-    df = fdr.DataReader(ticker, two_years_ago)
+    df = fdr.DataReader(ticker, start)
     df = calculate_indicators(df)
 
     buys = df[buy_condition(df)]
@@ -198,8 +198,8 @@ def process_stock(row, two_years_ago, today):
     print(f"Error processing {ticker}: {e}")
     return None
 
-def parallel_process_stocks(all_stocks, two_years_ago, today):
-  process_func = partial(process_stock, two_years_ago=two_years_ago, today=today)
+def parallel_process_stocks(all_stocks, start, today):
+  process_func = partial(process_stock, start=start, today=today)
   results = []
 
   with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -226,10 +226,11 @@ if __name__ == "__main__":
 
     # 날짜 설정
     today = datetime.today()
-    two_years_ago = today.year - 2
+    start = today - timedelta(days=365)
+    # two_years_ago = today.year - 2
 
     # 병렬 처리로 데이터 분석
-    result_data = parallel_process_stocks(all_stocks, two_years_ago, today)
+    result_data = parallel_process_stocks(all_stocks, start, today)
 
     # Slack 메시지 전송
     send_to_slack(result_data)
