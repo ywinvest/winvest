@@ -17,13 +17,13 @@ def backtest(data, ticker, buy_condition):
   """Perform backtest with the specified buy and sell conditions."""
   df = indicators.calculate_indicators(data.copy())
 
-  buys = df[buy_condition(df)].index
+  buys = df[buy_condition(df)]
 
   returns = []
   holding_periods = []
   buy_count = len(buys)
 
-  for buy_date in buys:
+  for buy_date in buys.index:
     position = df.loc[buy_date, 'Close']
     df.loc[buy_date, 'Action'] = 'Buy'
 
@@ -58,9 +58,9 @@ if __name__ == "__main__":
   today = datetime.today()
   ten_years_ago = today.year - 10
 
-    # 오늘 날짜와 10년 전 날짜를 'YYYY-MM-DD' 형식으로 계산
+  # 오늘 날짜와 10년 전 날짜를 'YYYY-MM-DD' 형식으로 계산
   end_date = datetime.today()
-  start_date = end_date - timedelta(days=10*365) # 근사치로 10년 계산
+  start_date = end_date - timedelta(days=10 * 365)  # 근사치로 10년 계산
 
   # 날짜를 문자열 형식으로 변환
   end_date_str = end_date.strftime('%Y-%m-%d')
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
   for ticker, name in tickers.items():
     print(f"Processing {ticker} ({name})...")
-    data = fdr.DataReader(ticker, start=start_date_str, end=end_date_str, data_source='yahoo')
+    data = fdr.DataReader(ticker, start=start_date_str, end=end_date_str)
     # data = fdr.DataReader(ticker)
 
     if data.empty:
@@ -80,13 +80,13 @@ if __name__ == "__main__":
         buy_condition
     )
 
-    results[ticker] = {
+    results[name] = {
       "Average Return": avg_return * 100,
       "Average Holding Period": avg_holding_period,
       "Buy Count": buy_count
     }
 
   print("\nBacktest Results:")
-  for ticker, metrics in results.items():
+  for name, metrics in results.items():
     print(
-      f"{ticker}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
+      f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")

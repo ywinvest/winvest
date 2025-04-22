@@ -8,15 +8,15 @@ import indicators
 
 
 def buy_condition(df):
-  """Buy condition for KOSPI and KOSDAQ."""
+  """Buy condition for korea indicies."""
   return (df['RSI'] <= 30) & (~df['Bullish']) & (df['Change_Rate'] < 0)
 
 def sell_condition_partial(df):
-  """Partial sell condition for KOSPI and KOSDAQ."""
+  """Partial sell condition for korea indicies."""
   return df['MA_10_Cross']
 
 def sell_condition_full(df):
-  """Full sell condition for KOSPI and KOSDAQ."""
+  """Full sell condition for korea indicies."""
   return df['MA_20_Cross'] | df['MA_10_Break']
 
 def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition_full):
@@ -92,12 +92,14 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       holding_periods.append((sell_date_full - buy_date).days)
 
   avg_return = sum(returns) / len(returns) if returns else 0
-  avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
+  avg_holding_period = sum(holding_periods) / len(
+    holding_periods) if holding_periods else 0
 
   # Save details to CSV
   df.to_csv(f'{ticker}_backtest_results.csv')
 
   return avg_return, avg_holding_period, buy_count
+
 
 if __name__ == "__main__":
   with open('config-woo2.json', 'r') as config_file:
@@ -112,7 +114,7 @@ if __name__ == "__main__":
 
   # 오늘 날짜와 10년 전 날짜를 'YYYY-MM-DD' 형식으로 계산
   end_date = datetime.today()
-  start_date = end_date - timedelta(days=30*365) # 근사치로 10년 계산
+  start_date = end_date - timedelta(days=30 * 365)  # 근사치로 10년 계산
 
   # 날짜를 문자열 형식으로 변환
   end_date_str = end_date.strftime('%Y-%m-%d')
@@ -142,4 +144,5 @@ if __name__ == "__main__":
 
   print("\nBacktest Results:")
   for name, metrics in results.items():
-    print(f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
+    print(
+      f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
