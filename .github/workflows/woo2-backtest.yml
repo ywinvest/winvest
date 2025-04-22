@@ -41,5 +41,5 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: woo2_backtest_result
+        name: woo2_backtest_results
         path: ./*_backtest_results.csv
