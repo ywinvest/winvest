@@ -1,0 +1,21 @@
+{
+  "slack_webhook_url": "https://hooks.slack.com/services/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",
+  "slack_bot_token": "xoxb-8158672641796-8339694859364-pyNvtyNOGH7zcRKX30tWefh9",
+  "slack_channel": "rsi",
+  "korea": {
+    "name": "Korea Market",
+    "icon": ":kr:",
+    "tickers": {
+      "KS11": "KOSPI",
+      "KQ11": "KOSDAQ",
+      "KS200": "KOSPI200"
+    }
+  },
+  "global": {
+    "name": "Global Market",
+    "icon": ":earth_americas:",
+    "tickers": {
+      "IXIC": "NASDAQ"
+    }
+  }
+}

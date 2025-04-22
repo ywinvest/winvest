@@ -127,7 +127,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
   return avg_return, avg_holding_period, buy_count
 
 if __name__ == "__main__":
-  with open('backup/config.json', 'r') as config_file:
+  with open('config-woo2.json', 'r') as config_file:
     config = json.load(config_file)
 
   tickers = config["global"]["tickers"]
