@@ -68,8 +68,8 @@ if __name__ == "__main__":
 
   for ticker, name in tickers.items():
     print(f"Processing {ticker} ({name})...")
-    data = fdr.DataReader(ticker, start=start_date_str, end=end_date_str)
-    # data = fdr.DataReader(ticker)
+    # data = fdr.DataReader(ticker, start=start_date_str, end=end_date_str)
+    data = fdr.DataReader(ticker)
 
     if data.empty:
       print(f"No data found for {ticker}, skipping.")

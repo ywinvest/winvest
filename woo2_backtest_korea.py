@@ -39,6 +39,8 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     position = df.loc[buy_date, 'Close']
     df.loc[buy_date, 'Action'] = 'Buy'
 
+    position_size = 1  # 그 외의 경우 1배
+
     # Subset the data to look forward from the buy date
     subsequent_data = df.loc[buy_date:]
 
@@ -79,14 +81,16 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     if sell_date_partial:
       df.loc[sell_date_partial, 'Action'] = 'Partial Sell'
-      partial_return = (df.loc[sell_date_partial, 'Close'] / position - 1)
+      partial_price = df.loc[sell_date_partial, 'Close']
+      partial_return = (partial_price / position - 1) * position_size
       df.loc[buy_date, 'Partial Return'] = partial_return
       returns.append(partial_return)
       holding_periods.append((sell_date_partial - buy_date).days)
 
     if sell_date_full:
       df.loc[sell_date_full, 'Action'] = 'Full Sell'
-      full_return = (df.loc[sell_date_full, 'Close'] / position - 1)
+      full_price = df.loc[sell_date_full, 'Close']
+      full_return = (full_price / position - 1) * position_size
       df.loc[buy_date, 'Full Return'] = full_return
       returns.append(full_return)
       holding_periods.append((sell_date_full - buy_date).days)
