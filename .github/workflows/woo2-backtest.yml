@@ -1,0 +1,45 @@
+name: woo2 - Backtest
+
+on:
+  workflow_dispatch:
+  schedule:
+  # 매주 월~금 오후 5:30 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
+  - cron: "30 8 * * 1-5"  # 오후 5:30 (UTC+9)
+
+jobs:
+  run-python:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 레포지토리 클론
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # Python 설치
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+        cache: "pip"
+        cache-dependency-path: "requirements.txt"
+
+    # 의존성 설치
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run python script
+#      env:
+#        RELEASE_API_URL: ${{ vars.RELEASE_API_URL }}
+#        RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      run: |
+        python woo2_backtest_global.py
+        python woo2_backtest_global_short_term.py
+        python woo2_backtest_korea.py
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: woo2_backtest_result
+        path: ./*_backtest_result.csv
