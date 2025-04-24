@@ -37,6 +37,7 @@ jobs:
         python woo2_backtest_global.py
         python woo2_backtest_global_short_term.py
         python woo2_backtest_korea.py
+        python woo2_backtest_korea_inverse.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
