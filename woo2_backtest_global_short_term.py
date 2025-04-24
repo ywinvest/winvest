@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
@@ -122,8 +123,10 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
   avg_holding_period = sum(holding_periods) / len(
     holding_periods) if holding_periods else 0
 
-  # Save details to CSV
-  df.to_csv(f'global/buy-and-sell/{ticker}_backtest_results.csv')
+  output_dir = 'global/buy-and-sell'
+  os.makedirs(output_dir, exist_ok=True)
+
+  df.to_csv(os.path.join(output_dir, f'{ticker}_backtest_results.csv'))
 
   return avg_return, avg_holding_period, buy_count
 
