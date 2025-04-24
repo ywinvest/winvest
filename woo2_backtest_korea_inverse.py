@@ -9,15 +9,15 @@ import indicators
 
 def buy_condition(df):
   """Buy condition for korea indicies."""
-  return (df['RSI'] <= 30) & (~df['Bullish']) & (df['Change_Rate'] < 0)
+  return (df['RSI'] > 70) & (df['Bullish']) & (df['Change_Rate'] > 0)
 
 def sell_condition_partial(df):
   """Partial sell condition for korea indicies."""
-  return df['MA_10_Cross']
+  return df['MA_10_Break']
 
 def sell_condition_full(df):
   """Full sell condition for korea indicies."""
-  return df['MA_20_Cross'] | df['MA_10_Break']
+  return df['MA_20_Break'] | df['MA_10_Cross']
 
 def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition_full):
   """Perform backtest with the specified buy and sell conditions."""
@@ -100,7 +100,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     holding_periods) if holding_periods else 0
 
   # Save details to CSV
-  df.to_csv(f'korea/buy-and-sell/{ticker}_backtest_results.csv')
+  df.to_csv(f'korea/buy-and-sell/inverse/{ticker}_backtest_results.csv')
 
   return avg_return, avg_holding_period, buy_count
 

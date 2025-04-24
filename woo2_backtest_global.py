@@ -42,7 +42,7 @@ def backtest(data, ticker, buy_condition):
     holding_periods) if holding_periods else 0
 
   # Save details to CSV
-  df.to_csv(f'{ticker}_backtest_results.csv')
+  df.to_csv(f'global/buy-and-hold/{ticker}_backtest_results.csv')
 
   return avg_return, avg_holding_period, buy_count
 
