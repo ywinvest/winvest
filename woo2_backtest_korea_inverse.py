@@ -56,18 +56,18 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     if sell_date_partial:
       group_data = subsequent_data.loc[:sell_date_partial]
       consecutive_buys = len(group_data[buy_condition(group_data)])
-      if consecutive_buys >= 3:
-        current_buy_group_flag = True
+      # if consecutive_buys >= 3:
+      #   current_buy_group_flag = True
       df.loc[buy_date, 'Consecutive Buys'] = consecutive_buys
 
 
     # Adjust sell conditions based on the flag
-    if current_buy_group_flag:
-      sell_condition_partial = lambda df: df['MA_20_Cross']
-      sell_condition_full = lambda df: df['MA_20_Cross']
-    else:
-      sell_condition_partial = lambda df: df['MA_10_Cross']
-      sell_condition_full = lambda df: df['MA_20_Cross'] | df['MA_10_Break']
+    # if current_buy_group_flag:
+    #   sell_condition_partial = lambda df: df['MA_20_Cross']
+    #   sell_condition_full = lambda df: df['MA_20_Cross']
+    # else:
+    #   sell_condition_partial = lambda df: df['MA_10_Cross']
+    #   sell_condition_full = lambda df: df['MA_20_Cross'] | df['MA_10_Break']
 
     # Calculate partial sell dates
     sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
