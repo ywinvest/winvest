@@ -29,9 +29,13 @@ def calculate_indicators(df):
   return df
 
 def filter_common_stocks(df):
-  # ETN, ETF, 리츠, 선박펀드, 우선주, 스팩 제외
-  exclude_pattern = r'ETN|ETF|리츠|선박펀드|우|2우|3우|우B|우C|스팩'
+  # ETN, ETF, 리츠, 선박펀드, 스팩 제외
+  exclude_pattern = r'ETN|ETF|리츠|선박펀드|스팩'
   return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
+            & (~df['Code'].str.endswith("5", na=False)) # 우선주
+            & (~df['Code'].str.endswith("7", na=False)) # 우선주
+            & (~df['Code'].str.endswith("K", na=False)) # 우선주
+            & (~df['Code'].str.endswith("L", na=False)) # 우선주
             # & (df['Name'].str.contains("나무기술", na=False, regex=True))
             ]
 
