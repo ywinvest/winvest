@@ -92,7 +92,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       holding_periods.append((sell_date_partial - buy_date).days)
 
       current_weight = df.loc[sell_date_partial, 'Weight']
-      df.loc[sell_date_partial:, 'Weight'] -= current_weight / 2
+      df.loc[sell_date_partial:, 'Weight'] = current_weight / 2
 
     if sell_date_full:
       df.loc[sell_date_full, 'Action'] = 'Full Sell'
