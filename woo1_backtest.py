@@ -163,7 +163,7 @@ def process_stock(row):
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
           if market == 'KOSPI':
-            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
+            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[buy_date, 'RSI']
           elif market == 'KOSDAQ':
             buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[partial_sell_date, 'RSI']
           buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
@@ -380,9 +380,9 @@ def process_stock_complex(row):
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
           if market == 'KOSPI':
-            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
+            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[buy_date, 'RSI']
           elif market == 'KOSDAQ':
-            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[partial_sell_date, 'RSI']
+            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[buy_date, 'RSI']
         else:
           buys.loc[buy_date, 'Partial_Holding_Days'] = None
           buys.loc[buy_date, 'Partial_Return'] = None
@@ -478,7 +478,7 @@ if __name__ == "__main__":
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
 
-    result_file = "woo1_backtest_result.csv"
+    result_file = "woo1_backtest_results.csv"
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks)
