@@ -28,6 +28,8 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
   """Perform backtest with the specified buy and sell conditions."""
   df = indicators.calculate_indicators(data.copy())
 
+  df['Weight'] = 0.0
+
   buys = df[buy_condition(df)]
 
   returns = []
@@ -62,6 +64,8 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       position_size = 2  # RSI 30 이하일 때 2배
     else:
       position_size = 1  # 그 외의 경우 1배
+
+    df.loc[buy_date:, 'Weight'] += position_size
 
     # Subset the data to look forward from the buy date
     subsequent_data = df.loc[buy_date:]
@@ -111,6 +115,9 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       returns.append(partial_return)
       holding_periods.append((sell_date_partial - buy_date).days)
 
+      current_weight = df.loc[sell_date_partial, 'Weight']
+      df.loc[sell_date_partial:, 'Weight'] = current_weight / 2
+
     if sell_date_full:
       df.loc[sell_date_full, 'Action'] = 'Full Sell'
       full_price = df.loc[sell_date_full, 'Close']
@@ -118,6 +125,9 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       df.loc[buy_date, 'Full Return'] = full_return
       returns.append(full_return)
       holding_periods.append((sell_date_full - buy_date).days)
+
+      current_weight = df.loc[sell_date_full, 'Weight']
+      df.loc[sell_date_full:, 'Weight'] -= current_weight
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(
