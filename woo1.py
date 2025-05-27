@@ -55,7 +55,7 @@ def buy_condition(df):
   conditions &= (df['Low'] != df['52WeekLow']) # 52주 신저가 경신 제외
   return conditions
 
-def create_rich_text_header(emoji, text):
+def create_rich_text_with_imoji(emoji, text, bold=True):
   return {
     "type": "rich_text_section",
     "elements": [
@@ -67,19 +67,22 @@ def create_rich_text_header(emoji, text):
         "type": "text",
         "text": text,
         "style": {
-          "bold": True
+          "bold": bold
         }
       }
     ]
   }
 
-def create_rich_text_item(text):
+def create_rich_text_item(text, bold=False):
   return {
     "type": "rich_text_section",
     "elements": [
       {
         "type": "text",
-        "text": text
+        "text": text,
+        "style": {
+          "bold": bold
+        }
       }
     ]
   }
@@ -139,12 +142,10 @@ def send_to_slack(result_data):
 
     # 시장별로 데이터 구성
     rich_text_elements = []
+    rich_text_elements.append(create_rich_text_item(
+        f" {today.year}년 {today.month}월 {today.day}일 매수 후보\n", True
+    ))
     for market, group in result_data.groupby('Market'):
-      rich_text_elements.append(create_rich_text_header(
-          "chart_with_upwards_trend", f" {today.year}년 {today.month}월 {today.day}일 {market} 매수 후보\n"
-      ))
-      # 리스트 아이템 추가
-      list_elements = []
       for _, row in group.iterrows():
         name = row['Name']
         change = row['Change']
@@ -153,19 +154,26 @@ def send_to_slack(result_data):
         volume_change = row['Volume_Change']
         open = row['Open']
         close = row['Close']
+        high = row['High']
+        diff_high_close = high_change / 100 - change
+        diff_close_open = (close - open) / open
+
+        message = f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%, 고가-종가: {diff_high_close * 100:.2f}%, 종가-시가: {diff_close_open * 100:.2f}%, 거래량: {volume_change * 100:.2f}%"
 
         # Rich Text 아이템 생성
-        item = create_rich_text_item(
-            f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%, 고가-종가: {high_change - change * 100:.2f}%, 종가-시가: {(close - open) / open * 100:.2f}%, 거래량: {volume_change * 100:.2f}%"
+        item = create_rich_text_with_imoji(
+            "question", message, False
         )
-        list_elements.append(item)
+        if high_change >= 10 and volume_change > 5 and diff_high_close >= 0 and diff_high_close <= 0.025:
+          item = create_rich_text_with_imoji(
+              "first_place_medal", message, False
+          )
+        elif high_change >= 10 and volume_change > 5 and diff_high_close > 0.1 and diff_close_open >= 0.01:
+          item = create_rich_text_with_imoji(
+              "second_place_medal", message, False
+          )
 
-      rich_text_elements.append({
-        "type": "rich_text_list",
-        "style": "bullet",
-        "indent": 0,
-        "elements": list_elements
-      })
+        rich_text_elements.append(item)
 
     blocks = [
       {

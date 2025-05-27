@@ -37,9 +37,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Set SLACK_CHANNEL based on branch
+      id: set-channel
+      run: |
+        if [ "${{ github.ref_name }}" = "${{ github.event.repository.default_branch }}" ]; then
+          echo "SLACK_CHANNEL=woo1" >> $GITHUB_ENV
+        else
+          echo "SLACK_CHANNEL=woo1-dev" >> $GITHUB_ENV
+        fi
+
     - name: Run python script
       env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-        SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
+        SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
       run: |
         python woo1.py
