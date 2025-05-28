@@ -90,12 +90,19 @@ def process_stock(row):
           open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
           high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
 
-          if open_sell_date:
-            partial_sell_date = open_sell_date
-            partial_sell_price = data_1_5.loc[open_sell_date, 'Open']
-          elif high_sell_date:
-            partial_sell_date = high_sell_date
-            partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+          # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
+          valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
+                        [(d, 'high') for d in [high_sell_date] if d is not None]
+
+          if valid_dates:
+            earliest_date, condition = min(valid_dates, key=lambda x: x[0])
+
+            if condition == 'open':
+              partial_sell_date = earliest_date
+              partial_sell_price = data_1_5.loc[earliest_date, 'Open']
+            elif condition == 'high':
+              partial_sell_date = earliest_date
+              partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
 
         else:
           print(f"{name} buy in {buy_date}")
