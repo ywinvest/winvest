@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 import woo1
 
+FRONT_PARTIAL_TARGET_RETURN = 1.102
 PARTIAL_TARGET_RETURN = 1.082
 FULL_TARTET_RETURN = 1.10
 
@@ -84,8 +85,8 @@ def process_stock(row):
 
         # 1~5일차 (T+1~T+5)
         if not data_1_5.empty:
-          target_open_sell = data_1_5[data_1_5['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
-          target_high_sell = data_1_5[(data_1_5['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_1_5['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
+          target_open_sell = data_1_5[data_1_5['Open'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN]
+          target_high_sell = data_1_5[(data_1_5['Open'] < buy_price * FRONT_PARTIAL_TARGET_RETURN) & (data_1_5['High'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN)]
 
           open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
           high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
@@ -102,7 +103,7 @@ def process_stock(row):
               partial_sell_price = data_1_5.loc[earliest_date, 'Open']
             elif condition == 'high':
               partial_sell_date = earliest_date
-              partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              partial_sell_price = buy_price * FRONT_PARTIAL_TARGET_RETURN
 
         else:
           print(f"{name} buy in {buy_date}")
