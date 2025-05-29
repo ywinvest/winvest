@@ -85,25 +85,44 @@ def process_stock(row):
 
         # 1~5일차 (T+1~T+5)
         if not data_1_5.empty:
-          target_open_sell = data_1_5[data_1_5['Open'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN]
-          target_high_sell = data_1_5[(data_1_5['Open'] < buy_price * FRONT_PARTIAL_TARGET_RETURN) & (data_1_5['High'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN)]
+          # 각 날짜별로 5일선 이탈 여부와 목표가 도달 여부를 확인
+          for i, (date, row_data) in enumerate(data_1_5.iterrows()):
+            # 5일선 이탈 확인 (종가가 5일선 아래로 떨어짐)
+            ma5_break = row_data['Close'] < row_data['MA5']
 
-          open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
-          high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
+            # 목표가 도달 확인
+            target_open_reached = row_data['Open'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN
+            target_high_reached = (row_data['Open'] < buy_price * FRONT_PARTIAL_TARGET_RETURN) and (row_data['High'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN)
 
-          # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
-          valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
-                        [(d, 'high') for d in [high_sell_date] if d is not None]
+            # 5일차인지 확인
+            is_day_5 = (i == len(data_1_5) - 1)
 
-          if valid_dates:
-            earliest_date, condition = min(valid_dates, key=lambda x: x[0])
-
-            if condition == 'open':
-              partial_sell_date = earliest_date
-              partial_sell_price = data_1_5.loc[earliest_date, 'Open']
-            elif condition == 'high':
-              partial_sell_date = earliest_date
+            # 매도 조건 판단
+            if ma5_break:
+              # 5일선 이탈 시 목표 수익률에 매도
+              if target_open_reached:
+                partial_sell_date = date
+                partial_sell_price = row_data['Open']
+                break
+              elif target_high_reached:
+                partial_sell_date = date
+                partial_sell_price = buy_price * FRONT_PARTIAL_TARGET_RETURN
+                break
+            elif is_day_5:
+              # 5일차까지 5일선을 이탈하지 않았다면 5일차 종가에 매도
+              partial_sell_date = date
+              partial_sell_price = row_data['Close']
+              break
+            elif target_open_reached:
+              # 5일선 이탈하지 않았지만 목표가에 도달한 경우 (기존 로직 유지)
+              partial_sell_date = date
+              partial_sell_price = row_data['Open']
+              break
+            elif target_high_reached:
+              # 5일선 이탈하지 않았지만 고가에서 목표가에 도달한 경우 (기존 로직 유지)
+              partial_sell_date = date
               partial_sell_price = buy_price * FRONT_PARTIAL_TARGET_RETURN
+              break
 
         else:
           print(f"{name} buy in {buy_date}")
