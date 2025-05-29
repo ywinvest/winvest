@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 import woo1
 
-FRONT_PARTIAL_TARGET_RETURN = 1.102
+FRONT_PARTIAL_TARGET_RETURN = 1.082
 PARTIAL_TARGET_RETURN = 1.082
 FULL_TARTET_RETURN = 1.10
 
@@ -76,17 +76,17 @@ def process_stock(row):
       for buy_date in buys.index:
         df['Buy'] = buys.loc[buy_date, 'Close']
         buy_date_idx = df.index.get_loc(buy_date)
-        data_1_5 = df.iloc[buy_date_idx + 1:buy_date_idx + 6]
+        data_1_2 = df.iloc[buy_date_idx + 1:buy_date_idx + 3]
 
         buy_price = df.loc[buy_date, 'Buy']
 
         partial_sell_date = None
         partial_sell_price = None
 
-        # 1~5일차 (T+1~T+5)
-        if not data_1_5.empty:
-          target_open_sell = data_1_5[data_1_5['Open'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN]
-          target_high_sell = data_1_5[(data_1_5['Open'] < buy_price * FRONT_PARTIAL_TARGET_RETURN) & (data_1_5['High'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN)]
+        # 1~2일차 (T+1~T+2)
+        if not data_1_2.empty:
+          target_open_sell = data_1_2[data_1_2['Open'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN]
+          target_high_sell = data_1_2[(data_1_2['Open'] < buy_price * FRONT_PARTIAL_TARGET_RETURN) & (data_1_2['High'] >= buy_price * FRONT_PARTIAL_TARGET_RETURN)]
 
           open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
           high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
@@ -100,7 +100,7 @@ def process_stock(row):
 
             if condition == 'open':
               partial_sell_date = earliest_date
-              partial_sell_price = data_1_5.loc[earliest_date, 'Open']
+              partial_sell_price = data_1_2.loc[earliest_date, 'Open']
             elif condition == 'high':
               partial_sell_date = earliest_date
               partial_sell_price = buy_price * FRONT_PARTIAL_TARGET_RETURN
@@ -108,16 +108,16 @@ def process_stock(row):
         else:
           print(f"{name} buy in {buy_date}")
 
-        # 6~22일차 (T+6~T+22)
+        # 3~22일차 (T+3~T+22)
         if not partial_sell_date:
-          data_6_22 = df.iloc[buy_date_idx + 6:buy_date_idx + 23]
+          data_3_22 = df.iloc[buy_date_idx + 3:buy_date_idx + 23]
 
-          if not data_6_22.empty:
+          if not data_3_22.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
-            target_open_sell = data_6_22[data_6_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
-            target_high_sell = data_6_22[(data_6_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_6_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
-            stop_loss1 = data_6_22[(data_6_22['Close'] < df.loc[buy_date, 'Open']) & (data_6_22['Close'] < data_6_22['MA20']) & ~data_6_22['Bullish']]
-            stop_loss2 = data_6_22[(data_6_22['Close'] <= buy_price * 0.92) & ((data_6_22['Close'] < df.loc[buy_date, 'Open']) | (data_6_22['Close'] < data_6_22['MA20'])) & ~data_6_22['Bullish']]
+            target_open_sell = data_3_22[data_3_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
+            target_high_sell = data_3_22[(data_3_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_3_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
+            stop_loss1 = data_3_22[(data_3_22['Close'] < df.loc[buy_date, 'Open']) & (data_3_22['Close'] < data_3_22['MA20']) & ~data_3_22['Bullish']]
+            stop_loss2 = data_3_22[(data_3_22['Close'] <= buy_price * 0.92) & ((data_3_22['Close'] < df.loc[buy_date, 'Open']) | (data_3_22['Close'] < data_3_22['MA20'])) & ~data_3_22['Bullish']]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
             open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
@@ -136,16 +136,16 @@ def process_stock(row):
 
               if condition == 'open':
                 partial_sell_date = earliest_date
-                partial_sell_price = data_6_22.loc[earliest_date, 'Open']
+                partial_sell_price = data_3_22.loc[earliest_date, 'Open']
               elif condition == 'high':
                 partial_sell_date = earliest_date
                 partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
               elif condition == 'stop2':
                 partial_sell_date = earliest_date
-                partial_sell_price = data_6_22.loc[earliest_date, 'Close']
+                partial_sell_price = data_3_22.loc[earliest_date, 'Close']
               else:  # condition == 'stop'
                 partial_sell_date = earliest_date
-                partial_sell_price = data_6_22.loc[earliest_date, 'Close']
+                partial_sell_price = data_3_22.loc[earliest_date, 'Close']
 
         # 22일차 (T+22)
         if not partial_sell_date:
