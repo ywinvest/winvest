@@ -169,9 +169,9 @@ def process_stock(row):
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
           if market == 'KOSPI':
-            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
+            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[buy_date, 'RSI']
           elif market == 'KOSDAQ':
-            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[partial_sell_date, 'RSI']
+            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[buy_date, 'RSI']
           buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           # 전량매도 수익률 계산 (%)
           buys.loc[buy_date, 'Full_Return'] = ((partial_sell_price / buy_price) - 1)
