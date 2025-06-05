@@ -10,7 +10,7 @@ import indicators
 
 def buy_condition(df):
   """Buy condition for korea indicies."""
-  return (df['RSI'] > 70) & (df['Bullish']) & (df['Change_Rate'] > 0)
+  return (df['RSI'] > 70) & (df['Bullish']) & (df['Change_Rate'] > 0) & (df['Close'] != df['High'])
 
 def sell_condition_partial(df):
   """Partial sell condition for korea indicies."""
