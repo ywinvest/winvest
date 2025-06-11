@@ -10,7 +10,11 @@ import indicators
 
 def buy_condition(df):
   """Buy condition for korea indicies."""
-  return (df['RSI'] > 70) & (df['Bullish']) & (df['Change_Rate'] > 0) & (df['Close'] != df['High'])
+  return (df['RSI'] > 70) & \
+    (df['Bullish']) & \
+    (df['Change_Rate'] > 0) & \
+    (df['Close'] != df['High']) & \
+    (df['Is_Option_Week'])
 
 def sell_condition_partial(df):
   """Partial sell condition for korea indicies."""
@@ -20,9 +24,26 @@ def sell_condition_full(df):
   """Full sell condition for korea indicies."""
   return df['MA_20_Break'] | df['MA_10_Cross']
 
+def is_option_expiration_week(date):
+  """Checks if a given date is in the week of the second Thursday of the month."""
+  # Find the first day of the month
+  first_day_of_month = date.replace(day=1)
+  # Find the first Thursday of the month
+  first_thursday = first_day_of_month + timedelta(days=((3 - first_day_of_month.weekday() + 7) % 7))
+  # Calculate the second Thursday (option expiration day)
+  second_thursday = first_thursday + timedelta(days=7)
+
+  # Determine the start (Monday) and end (Friday) of the expiration week
+  start_of_week = second_thursday - timedelta(days=second_thursday.weekday())
+  end_of_week = start_of_week + timedelta(days=4)
+
+  return start_of_week <= date <= end_of_week
+
 def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition_full):
   """Perform backtest with the specified buy and sell conditions."""
   df = indicators.calculate_indicators(data.copy())
+
+  df['Is_Option_Week'] = df.index.to_series().apply(is_option_expiration_week)
 
   buys = df[buy_condition(df)]
 
