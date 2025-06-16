@@ -19,5 +19,7 @@ def calculate_indicators(df):
   df['MA_10_Break'] = (df['Close'].lt(df['MA_10'], axis=0)) & (df['Close'].shift(1).ge(df['MA_10'].shift(1), axis=0))
   df['MA_20_Break'] = (df['Close'].lt(df['MA_20'], axis=0)) & (df['Close'].shift(1).ge(df['MA_20'].shift(1), axis=0))
 
+  df['5D_High'] = df['High'].shift(1).rolling(window=5).max()
+
   df.dropna(inplace=True)
   return df

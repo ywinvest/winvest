@@ -13,7 +13,8 @@ def buy_condition(df):
   return (df['RSI'] > 70) & \
     (df['Bullish']) & \
     (df['Change_Rate'] > 0) & \
-    (((df['High'] - df['Close']) / df['Close']) > 0.0001)
+    (((df['High'] - df['Close']) / df['Close']) > 0.0001) & \
+    df['High'] > df['5D_High']
     # (df['Is_Option_Week'])
 
 def sell_condition_partial(df):
