@@ -13,7 +13,7 @@ def buy_condition(df):
   return (df['RSI'] > 70) & \
     (df['Bullish']) & \
     (df['Change_Rate'] > 0) & \
-    (((df['High'] - df['Close']) / df['Close']) > 0.0001) & \
+    (((df['High'] - df['Close']) / df['Close']) > 0.0005) & \
     (df['High'] == df['High_5D'])
     # (df['Is_Option_Week'])
 
