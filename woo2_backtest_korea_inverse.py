@@ -13,8 +13,8 @@ def buy_condition(df):
   return (df['RSI'] > 70) & \
     (df['Bullish']) & \
     (df['Change_Rate'] > 0) & \
-    (df['Close'] != df['High']) & \
-    (df['Is_Option_Week'])
+    (((df['High'] - df['Close']) / df['Close']) > 0.0001)
+    # (df['Is_Option_Week'])
 
 def sell_condition_partial(df):
   """Partial sell condition for korea indicies."""
