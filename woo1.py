@@ -52,7 +52,7 @@ def buy_condition(df):
   # conditions &= ~((df['Pre_Volume_Change'] > 3) & (df['Pre_Change'] > 0)) # 전봉 거래량 300% 초과 + 등락률 0% 초과 제외
   conditions &= (df['Pre_Volume_Change'] <= 4) # 전봉 거래량 400% 이하
   conditions &= (df['Close'] >= df['MA20'])
-  conditions &= (df['Low'] != df['52WeekLow']) # 52주 신저가 경신 제외
+  # conditions &= (df['Low'] != df['52WeekLow']) # 52주 신저가 경신 제외
   return conditions
 
 def create_rich_text_with_imoji(emoji, text, bold=True):
