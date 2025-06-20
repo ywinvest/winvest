@@ -133,7 +133,7 @@ def process_stock(row):
   listing_date = row['ListingDate']  # all_stocks에서 상장일 가져오기
   try:
     # 종목 데이터 가져오기
-    df = fdr.DataReader(ticker, "2004")
+    df = fdr.DataReader(ticker, "2015")
 
     # 상장일 이전 데이터 제거
     if not pd.isna(listing_date):
@@ -148,7 +148,7 @@ def process_stock(row):
 
     # 매수 조건에 해당하는 데이터 필터링
     buys = df[buy_condition(df)]
-    buys = buys[~buys.index.year.isin([2004])]  # 2004년 데이터 제외
+    buys = buys[~buys.index.year.isin([2015])]  # 2015년 데이터 제외
 
     # NEW LOGIC: 이전 거래의 매도일을 추적하기 위한 변수
     prev_sell_date = pd.Timestamp.min
@@ -273,7 +273,7 @@ if __name__ == "__main__":
     ], ignore_index=True)
 
     # 상장일 정보 가져오기
-    krx_desc = fdr.StockListing('KRX-DESC', "2004")[['Code', 'ListingDate']]
+    krx_desc = fdr.StockListing('KRX-DESC', "2015")[['Code', 'ListingDate']]
     all_stocks = all_stocks.merge(krx_desc, on='Code', how='left')
 
     kospi = fdr.DataReader('KS11')
