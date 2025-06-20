@@ -163,8 +163,8 @@ def process_stock(row):
           continue  # 다음 신호로 넘어감
 
         df['Buy'] = buys.loc[buy_date, 'Close']
-        buy_date_idx = df.index.get_loc(buy_date)
-        data_1 = df.iloc[buy_date_idx + 1:]
+        date_idx = df.index.get_loc(buy_date)
+        data_1 = df.iloc[date_idx + 1:]
 
         buy_price = df.loc[buy_date, 'Buy']
         current_price = df['Close'].iloc[-1]
@@ -204,8 +204,8 @@ def process_stock(row):
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
 
               if condition == 'take1':
-                buy_date_idx = df.index.get_loc(earliest_date)
-                take_profit_data = data_1.iloc[buy_date_idx + 1:]
+                date_idx = data_1.index.get_loc(earliest_date)
+                take_profit_data = data_1.iloc[date_idx + 1:]
 
                 take_profit = take_profit_data[
                   (take_profit_data['Close'] < take_profit_data['MA20']) &
