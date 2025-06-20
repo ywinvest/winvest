@@ -179,32 +179,44 @@ def process_stock(row):
         if not sell_date:
           if not data_1.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
-            # take_profit = data_1[data_1['Close'] >= take_profit_price]
-            take_profit = data_1[
-              (data_1['Close'] >= take_profit_price) &
-              (data_1['Close'] < data_1['MA20']) &
-              (data_1['MA20_Uptrend'] == False) &
-              (data_1['Bullish'] == False) &
-              (data_1['Change'] < -0.01)]
+            take_profit1 = data_1[data_1['Close'] >= take_profit_price]
+            # take_profit2 = data_1[
+            #   (data_1['Close'] >= take_profit_price) &
+            #   (data_1['Close'] < data_1['MA20']) &
+            #   (data_1['MA20_Uptrend'] == False) &
+            #   (data_1['Bullish'] == False) &
+            #   (data_1['Change'] < -0.01)]
             # stop_loss1 = data_1[data_1['Low'] < stop_loss1_price]
             stop_loss2 = data_1[data_1['Close'] < stop_loss2_price]
             # stop_loss = data_1[(data_1['Close'] < data_1['MA20']) & (data_1['Volume_Change'] > 1)]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
-            take_profit_date = take_profit.index[0] if not take_profit.empty else None
+            take_profit1_date = take_profit1.index[0] if not take_profit1.empty else None
+            # take_profit2_date = take_profit2.index[0] if not take_profit2.empty else None
             # stop_loss1_date = stop_loss1.index[0] if not stop_loss1.empty else None
             stop_loss2_date = stop_loss2.index[0] if not stop_loss2.empty else None
 
             # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
-            valid_dates = [(d, 'take') for d in [take_profit_date] if d is not None] + \
+            valid_dates = [(d, 'take1') for d in [take_profit1_date] if d is not None] + \
                           [(d, 'stop2') for d in [stop_loss2_date] if d is not None]
 
             if valid_dates:
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
 
-              if condition == 'take':
-                sell_date = earliest_date
-                sell_price = data_1.loc[earliest_date, 'Close']
+              if condition == 'take1':
+                buy_date_idx = df.index.get_loc(earliest_date)
+                take_profit_data = data_1.iloc[buy_date_idx + 1:]
+
+                take_profit = take_profit_data[
+                  (take_profit_data['Close'] < take_profit_data['MA20']) &
+                  (take_profit_data['MA20_Uptrend'] == False) &
+                  (take_profit_data['Bullish'] == False) &
+                  (take_profit_data['Change'] < -0.01)]
+
+                take_profit_date = take_profit.index[0] if not take_profit.empty else None
+
+                sell_date = take_profit_date
+                sell_price = data_1.loc[take_profit_date, 'Close']
               # elif condition == 'stop1':
               #   sell_date = earliest_date
               #   sell_price = stop_loss1_price
