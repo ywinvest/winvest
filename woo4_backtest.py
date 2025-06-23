@@ -29,9 +29,9 @@ def calculate_indicators(df):
   # df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
   # df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
-  # df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
+  df['Pre52WeekLow'] = df['Low'].shift(1).rolling(window='364D', min_periods=1).min()
 
-  df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='365D', min_periods=1).max()
+  df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
   # 52주 신고가 돌파 여부
   is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
 
@@ -80,7 +80,7 @@ def buy_condition(df):
   # conditions &= (df['MA120_Uptrend'])
   # conditions &= (df['MA20_Cross'])
   conditions &= (df['Pre52WeekHigh'] != 0)
-  conditions &= (df['Close'] > df['Pre52WeekHigh'])
+  # conditions &= (df['Close'] > df['Pre52WeekHigh'])
   conditions &= (df['First_52WeekHigh_Break'])
   conditions &= (df['MA20_Uptrend'] == True)
   conditions &= (df['MA60_Uptrend'] == True)
@@ -134,7 +134,7 @@ def process_stock(row):
   listing_date = row['ListingDate']  # all_stocks에서 상장일 가져오기
   try:
     # 종목 데이터 가져오기
-    df = fdr.DataReader(ticker, "2004")
+    df = fdr.DataReader(ticker, "2015")
 
     # 상장일 이전 데이터 제거
     if not pd.isna(listing_date):
@@ -149,7 +149,7 @@ def process_stock(row):
 
     # 매수 조건에 해당하는 데이터 필터링
     buys = df[buy_condition(df)]
-    buys = buys[~buys.index.year.isin([2004])]  # 2004년 데이터 제외
+    buys = buys[~buys.index.year.isin([2015])]  # 2015년 데이터 제외
 
     # NEW LOGIC: 이전 거래의 매도일을 추적하기 위한 변수
     prev_sell_date = pd.Timestamp.min
@@ -176,19 +176,61 @@ def process_stock(row):
 
         sell_date = None
         sell_price = None
+        full_sell_date = None
+        full_sell_price = None
 
-        if not sell_date:
-          if not data_1.empty:
+        if not data_1.empty:
+          # 각 조건이 처음 발생하는 날짜 찾기
+          # take_profit = data_1[data_1['Close'] >= take_profit_price]
+          take_profit = data_1[(data_1['High'] >= take_profit_price)]
+          # stop_loss1 = data_1[data_1['Low'] < stop_loss1_price]
+          stop_loss2 = data_1[data_1['Close'] < stop_loss2_price]
+          # stop_loss = data_1[(data_1['Close'] < data_1['MA20']) & (data_1['Volume_Change'] > 1)]
+
+          # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
+          take_profit_date = take_profit.index[0] if not take_profit.empty else None
+          # stop_loss1_date = stop_loss1.index[0] if not stop_loss1.empty else None
+          stop_loss2_date = stop_loss2.index[0] if not stop_loss2.empty else None
+
+          # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
+          valid_dates = [(d, 'take') for d in [take_profit_date] if d is not None] + \
+                        [(d, 'stop2') for d in [stop_loss2_date] if d is not None]
+
+          if valid_dates:
+            earliest_date, condition = min(valid_dates, key=lambda x: x[0])
+
+            if condition == 'take':
+              sell_date = earliest_date
+              sell_price = take_profit_price
+            # elif condition == 'stop1':
+            #   sell_date = earliest_date
+            #   sell_price = stop_loss1_price
+            elif condition == 'stop2':
+              sell_date = earliest_date
+              sell_price = data_1.loc[earliest_date, 'Close']
+              full_sell_date = earliest_date
+              full_sell_price = data_1.loc[earliest_date, 'Close']
+            else:  # condition == 'stop'
+              sell_date = earliest_date
+              sell_price = data_1.loc[earliest_date, 'Close']
+              full_sell_date = earliest_date
+              full_sell_price = data_1.loc[earliest_date, 'Close']
+
+        if sell_date and not full_sell_date:
+          sell_date_idx = df.index.get_loc(sell_date)
+          after_partial_sell_data = df.iloc[sell_date_idx:]
+
+          if not after_partial_sell_data.empty:
             # 각 조건이 처음 발생하는 날짜 찾기
             # take_profit = data_1[data_1['Close'] >= take_profit_price]
-            take_profit = data_1[
-              (data_1['Close'] >= take_profit_price) &
-              (data_1['Close'] < data_1['MA20']) &
-              (data_1['MA20_Uptrend'] == False) &
-              (data_1['Bullish'] == False) &
-              (data_1['Change'] < -0.01)]
+            take_profit = after_partial_sell_data[
+              # (after_partial_sell_data['Close'] >= take_profit_price) &
+              (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
+              (after_partial_sell_data['MA20_Uptrend'] == False) &
+              (after_partial_sell_data['Bullish'] == False) &
+              (after_partial_sell_data['Change'] < -0.01)]
             # stop_loss1 = data_1[data_1['Low'] < stop_loss1_price]
-            stop_loss2 = data_1[data_1['Close'] < stop_loss2_price]
+            stop_loss2 = after_partial_sell_data[after_partial_sell_data['Close'] < stop_loss2_price]
             # stop_loss = data_1[(data_1['Close'] < data_1['MA20']) & (data_1['Volume_Change'] > 1)]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
@@ -204,17 +246,17 @@ def process_stock(row):
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
 
               if condition == 'take':
-                sell_date = earliest_date
-                sell_price = data_1.loc[earliest_date, 'Close']
+                full_sell_date = earliest_date
+                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
               # elif condition == 'stop1':
               #   sell_date = earliest_date
               #   sell_price = stop_loss1_price
               elif condition == 'stop2':
-                sell_date = earliest_date
-                sell_price = data_1.loc[earliest_date, 'Close']
+                full_sell_date = earliest_date
+                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
               else:  # condition == 'stop'
-                sell_date = earliest_date
-                sell_price = data_1.loc[earliest_date, 'Close']
+                full_sell_date = earliest_date
+                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
 
         # 매도 정보를 해당 행에 추가
         buys.loc[buy_date, 'Ticker'] = ticker
@@ -230,20 +272,35 @@ def process_stock(row):
           buys.loc[buy_date, 'Holding_Days'] = calculate_trading_days(df, buy_date, sell_date)
           # 매도 수익률 계산 (%)
           buys.loc[buy_date, 'Return'] = ((sell_price / buy_price) - 1)
-          if market == 'KOSPI':
-            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[sell_date, 'RSI']
-          elif market == 'KOSDAQ':
-            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[sell_date, 'RSI']
-          # NEW LOGIC: 다음 매수 가능일을 위해 prev_sell_date 업데이트
-          prev_sell_date = sell_date
         else:
-          # NEW LOGIC: 매도되지 않았다면, 이 종목에 대한 모든 향후 매수를 막기 위해 prev_sell_date를 최대로 설정
-          prev_sell_date = pd.Timestamp.max
           buys.loc[buy_date, 'Holding_Days'] = None
           buys.loc[buy_date, 'Return'] = ((current_price / buy_price) - 1)
           # buys.loc[buy_date, 'Return'] = None
-          buys.loc[buy_date, 'Index_RSI'] = None
 
+        buys.loc[buy_date, 'Full_Sell_Date'] = full_sell_date
+        buys.loc[buy_date, 'Full_Sell_Price'] = full_sell_price
+        # 보유기간 계산 (영업일 기준)
+        if full_sell_date:
+          buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, full_sell_date)
+          # 매도 수익률 계산 (%)
+          buys.loc[buy_date, 'Full_Return'] = ((full_sell_price / buy_price) - 1)
+          # NEW LOGIC: 다음 매수 가능일을 위해 prev_sell_date 업데이트
+          prev_sell_date = full_sell_date
+        else:
+          buys.loc[buy_date, 'Full_Holding_Days'] = None
+          buys.loc[buy_date, 'Full_Return'] = ((current_price / buy_price) - 1)
+          # buys.loc[buy_date, 'Return'] = None
+          # NEW LOGIC: 매도되지 않았다면, 이 종목에 대한 모든 향후 매수를 막기 위해 prev_sell_date를 최대로 설정
+          prev_sell_date = pd.Timestamp.max
+
+        if market == 'KOSPI':
+          buys.loc[buy_date, 'Index_RSI'] = kospi.loc[buy_date, 'RSI']
+          buys.loc[buy_date, 'Index_MA60_Up'] = kospi.loc[buy_date, 'MA60_Up']
+        elif market == 'KOSDAQ' or market == 'KOSDAQ GLOBAL':
+          buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[buy_date, 'RSI']
+          buys.loc[buy_date, 'Index_MA60_Up'] = kosdaq.loc[buy_date, 'MA60_Up']
+        else:
+          print(f"No market {name}: {e}")
         buys.loc[buy_date, 'Current_Price'] = current_price
 
       # NEW LOGIC: 루프가 끝난 후, 보유 중 발생한 모든 매수 신호를 결과에서 제거
@@ -274,14 +331,16 @@ if __name__ == "__main__":
     ], ignore_index=True)
 
     # 상장일 정보 가져오기
-    krx_desc = fdr.StockListing('KRX-DESC', "2004")[['Code', 'ListingDate']]
+    krx_desc = fdr.StockListing('KRX-DESC', "2015")[['Code', 'ListingDate']]
     all_stocks = all_stocks.merge(krx_desc, on='Code', how='left')
 
     kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
+    kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
+    kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
 
     result_file = "woo4_backtest_results.csv"
 
