@@ -29,9 +29,12 @@ def calculate_indicators(df):
   # df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
   # df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
-  df['Pre52WeekLow'] = df['Low'].shift(1).rolling(window='364D', min_periods=1).min()
+  df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
 
   df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
+
+  # 39주 신고가 돌파 여부
+  is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
   # 52주 신고가 돌파 여부
   is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
 
@@ -41,8 +44,10 @@ def calculate_indicators(df):
   # is_first_break = is_52weekhigh_break & (~is_52weekhigh_break.shift(1).fillna(False))
   # df['First_52WeekHigh_Break'] = is_first_break.groupby(breaks).cumsum() == 1
   # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(is_52weekhigh_break, False)
+  # 39주 신고가 첫 돌파여부
+  df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
   # 52주 신고가 첫 돌파여부
-  df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1).fillna(False))
+  df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
   # 첫 돌파 이후 10일 동안 추가 돌파 무시
   # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(
   #     ~df['First_52WeekHigh_Break'].rolling(window=10, min_periods=1).sum().shift(1).fillna(0).astype(bool),
@@ -73,15 +78,19 @@ def calculate_indicators(df):
   # df['MA20_Gap'] = df['Close']/df['MA20'] - 1
   return df
 
-def buy_condition(df):
+def buy_condition(df, market):
   # 벡터화된 연산 사용
   conditions = pd.Series(True, index=df.index)
   # conditions &= (df['MA60_Uptrend'])
   # conditions &= (df['MA120_Uptrend'])
   # conditions &= (df['MA20_Cross'])
-  conditions &= (df['Pre52WeekHigh'] != 0)
   # conditions &= (df['Close'] > df['Pre52WeekHigh'])
-  conditions &= (df['First_52WeekHigh_Break'])
+  if market == 'KOSPI' or market == 'KOSDAQ GLOBAL':
+    conditions &= (df['Pre52WeekHigh'] != 0)
+    conditions &= (df['First_52WeekHigh_Break'])
+  elif market == 'KOSDAQ':
+    conditions &= (df['Pre39WeekHigh'] != 0)
+    conditions &= (df['First_39WeekHigh_Break'])
   conditions &= (df['MA20_Uptrend'] == True)
   conditions &= (df['MA60_Uptrend'] == True)
   conditions &= (df['MA120_Uptrend'] == True)
@@ -134,7 +143,7 @@ def process_stock(row):
   listing_date = row['ListingDate']  # all_stocks에서 상장일 가져오기
   try:
     # 종목 데이터 가져오기
-    df = fdr.DataReader(ticker, "2015")
+    df = fdr.DataReader(ticker, "2014")
 
     # 상장일 이전 데이터 제거
     if not pd.isna(listing_date):
@@ -148,8 +157,8 @@ def process_stock(row):
     df = calculate_indicators(df)
 
     # 매수 조건에 해당하는 데이터 필터링
-    buys = df[buy_condition(df)]
-    buys = buys[~buys.index.year.isin([2015])]  # 2015년 데이터 제외
+    buys = df[buy_condition(df, market)]
+    buys = buys[~buys.index.year.isin([2014])]  # 2015년 데이터 제외
 
     # NEW LOGIC: 이전 거래의 매도일을 추적하기 위한 변수
     prev_sell_date = pd.Timestamp.min
@@ -262,6 +271,7 @@ def process_stock(row):
         buys.loc[buy_date, 'Ticker'] = ticker
         buys.loc[buy_date, 'Name'] = name
         buys.loc[buy_date, 'Marcap'] = marcap
+        buys.loc[buy_date, 'Market'] = market
         buys.loc[buy_date, 'Buy_Date'] = buy_date
         buys.loc[buy_date, 'Buy_Price'] = buy_price
         buys.loc[buy_date, 'Sell_Date'] = sell_date
@@ -331,7 +341,7 @@ if __name__ == "__main__":
     ], ignore_index=True)
 
     # 상장일 정보 가져오기
-    krx_desc = fdr.StockListing('KRX-DESC', "2015")[['Code', 'ListingDate']]
+    krx_desc = fdr.StockListing('KRX-DESC', "2014")[['Code', 'ListingDate']]
     all_stocks = all_stocks.merge(krx_desc, on='Code', how='left')
 
     kospi = fdr.DataReader('KS11')
