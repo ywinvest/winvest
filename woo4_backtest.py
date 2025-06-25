@@ -306,9 +306,15 @@ def process_stock(row):
         if market == 'KOSPI':
           buys.loc[buy_date, 'Index_RSI'] = kospi.loc[buy_date, 'RSI']
           buys.loc[buy_date, 'Index_MA60_Up'] = kospi.loc[buy_date, 'MA60_Up']
+          buys.loc[buy_date, 'Index_MA20_Uptrend'] = kospi.loc[buy_date, 'MA20_Uptrend']
+          buys.loc[buy_date, 'Index_MA60_Uptrend'] = kospi.loc[buy_date, 'MA60_Uptrend']
+          buys.loc[buy_date, 'Index_MA120_Uptrend'] = kospi.loc[buy_date, 'MA120_Uptrend']
         elif market == 'KOSDAQ' or market == 'KOSDAQ GLOBAL':
           buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[buy_date, 'RSI']
           buys.loc[buy_date, 'Index_MA60_Up'] = kosdaq.loc[buy_date, 'MA60_Up']
+          buys.loc[buy_date, 'Index_MA20_Uptrend'] = kosdaq.loc[buy_date, 'MA20_Uptrend']
+          buys.loc[buy_date, 'Index_MA60_Uptrend'] = kosdaq.loc[buy_date, 'MA60_Uptrend']
+          buys.loc[buy_date, 'Index_MA120_Uptrend'] = kosdaq.loc[buy_date, 'MA120_Uptrend']
         else:
           print(f"No market {name}: {e}")
         buys.loc[buy_date, 'Current_Price'] = current_price
@@ -346,11 +352,23 @@ if __name__ == "__main__":
 
     kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
-    kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
+    kospi['MA20'] = kospi['Close'].rolling(window=20).mean()
+    kospi['MA60'] = kospi['Close'].rolling(window=60).mean()
+    kospi['MA120'] = kospi['Close'].rolling(window=120).mean()
+    kospi['MA60_Up'] = kospi['Close'] > kospi['MA20']
+    kospi['MA20_Uptrend'] = kospi['MA20'] > kospi['MA20'].shift(1)
+    kospi['MA60_Uptrend'] = kospi['MA60'] > kospi['MA60'].shift(1)
+    kospi['MA120_Uptrend'] = kospi['MA120'] > kospi['MA120'].shift(1)
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
+    kosdaq['MA20'] = kosdaq['Close'].rolling(window=20).mean()
+    kosdaq['MA60'] = kosdaq['Close'].rolling(window=60).mean()
+    kosdaq['MA120'] = kosdaq['Close'].rolling(window=120).mean()
     kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
+    kosdaq['MA20_Uptrend'] = kosdaq['MA20'] > kosdaq['MA20'].shift(1)
+    kosdaq['MA60_Uptrend'] = kosdaq['MA60'] > kosdaq['MA60'].shift(1)
+    kosdaq['MA120_Uptrend'] = kosdaq['MA120'] > kosdaq['MA120'].shift(1)
 
     result_file = "woo4_backtest_results.csv"
 
