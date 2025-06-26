@@ -58,9 +58,9 @@ def calculate_indicators(df):
   # df['MA20_Uptrend'] = df['MA20'] > df['MA20'].shift(1)
   # df['MA60_Uptrend'] = df['MA60'] > df['MA60'].shift(1)
   # df['MA120_Uptrend'] = df['MA120'] > df['MA120'].shift(1)
-  df['MA20_Slope'] = df['MA20'].pct_change()
-  df['MA60_Slope'] = df['MA60'].pct_change()
-  df['MA120_Slope'] = df['MA120'].pct_change()
+  df['MA20_Slope'] = df['MA20'].pct_change(fill_method=None)
+  df['MA60_Slope'] = df['MA60'].pct_change(fill_method=None)
+  df['MA120_Slope'] = df['MA120'].pct_change(fill_method=None)
 
   # 벡터화된 연속 상승 일수 계산
   def calculate_uptrend_days_vec(uptrend_series):
@@ -194,6 +194,7 @@ def process_stock(row):
 
         buy_price = df.loc[buy_date, 'Buy']
         current_price = df['Close'].iloc[-1]
+        estimated_marcap = marcap * (buy_price / current_price)
         pre_52weekhigh = df.loc[buy_date, 'Pre52WeekHigh']
         take_profit_price = buy_price * 1.3
         # stop_loss1_price = buy_price * 0.84
@@ -252,8 +253,9 @@ def process_stock(row):
               # (after_partial_sell_data['Close'] >= take_profit_price) &
               (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
               (after_partial_sell_data['MA20_Slope'] < 0) &
+              (after_partial_sell_data['MA20_Gap'] < -0.05) &
               (after_partial_sell_data['Bullish'] == False) &
-              (after_partial_sell_data['Change'] < -0.01)]
+              (after_partial_sell_data['Change'] < -0.02)]
             # stop_loss1 = data_1[data_1['Low'] < stop_loss1_price]
             stop_loss2 = after_partial_sell_data[after_partial_sell_data['Close'] < stop_loss2_price]
             # stop_loss = data_1[(data_1['Close'] < data_1['MA20']) & (data_1['Volume_Change'] > 1)]
@@ -287,6 +289,7 @@ def process_stock(row):
         buys.loc[buy_date, 'Ticker'] = ticker
         buys.loc[buy_date, 'Name'] = name
         buys.loc[buy_date, 'Marcap'] = marcap
+        buys.loc[buy_date, 'Estimated_Marcap'] = estimated_marcap
         buys.loc[buy_date, 'Market'] = market
         buys.loc[buy_date, 'Buy_Date'] = buy_date
         buys.loc[buy_date, 'Buy_Price'] = buy_price
@@ -327,7 +330,6 @@ def process_stock(row):
           buys.loc[buy_date, 'Index_MA60_Up'] = kosdaq.loc[buy_date, 'MA60_Up']
         else:
           print(f"No market {name}: {e}")
-        buys.loc[buy_date, 'Current_Price'] = current_price
 
       # NEW LOGIC: 루프가 끝난 후, 보유 중 발생한 모든 매수 신호를 결과에서 제거
       if buys_to_remove:
