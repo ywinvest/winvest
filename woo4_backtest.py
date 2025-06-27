@@ -192,7 +192,7 @@ def process_stock(row):
           buys_to_remove.append(buy_date)  # 제거할 매수 신호로 추가
           continue  # 다음 신호로 넘어감
 
-        if (index_rsi > 80 or index_rsi < 30) and buys.loc[buy_date, 'MA20_Gap'] > 0.2:
+        if index_rsi > 80 or index_rsi < 30:
           buys_to_remove.append(buy_date)  # 제거할 매수 신호로 추가
           continue  # 다음 신호로 넘어감
 
