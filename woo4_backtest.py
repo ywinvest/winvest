@@ -184,17 +184,21 @@ def process_stock(row):
         elif market == 'KOSDAQ' or market == 'KOSDAQ GLOBAL':
           index_rsi = kosdaq.loc[buy_date, 'RSI']
 
+        buy_price = buys.loc[buy_date, 'Close']
+        current_price = df['Close'].iloc[-1]
+        estimated_marcap = marcap * (buy_price / current_price)
+
+        if estimated_marcap < 2e+11:
+          buys_to_remove.append(buy_date)  # 제거할 매수 신호로 추가
+          continue  # 다음 신호로 넘어감
+
         if (index_rsi > 80 or index_rsi < 30) and buys.loc[buy_date, 'MA20_Gap'] > 0.2:
           buys_to_remove.append(buy_date)  # 제거할 매수 신호로 추가
           continue  # 다음 신호로 넘어감
 
-        df['Buy'] = buys.loc[buy_date, 'Close']
+        # df['Buy'] = buys.loc[buy_date, 'Close']
         buy_date_idx = df.index.get_loc(buy_date)
         data_1 = df.iloc[buy_date_idx + 1:]
-
-        buy_price = df.loc[buy_date, 'Buy']
-        current_price = df['Close'].iloc[-1]
-        estimated_marcap = marcap * (buy_price / current_price)
         pre_52weekhigh = df.loc[buy_date, 'Pre52WeekHigh']
         take_profit_price = buy_price * 1.3
         # stop_loss1_price = buy_price * 0.84
