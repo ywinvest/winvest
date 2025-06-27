@@ -81,6 +81,62 @@ def calculate_indicators(df):
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
   return df
 
+# NEW: 모든 종목의 RS 점수를 미리 계산하는 함수
+def precalculate_rs_scores(all_stocks_df, start_date):
+  """
+  모든 종목에 대해 기간별 RS 점수(0-99)를 미리 계산합니다.
+  """
+  print("모든 종목의 종가 데이터를 다운로드 중입니다...")
+  all_closes = {}
+  with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    future_to_ticker = {executor.submit(fdr.DataReader, row['Code'], start_date): row['Code'] for _, row in all_stocks_df.iterrows()}
+    for future in concurrent.futures.as_completed(future_to_ticker):
+      ticker = future_to_ticker[future]
+      try:
+        data = future.result()
+        if not data.empty:
+          all_closes[ticker] = data['Close']
+      except Exception as e:
+        print(f"{ticker} 데이터 다운로드 오류: {e}")
+
+  if not all_closes:
+    print("다운로드된 데이터가 없어 RS 점수 계산을 중단합니다.")
+    return pd.DataFrame()
+
+  # 하나의 DataFrame으로 통합
+  all_closes_df = pd.DataFrame(all_closes)
+  # 모든 날짜가 포함되도록 인덱스 확장 후, 누락된 값은 이전 값으로 채움
+  all_closes_df = all_closes_df.reindex(pd.date_range(start=all_closes_df.index.min(), end=all_closes_df.index.max(), freq='D')).fillna(method='ffill')
+  # 주말/휴일 등 거래가 없는 날 제거
+  all_closes_df.dropna(how='all', axis=0, inplace=True)
+
+  print("기간별 RS 점수를 계산 중입니다...")
+  # 계산할 기간 (거래일 기준)
+  periods = {
+    'RS_1Y': 252,
+    'RS_6M': 126,
+    'RS_3M': 63,
+    'RS_1M': 21
+  }
+
+  rs_results = {}
+  for name, period in periods.items():
+    # 기간별 수익률 계산
+    perf = all_closes_df.pct_change(periods=period)
+    # 수익률을 기준으로 랭킹 계산 (0~1 사이의 백분위수)
+    # rank(axis=1)는 각 날짜(행)에 대해 모든 종목(열)의 순위를 매깁니다.
+    rs_rank = perf.rank(axis=1, pct=True, ascending=True)
+    # 0~99점으로 변환
+    rs_score = (rs_rank * 99).round().astype('Int64')
+    rs_results[name] = rs_score
+
+  # 결과를 하나의 DataFrame으로 결합
+  final_rs_df = pd.concat([df.stack() for df in rs_results.values()], axis=1)
+  final_rs_df.columns = periods.keys()
+  final_rs_df.index.names = ['Date', 'Code']
+  print("RS 점수 계산 완료.")
+  return final_rs_df.reset_index()
+
 def buy_condition(df, market):
   # 벡터화된 연산 사용
   conditions = pd.Series(True, index=df.index)
@@ -128,8 +184,9 @@ def calculate_trading_days(df, start_date, end_date):
   trading_days = df.loc[start_date:end_date].index
   return len(trading_days) - 1  # 매수일 제외
 
-def parallel_process_stocks(all_stocks):
-  process_func = partial(process_stock)
+def parallel_process_stocks(all_stocks, rs_scores_df):
+  # partial을 사용하여 rs_scores_df를 각 worker 프로세스에 전달
+  process_func = partial(process_stock, rs_scores_df=rs_scores_df)
   results = []
 
   with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -141,7 +198,7 @@ def parallel_process_stocks(all_stocks):
 
   return pd.concat(results) if results else pd.DataFrame()
 
-def process_stock(row):
+def process_stock(row, rs_scores_df):
   ticker = row['Code']
   name = row['Name']
   marcap = row['Marcap']
@@ -159,6 +216,18 @@ def process_stock(row):
     if df.empty:
       print(f"No data after listing date for {ticker}")
       return None
+
+    # NEW: 사전 계산된 RS 점수를 종목 데이터에 병합
+    if not rs_scores_df.empty:
+      ticker_rs = rs_scores_df[rs_scores_df['Code'] == ticker].copy()
+      ticker_rs.set_index('Date', inplace=True)
+      ticker_rs.drop(columns='Code', inplace=True)
+      df = df.merge(ticker_rs, left_index=True, right_index=True, how='left')
+      # RS 점수는 매일 계산되므로, 주말/휴일 등으로 생긴 NaN은 이전 값으로 채움
+      rs_cols = ['RS_1M', 'RS_3M', 'RS_6M', 'RS_1Y']
+      df[rs_cols] = df[rs_cols].fillna(method='ffill')
+      # RS 점수가 계산되기 전 기간의 데이터는 조건에서 제외하기 위해 NaN으로 남겨둠
+      df.dropna(subset=rs_cols, inplace=True)
 
     df = calculate_indicators(df)
 
@@ -352,6 +421,9 @@ if __name__ == "__main__":
   # .env 파일 로드
   load_dotenv()
 
+  # 지수 데이터는 전역 변수로 선언하여 process_stock에서 참조할 수 있도록 함
+  global kospi, kosdaq
+
   try:
     # delisting = fdr.StockListing('KRX-DELISTING') # 3천+ 종목 - 상장폐지 종목 전체
     # admin = fdr.StockListing('KRX-ADMIN') # 50+ 종목 - KRX 관리종목
@@ -362,23 +434,32 @@ if __name__ == "__main__":
       woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
     ], ignore_index=True)
 
-    # 상장일 정보 가져오기
+    rs_scores = precalculate_rs_scores(all_stocks, "2014")
+
+  # 상장일 정보 가져오기
     krx_desc = fdr.StockListing('KRX-DESC', "2014")[['Code', 'ListingDate']]
     all_stocks = all_stocks.merge(krx_desc, on='Code', how='left')
 
-    kospi = fdr.DataReader('KS11')
+    kospi = fdr.DataReader('KS11', "2014")
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
 
-    kosdaq = fdr.DataReader('KQ11')
+    kosdaq = fdr.DataReader('KQ11', "2014")
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
 
     result_file = "woo4_backtest_results.csv"
 
-    # 병렬 처리로 데이터 분석
-    result_data = parallel_process_stocks(all_stocks)
-    result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
+    # MODIFIED: 병렬 처리에 rs_scores 전달
+    if not rs_scores.empty:
+      result_data = parallel_process_stocks(all_stocks, rs_scores)
+      if result_data is not None and not result_data.empty:
+        result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
+        print(f"백테스트 결과가 '{result_file}' 파일로 저장되었습니다.")
+      else:
+        print("백테스트 결과 데이터가 없습니다.")
+    else:
+      print("RS 점수 데이터가 없어 백테스트를 실행하지 않았습니다.")
   except Exception as e:
     print(f"Error in main execution: {e}")
 
