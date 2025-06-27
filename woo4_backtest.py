@@ -256,6 +256,7 @@ def process_stock(row):
             take_profit = after_partial_sell_data[
               # (after_partial_sell_data['Close'] >= take_profit_price) &
               (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
+              (after_partial_sell_data['MA20_Slope'].shift(1) < 0) &
               (after_partial_sell_data['MA20_Slope'] < 0) &
               (after_partial_sell_data['MA20_Gap'] < -0.05) &
               (after_partial_sell_data['Bullish'] == False) &
