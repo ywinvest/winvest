@@ -200,7 +200,7 @@ def process_stock(row):
         buy_date_idx = df.index.get_loc(buy_date)
         data_1 = df.iloc[buy_date_idx + 1:]
         pre_52weekhigh = df.loc[buy_date, 'Pre52WeekHigh']
-        take_profit_price = buy_price * 1.3
+        take_profit_price = buy_price * 1.24
         # stop_loss1_price = buy_price * 0.84
         stop_loss2_price = buy_price * 0.92
 
