@@ -1,4 +1,4 @@
-name: woo4 - Backtest
+name: test rs
 
 on:
   workflow_dispatch:
