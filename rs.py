@@ -1,40 +1,46 @@
 import FinanceDataReader as fdr
 import pandas as pd
+from pykrx import stock
 from datetime import datetime, timedelta
 import numpy as np
 
 # 1. 데이터 수집 기간 설정 (오늘로부터 1개월 전까지)
 end_date = datetime.today()
 start_date = end_date - timedelta(days=40)  # 약 1개월 + 여유분
+end_date_str = end_date.strftime('%Y%m%d')
+start_date_str = start_date.strftime('%Y%m%d')
 
 # 2. 코스피 상장 종목 리스트 가져오기
 kospi = fdr.StockListing('KOSPI')
-tickers = kospi['Code'].tolist()
+tickers = kospi['Symbol'].tolist()
 
-# 3. 코스피 지수 데이터 가져오기
+# 3. 코스피 지수 시가총액 데이터 가져오기
 kospi_index = fdr.DataReader('KS11', start_date, end_date)
+# pykrx로 코스피 시가총액 데이터 가져오기
+kospi_marketcap = stock.get_index_fundamental(start_date_str, end_date_str, '1001')  # 1001: 코스피
+kospi_marketcap['MarketCap'] = kospi_marketcap['PER'] * kospi_marketcap['지수'] * 1e8  # 시가총액 계산 (단위: 원)
 
-# 4. 코스피 지수 1개월 상승률 계산
-kospi_index['Price_1M_Ago'] = kospi_index['Close'].shift(20)  # 약 1개월(20 거래일) 전
-kospi_index['Kospi_Return'] = (kospi_index['Close'] / kospi_index['Price_1M_Ago'] - 1) * 100
+# 4. 코스피 시가총액 1개월 상승률 계산
+kospi_marketcap['MarketCap_1M_Ago'] = kospi_marketcap['MarketCap'].shift(20)  # 약 1개월(20 거래일) 전
+kospi_marketcap['Kospi_Return'] = (kospi_marketcap['MarketCap'] / kospi_marketcap['MarketCap_1M_Ago'] - 1) * 100
 
-# 5. 종목별 상대강도 계산 및 정규화
+# 5. 종목별 시가총액 및 상대강도 계산
 results = []
-for ticker in tickers:
+for ticker in tickers:  # 테스트를 위해 50개 종목으로 제한, 전체 종목은 제거 가능
   try:
-    # 종목 데이터 가져오기
-    df = fdr.DataReader(ticker, start_date, end_date)
+    # 종목 시가총액 데이터 가져오기 (pykrx)
+    df = stock.get_market_cap(start_date_str, end_date_str, ticker)
 
-    # 1개월 전 종가
-    df['Price_1M_Ago'] = df['Close'].shift(20)  # 약 1개월(20 거래일) 전
+    # 시가총액 1개월 전 데이터
+    df['MarketCap_1M_Ago'] = df['시가총액'].shift(20)  # 약 1개월(20 거래일) 전
 
-    # 종목 1개월 상승률 계산
-    df['Stock_Return'] = (df['Close'] / df['Price_1M_Ago'] - 1) * 100
+    # 종목 시가총액 상승률 계산
+    df['Stock_Return'] = (df['시가총액'] / df['MarketCap_1M_Ago'] - 1) * 100
 
-    # 코스피 상승률과 병합
-    df = df.join(kospi_index['Kospi_Return'])
+    # 코스피 시가총액 상승률과 병합
+    df = df.join(kospi_marketcap['Kospi_Return'])
 
-    # 상대강도 계산 (TraderLion 방식: 종목 상승률 / 코스피 상승률)
+    # 상대강도 계산 (TraderLion 방식: 종목 시가총액 상승률 / 코스피 시가총액 상승률)
     df['Relative_Strength'] = df['Stock_Return'] / df['Kospi_Return']
 
     # 최신 데이터만 추출
@@ -62,9 +68,9 @@ else:
 # 8. 결과 출력 (상대강도 상위 10개 종목)
 result_df = result_df[['Ticker', 'Stock_Return', 'Kospi_Return', 'Relative_Strength', 'RS_Scaled']]
 result_df = result_df.dropna().sort_values(by='RS_Scaled', ascending=False)
-print("\n코스피 종목별 TraderLion 상대강도 상위 10개 (0~99 스케일):")
+print("\n코스피 종목별 TraderLion 상대강도 상위 10개 (시가총액 기준, 0~99 스케일):")
 print(result_df.head(10))
 
 # 9. 결과 저장 (CSV 파일)
-result_df.to_csv('kospi_traderlion_relative_strength.csv', index=False)
-print("결과가 'kospi_traderlion_relative_strength.csv' 파일로 저장되었습니다.")
+result_df.to_csv('kospi_traderlion_marketcap_relative_strength.csv', index=False)
+print("결과가 'kospi_traderlion_marketcap_relative_strength.csv' 파일로 저장되었습니다.")
