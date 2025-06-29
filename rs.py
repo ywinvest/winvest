@@ -20,7 +20,7 @@ kospi_index['Kospi_Return'] = (kospi_index['Close'] / kospi_index['Price_1M_Ago'
 
 # 5. 종목별 상대강도 계산 및 정규화
 results = []
-for ticker in tickers[:50]:  # 테스트를 위해 50개 종목으로 제한, 전체 종목은 제거 가능
+for ticker in tickers:
   try:
     # 종목 데이터 가져오기
     df = fdr.DataReader(ticker, start_date, end_date)
