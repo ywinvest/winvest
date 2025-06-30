@@ -4,7 +4,7 @@ from pykrx import stock
 from datetime import datetime, timedelta
 import numpy as np
 
-# 1. 데이터 수집 기간 설정 (오늘로부터 1개월 전까지)
+# 1. 데이터 수집 기간 설정
 end_date = datetime.today()
 start_date = end_date - timedelta(days=40)  # 약 1개월 + 여유분
 end_date_str = end_date.strftime('%Y%m%d')
@@ -34,7 +34,7 @@ kospi_marketcap['Kospi_Return'] = (kospi_marketcap['MarketCap'] / kospi_marketca
 results = []
 for ticker in tickers:  # 테스트를 위해 50개 종목으로 제한, 전체 종목은 제거 가능
   try:
-    # 종목 시가총액 데이터 가져오기 (pykrx)
+    # 종목 시가총액 데이터 가져오기
     df = stock.get_market_cap(start_date_str, end_date_str, ticker)
 
     # 시가총액 1개월 전 데이터
@@ -62,12 +62,11 @@ for ticker in tickers:  # 테스트를 위해 50개 종목으로 제한, 전체 
 result_df = pd.concat(results, ignore_index=True)
 
 # 7. 상대강도 정규화 (0~99 정수값)
-# Min-Max 정규화: (x - min) / (max - min) * 99
 rs_values = result_df['Relative_Strength'].dropna()
 if not rs_values.empty:
   rs_min = rs_values.min()
   rs_max = rs_values.max()
-  result_df['RS_Scaled'] = ((rs_values - rs_min) / (rs_max - rs_min) * 99).round().astype(int)
+  result_df['RS_Scaled'] = np.clip(((rs_values - rs_min) / (rs_max - rs_min) * 99), 0, 99).round().astype(int)
 else:
   result_df['RS_Scaled'] = 0  # 데이터가 없을 경우 기본값
 
