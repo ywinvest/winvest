@@ -12,8 +12,22 @@ start_date = end_date - timedelta(days=40)  # 1개월 + 여유분
 end_date_str = end_date.strftime('%Y%m%d')
 start_date_str = start_date.strftime('%Y%m%d')
 
+def filter_common_stocks(df):
+  # ETN, ETF, 리츠, 선박펀드, 스팩 제외
+  exclude_pattern = r'스팩'
+  return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
+            & (~df['Code'].str.endswith("5", na=False)) # 우선주
+            & (~df['Code'].str.endswith("7", na=False)) # 우선주
+            & (~df['Code'].str.endswith("K", na=False)) # 우선주
+            & (~df['Code'].str.endswith("L", na=False)) # 우선주
+    # & (df['Name'].str.contains("나무기술", na=False, regex=True))
+            ]
+
 # 2. 코스피 상장 종목 리스트
-kospi = fdr.StockListing('KOSPI')
+kospi = pd.concat([
+  filter_common_stocks(fdr.StockListing('KOSPI')),
+], ignore_index=True)
+
 tickers = kospi['Code'].astype(str).str.zfill(6).unique().tolist()
 
 # 3. 실제 거래일 목록 가져오기
