@@ -43,10 +43,10 @@ jobs:
 #        RELEASE_API_URL: ${{ vars.RELEASE_API_URL }}
 #        RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
-        python rs.py
+        python rs2.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: korea_market_relative_strength
-        path: ./*_relative_strength.csv
+        path: ./*.csv
