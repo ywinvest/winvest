@@ -50,7 +50,7 @@ else:
 
 # 6. 종목별 시가총액 및 상대강도 계산
 results = []
-for ticker in tickers:  # 테스트용 50개 제한, 전체는 [:50] 제거
+for ticker in tickers[:50]:  # 테스트용 50개 제한, 전체는 [:50] 제거
   try:
     # 종목별 시가총액 데이터
     df = stock.get_market_cap(start_date_str, end_date_str, ticker)
@@ -94,12 +94,18 @@ else:
   print("No valid results generated.")
   result_df = pd.DataFrame(columns=['Ticker', 'Stock_Return', 'Kospi_Return', 'Relative_Strength', 'RS_Scaled'])
 
-# 8. 상대강도 정규화 (0~99)
+# 8. 상대강도 랭킹 (0~99)
 rs_values = result_df['Relative_Strength'].dropna()
-if not rs_values.empty and rs_values.max() != rs_values.min():
-  rs_min = rs_values.min()
-  rs_max = rs_values.max()
-  result_df['RS_Scaled'] = np.clip(((rs_values - rs_min) / (rs_max - rs_min) * 99), 0, 99).round().astype(int)
+if not rs_values.empty:
+  # rank 함수로 순위 계산 (내림차순, 높은 RS가 높은 순위)
+  result_df['RS_Rank'] = rs_values.rank(ascending=False, method='min')
+  # 순위를 0~99로 스케일링
+  rank_min = result_df['RS_Rank'].min()
+  rank_max = result_df['RS_Rank'].max()
+  if rank_max != rank_min:
+    result_df['RS_Scaled'] = np.clip(((rank_max - result_df['RS_Rank']) / (rank_max - rank_min) * 99), 0, 99).round().astype(int)
+  else:
+    result_df['RS_Scaled'] = 0
 else:
   result_df['RS_Scaled'] = 0
 
@@ -107,7 +113,7 @@ else:
 result_df = result_df[['Ticker', 'Stock_Return', 'Kospi_Return', 'Relative_Strength', 'RS_Scaled']]
 result_df = result_df.dropna().sort_values(by='RS_Scaled', ascending=False)
 if not result_df.empty:
-  print("\n코스피 종목별 TraderLion 상대강도 상위 10개 (시가총액 기준, 0~99 스케일):")
+  print("\n코스피 종목별 TraderLion 상대강도 상위 10개 (시가총액 기준, 랭킹 기반 0~99 스케일):")
   print(result_df.head(10))
 else:
   print("No valid data to display.")
