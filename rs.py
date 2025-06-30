@@ -12,7 +12,7 @@ start_date_str = start_date.strftime('%Y%m%d')
 
 # 2. 코스피 상장 종목 리스트 가져오기
 kospi = fdr.StockListing('KOSPI')
-tickers = kospi['Symbol'].tolist()
+tickers = kospi['Code'].tolist()
 
 # 3. 코스피 지수 시가총액 데이터 가져오기
 kospi_index = fdr.DataReader('KS11', start_date, end_date)
