@@ -14,11 +14,17 @@ start_date_str = start_date.strftime('%Y%m%d')
 kospi = fdr.StockListing('KOSPI')
 tickers = kospi['Code'].tolist()
 
-# 3. 코스피 지수 시가총액 데이터 가져오기
-kospi_index = fdr.DataReader('KS11', start_date, end_date)
-# pykrx로 코스피 시가총액 데이터 가져오기
-kospi_marketcap = stock.get_index_fundamental(start_date_str, end_date_str, '1001')  # 1001: 코스피
-kospi_marketcap['MarketCap'] = kospi_marketcap['PER'] * kospi_marketcap['지수'] * 1e8  # 시가총액 계산 (단위: 원)
+# 3. 코스피 전체 시가총액 계산 (종목별 시가총액 합계)
+kospi_marketcap = pd.DataFrame()
+for date in pd.date_range(start_date, end_date, freq='B'):  # 영업일 기준
+  date_str = date.strftime('%Y%m%d')
+  try:
+    # 특정 날짜의 코스피 종목 시가총액
+    marketcap = stock.get_market_cap_by_ticker(date_str, market='KOSPI')
+    total_marketcap = marketcap['시가총액'].sum()
+    kospi_marketcap.loc[date, 'MarketCap'] = total_marketcap
+  except Exception as e:
+    print(f"Error processing date {date_str}: {e}")
 
 # 4. 코스피 시가총액 1개월 상승률 계산
 kospi_marketcap['MarketCap_1M_Ago'] = kospi_marketcap['MarketCap'].shift(20)  # 약 1개월(20 거래일) 전
