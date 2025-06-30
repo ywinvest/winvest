@@ -48,4 +48,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: korea_market_relative_strength
-        path: ./korea_market_relative_strength.csv
+        path: ./*_relative_strength.csv
