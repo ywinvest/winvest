@@ -17,12 +17,12 @@ kospi = fdr.StockListing('KOSPI')
 tickers = kospi['Code'].astype(str).str.zfill(6).tolist()  # 6자리 문자열로 포맷팅
 
 # 3. 코스피 거래일 목록 가져오기 (데이터 누락 방지)
-trading_days = stock.get_nearest_business_day_in_a_week(start_date_str, end_date_str)
-trading_days = pd.to_datetime([day for day in trading_days if start_date_str <= day <= end_date_str])
+# trading_days = stock.get_nearest_business_day_in_a_week(start_date_str, end_date_str)
+# trading_days = pd.to_datetime([day for day in trading_days if start_date_str <= day <= end_date_str])
 
 # 4. 코스피 전체 시가총액 계산
 kospi_marketcap = pd.DataFrame()
-for date in trading_days:
+for date in pd.date_range(start_date, end_date, freq='B'):  # 영업일 기준
   date_str = date.strftime('%Y%m%d')
   try:
     marketcap = stock.get_market_cap_by_ticker(date_str, market='KOSPI')
