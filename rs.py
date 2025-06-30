@@ -184,7 +184,7 @@ def main():
   print(result_df.head(10).to_string())
 
   # 6. 결과 저장
-  output_filename = 'kospi_relative_strength_enhanced.csv'
+  output_filename = 'kospi_traderlion_relative_strength.csv'
   result_df.to_csv(output_filename, index=False, encoding='utf-8-sig')
 
   end_time = time.time()
