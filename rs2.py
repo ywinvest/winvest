@@ -15,7 +15,7 @@ dates = {
 }
 
 # 종목 리스트 가져오기
-tickers = stock.get_market_ticker_list(market='KOSPI') + stock.get_market_ticker_list(market='KOSDAQ')
+tickers = stock.get_market_ticker_list(market='KOSPI')# + stock.get_market_ticker_list(market='KOSDAQ')
 
 # 결과 저장
 results = []
