@@ -15,10 +15,9 @@ warnings.filterwarnings('ignore')
 # --- 설정값 ---
 # 기준일은 가장 최신 거래일로 자동 조정됩니다.
 END_DATE = datetime.now()
-LOOKBACK_PERIOD = 20  # 20 거래일 전과 비교
-
-# 데이터 조회 기간 설정 (여유있게)
-START_DATE = END_DATE - timedelta(days=LOOKBACK_PERIOD + 45)
+LOOKBACK_PERIODS = [20, 60]  # 20 거래일(1개월) 및 60 거래일(3개월) 기준
+# 데이터 조회 기간 설정 (가장 긴 lookback 기간 + 여유있게)
+START_DATE = END_DATE - timedelta(days=max(LOOKBACK_PERIODS) + 45)
 START_DATE_STR = START_DATE.strftime('%Y%m%d')
 END_DATE_STR = END_DATE.strftime('%Y%m%d')
 
@@ -26,37 +25,41 @@ def filter_common_stocks(df):
   """필터링 제거 - 모든 종목 포함"""
   return df
 
-def get_market_returns(start_str, end_str, lookback, market_name, index_code):
+def get_market_returns(start_str, end_str, lookback_periods, market_name, index_code):
   """지정된 시장의 지수 수익률 및 전체 시가총액 수익률 계산"""
   print(f"\n>> {market_name} 시장 수익률 계산 중...")
+  returns = {}
 
-  # 1. 시장 지수 데이터 (수익률 기준)
-  market_index = stock.get_index_ohlcv(start_str, end_str, index_code)
+  for lookback in lookback_periods:
+    # 1. 시장 지수 데이터 (수익률 기준)
+    market_index = stock.get_index_ohlcv(start_str, end_str, index_code)
 
-  if len(market_index) < lookback + 1:
-    raise ValueError(f"{market_name} 지수 데이터가 부족합니다. (필요: {lookback+1}일, 조회: {len(market_index)}일)")
+    if len(market_index) < lookback + 1:
+      raise ValueError(f"{market_name} 지수 데이터가 부족합니다. (필요: {lookback+1}일, 조회: {len(market_index)}일)")
 
-  # iloc를 사용하여 20거래일 전 종가 계산
-  price_current = market_index['종가'].iloc[-1]
-  price_past = market_index['종가'].iloc[-(lookback + 1)]
-  market_price_return = (price_current / price_past - 1) if price_past != 0 else 0
+    # iloc를 사용하여 lookback 거래일 전 종가 계산
+    price_current = market_index['종가'].iloc[-1]
+    price_past = market_index['종가'].iloc[-(lookback + 1)]
+    market_price_return = (price_current / price_past - 1) if price_past != 0 else 0
 
-  # 실제 사용된 날짜 확인
-  latest_date_dt = market_index.index[-1]
-  past_date_dt = market_index.index[-(lookback + 1)]
-  latest_date_str = latest_date_dt.strftime('%Y%m%d')
-  past_date_str = past_date_dt.strftime('%Y%m%d')
+    # 실제 사용된 날짜 확인
+    latest_date_dt = market_index.index[-1]
+    past_date_dt = market_index.index[-(lookback + 1)]
+    latest_date_str = latest_date_dt.strftime('%Y%m%d')
+    past_date_str = past_date_dt.strftime('%Y%m%d')
 
-  # 2. 시장 전체 시가총액 (시가총액 기준)
-  marcap_current = stock.get_market_cap_by_ticker(latest_date_str, market=market_name)['시가총액'].sum()
-  marcap_past = stock.get_market_cap_by_ticker(past_date_str, market=market_name)['시가총액'].sum()
-  market_marcap_return = (marcap_current / marcap_past - 1) if marcap_past != 0 else 0
+    # 2. 시장 전체 시가총액 (시가총액 기준)
+    marcap_current = stock.get_market_cap_by_ticker(latest_date_str, market=market_name)['시가총액'].sum()
+    marcap_past = stock.get_market_cap_by_ticker(past_date_str, market=market_name)['시가총액'].sum()
+    market_marcap_return = (marcap_current / marcap_past - 1) if marcap_past != 0 else 0
 
-  print(f"   계산 기준일: {past_date_dt.strftime('%Y-%m-%d')} -> {latest_date_dt.strftime('%Y-%m-%d')} ({lookback} 거래일)")
-  print(f"   {market_name} 지수 수익률: {market_price_return:.2%}")
-  print(f"   {market_name} 시총 수익률: {market_marcap_return:.2%}")
+    print(f"   계산 기준일 ({lookback}일): {past_date_dt.strftime('%Y-%m-%d')} -> {latest_date_dt.strftime('%Y-%m-%d')}")
+    print(f"   {market_name} 지수 수익률 ({lookback}일): {market_price_return:.2%}")
+    print(f"   {market_name} 시총 수익률 ({lookback}일): {market_marcap_return:.2%}")
 
-  return market_price_return, market_marcap_return
+    returns[lookback] = {'price': market_price_return, 'marcap': market_marcap_return, 'latest_date': latest_date_str, 'past_date': past_date_str}
+
+  return returns
 
 def check_trading_halt(ticker):
   """거래정지 여부 확인"""
@@ -74,41 +77,42 @@ def check_trading_halt(ticker):
   except:
     return True  # 오류 발생시 거래정지로 간주
 
-def calculate_rs_for_ticker(ticker, market_name, lookback, market_price_ret, market_marcap_ret):
+def calculate_rs_for_ticker(ticker, market_name, lookback_periods, market_returns):
   """개별 종목의 상대강도(RS) 계산 (병렬 처리를 위한 함수)"""
   try:
     df_price = stock.get_market_ohlcv(START_DATE_STR, END_DATE_STR, ticker)
     df_marcap = stock.get_market_cap(START_DATE_STR, END_DATE_STR, ticker)
 
-    if len(df_price) < lookback + 1 or len(df_marcap) < lookback + 1:
+    if len(df_price) < max(lookback_periods) + 1 or len(df_marcap) < max(lookback_periods) + 1:
       return None
 
-    # 현재 시가총액 정보
-    marcap_current = df_marcap['시가총액'].iloc[-1]
-
-    # 거래정지 여부 확인
-    is_trading_halt = df_price['거래량'].iloc[-1] == 0
-
-    marcap_past = df_marcap['시가총액'].iloc[-(lookback + 1)]
-    stock_marcap_return = (marcap_current / marcap_past - 1) if marcap_past != 0 else 0
-    rs_marcap = (stock_marcap_return / market_marcap_ret) if market_marcap_ret != 0 else 0
-
-    price_current = df_price['종가'].iloc[-1]
-    price_past = df_price['종가'].iloc[-(lookback + 1)]
-    stock_price_return = (price_current / price_past - 1) if price_past != 0 else 0
-    rs_price = (stock_price_return / market_price_ret) if market_price_ret != 0 else 0
-
-    return {
+    result = {
       'Ticker': ticker,
       'Market': market_name,
       'Name': stock.get_market_ticker_name(ticker),
-      'Current_Marcap': marcap_current,
-      'Is_Trading_Halt': is_trading_halt,
-      'Stock_Marcap_Return': stock_marcap_return,
-      'Stock_Price_Return': stock_price_return,
-      'RS_Marcap': rs_marcap,
-      'RS_Price': rs_price
+      'Current_Marcap': df_marcap['시가총액'].iloc[-1],
+      'Is_Trading_Halt': df_price['거래량'].iloc[-1] == 0
     }
+
+    for lookback in lookback_periods:
+      # 시가총액 수익률
+      marcap_current = df_marcap['시가총액'].iloc[-1]
+      marcap_past = df_marcap['시가총액'].iloc[-(lookback + 1)]
+      stock_marcap_return = (marcap_current / marcap_past - 1) if marcap_past != 0 else 0
+      rs_marcap = (stock_marcap_return / market_returns[lookback]['marcap']) if market_returns[lookback]['marcap'] != 0 else 0
+
+      # 주가 수익률
+      price_current = df_price['종가'].iloc[-1]
+      price_past = df_price['종가'].iloc[-(lookback + 1)]
+      stock_price_return = (price_current / price_past - 1) if price_past != 0 else 0
+      rs_price = (stock_price_return / market_returns[lookback]['price']) if market_returns[lookback]['price'] != 0 else 0
+
+      result[f'Stock_Marcap_Return_{lookback}'] = stock_marcap_return
+      result[f'Stock_Price_Return_{lookback}'] = stock_price_return
+      result[f'RS_Marcap_{lookback}'] = rs_marcap
+      result[f'RS_Price_{lookback}'] = rs_price
+
+    return result
   except Exception:
     return None
 
@@ -134,7 +138,7 @@ def process_market(market_name, index_code):
   tickers = filter_common_stocks(fdr.StockListing(market_name))['Code'].tolist()
   print(f"   초기 분석 대상 종목 수: {len(tickers)}")
 
-  market_price_return, market_marcap_return = get_market_returns(START_DATE_STR, END_DATE_STR, LOOKBACK_PERIOD, market_name, index_code)
+  market_returns = get_market_returns(START_DATE_STR, END_DATE_STR, LOOKBACK_PERIODS, market_name, index_code)
 
   print(f"\n3. {len(tickers)}개 종목 상대강도 계산 시작 (병렬 처리)...")
   print(f"   - 모든 종목 포함 (필터링 없음)")
@@ -142,9 +146,8 @@ def process_market(market_name, index_code):
   results = []
   worker = partial(calculate_rs_for_ticker,
                    market_name=market_name,
-                   lookback=LOOKBACK_PERIOD,
-                   market_price_ret=market_price_return,
-                   market_marcap_ret=market_marcap_return)
+                   lookback_periods=LOOKBACK_PERIODS,
+                   market_returns=market_returns)
 
   with ProcessPoolExecutor() as executor:
     futures = {executor.submit(worker, ticker): ticker for ticker in tickers}
@@ -164,8 +167,9 @@ def process_market(market_name, index_code):
 
   # 시장별 데이터프레임 생성 및 랭킹
   market_df = pd.DataFrame(results)
-  market_df = scale_rank(market_df, 'RS_Marcap')
-  market_df = scale_rank(market_df, 'RS_Price')
+  for lookback in LOOKBACK_PERIODS:
+    market_df = scale_rank(market_df, f'RS_Marcap_{lookback}')
+    market_df = scale_rank(market_df, f'RS_Price_{lookback}')
 
   return market_df
 
@@ -196,13 +200,13 @@ def main():
     print(f"\n{market_name} 시장 분석 종목 수: {len(df)}")
 
     # 최종 결과 정리
-    final_cols = [
-      'Ticker', 'Name', 'Market',
-      'Current_Marcap', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled',
-      'RS_Price', 'RS_Marcap',
-      'Stock_Price_Return', 'Stock_Marcap_Return',
-    ]
+    final_cols = ['Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt']
+    for lookback in LOOKBACK_PERIODS:
+      final_cols.extend([
+        f'RS_Price_Scaled_{lookback}', f'RS_Marcap_Scaled_{lookback}',
+        f'RS_Price_{lookback}', f'RS_Marcap_{lookback}',
+        f'Stock_Price_Return_{lookback}', f'Stock_Marcap_Return_{lookback}'
+      ])
 
     result_df = df[final_cols].copy()
 
@@ -210,17 +214,18 @@ def main():
     result_df['Current_Marcap_Formatted'] = result_df['Current_Marcap'].apply(format_marcap)
 
     # 수익률 포맷팅
-    for col in ['Stock_Price_Return', 'Stock_Marcap_Return']:
-      result_df[col] = result_df[col].apply(lambda x: f"{x:.2%}")
+    for lookback in LOOKBACK_PERIODS:
+      for col in [f'Stock_Price_Return_{lookback}', f'Stock_Marcap_Return_{lookback}']:
+        result_df[col] = result_df[col].apply(lambda x: f"{x:.2%}")
 
-    # 최종 정렬 (수익률 기준 RS 점수)
-    result_df = result_df.sort_values(by='RS_Price_Scaled', ascending=False)
+    # 최종 정렬 (60일 수익률 기준 RS 점수)
+    result_df = result_df.sort_values(by=f'RS_Price_Scaled_60', ascending=False)
 
     print(f"\n--- {market_name} 시장 상대강도(RS) 상위 20개 종목 (0~98점) ---")
-    display_cols = [
-      'Ticker', 'Name', 'Current_Marcap_Formatted', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled', 'Stock_Price_Return', 'Stock_Marcap_Return'
-    ]
+    display_cols = ['Ticker', 'Name', 'Current_Marcap_Formatted', 'Is_Trading_Halt']
+    for lookback in LOOKBACK_PERIODS:
+      display_cols.extend([f'RS_Price_Scaled_{lookback}', f'RS_Marcap_Scaled_{lookback}',
+                           f'Stock_Price_Return_{lookback}', f'Stock_Marcap_Return_{lookback}'])
     print(result_df[display_cols].head(20).to_string(index=False))
 
     return result_df
@@ -233,22 +238,26 @@ def main():
   if not kospi_formatted.empty:
     kospi_filename = 'kospi_relative_strength.csv'
     # CSV 저장용 컬럼 정리
-    kospi_save_cols = [
-      'Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled', 'RS_Price', 'RS_Marcap',
-      'Stock_Price_Return', 'Stock_Marcap_Return'
-    ]
+    kospi_save_cols = ['Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt']
+    for lookback in LOOKBACK_PERIODS:
+      kospi_save_cols.extend([
+        f'RS_Price_Scaled_{lookback}', f'RS_Marcap_Scaled_{lookback}',
+        f'RS_Price_{lookback}', f'RS_Marcap_{lookback}',
+        f'Stock_Price_Return_{lookback}', f'Stock_Marcap_Return_{lookback}'
+      ])
     kospi_formatted[kospi_save_cols].to_csv(kospi_filename, index=False, encoding='utf-8-sig')
     print(f"\nKOSPI 결과가 '{kospi_filename}' 파일로 저장되었습니다.")
 
   if not kosdaq_formatted.empty:
     kosdaq_filename = 'kosdaq_relative_strength.csv'
     # CSV 저장용 컬럼 정리
-    kosdaq_save_cols = [
-      'Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled', 'RS_Price', 'RS_Marcap',
-      'Stock_Price_Return', 'Stock_Marcap_Return'
-    ]
+    kosdaq_save_cols = ['Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt']
+    for lookback in LOOKBACK_PERIODS:
+      kosdaq_save_cols.extend([
+        f'RS_Price_Scaled_{lookback}', f'RS_Marcap_Scaled_{lookback}',
+        f'RS_Price_{lookback}', f'RS_Marcap_{lookback}',
+        f'Stock_Price_Return_{lookback}', f'Stock_Marcap_Return_{lookback}'
+      ])
     kosdaq_formatted[kosdaq_save_cols].to_csv(kosdaq_filename, index=False, encoding='utf-8-sig')
     print(f"KOSDAQ 결과가 '{kosdaq_filename}' 파일로 저장되었습니다.")
 
