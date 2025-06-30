@@ -47,5 +47,5 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: kospi_traderlion_relative_strength
-        path: ./kospi_traderlion_relative_strength.csv
+        name: korea_market_relative_strength
+        path: ./korea_market_relative_strength.csv
