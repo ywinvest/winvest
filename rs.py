@@ -50,7 +50,7 @@ else:
 
 # 6. 종목별 시가총액 및 상대강도 계산
 results = []
-for ticker in tickers[:50]:  # 테스트용 50개 제한, 전체는 [:50] 제거
+for ticker in tickers:  # 테스트용 50개 제한, 전체는 [:50] 제거
   try:
     # 종목별 시가총액 데이터
     df = stock.get_market_cap(start_date_str, end_date_str, ticker)
