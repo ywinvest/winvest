@@ -1,12 +1,13 @@
-import pandas as pd
-import fdr
-from pykrx import stock
-from datetime import datetime, timedelta
-import numpy as np
+import time
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime, timedelta
 from functools import partial
-import time
+
+import FinanceDataReader as fdr
+import numpy as np
+import pandas as pd
+from pykrx import stock
 
 warnings.filterwarnings('ignore')
 
