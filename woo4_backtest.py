@@ -261,7 +261,7 @@ def process_stock(row):
               (after_partial_sell_data['Bullish'] == False) &
               (after_partial_sell_data['Change'] < -0.02)]
             # stop_loss1 = data_1[data_1['Low'] < stop_loss1_price]
-            stop_loss2 = after_partial_sell_data[after_partial_sell_data['Close'] < stop_loss2_price]
+            stop_loss2 = after_partial_sell_data[after_partial_sell_data['Close'] < buy_price]
             # stop_loss = data_1[(data_1['Close'] < data_1['MA20']) & (data_1['Volume_Change'] > 1)]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
