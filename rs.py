@@ -77,5 +77,5 @@ print("\n코스피 종목별 TraderLion 상대강도 상위 10개 (시가총액 
 print(result_df.head(10))
 
 # 9. 결과 저장 (CSV 파일)
-result_df.to_csv('kospi_traderlion_marketcap_relative_strength.csv', index=False)
-print("결과가 'kospi_traderlion_marketcap_relative_strength.csv' 파일로 저장되었습니다.")
+result_df.to_csv('kospi_traderlion_relative_strength.csv', index=False)
+print("결과가 'kospi_traderlion_relative_strength.csv' 파일로 저장되었습니다.")
