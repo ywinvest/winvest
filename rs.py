@@ -185,75 +185,67 @@ def main():
     print("\n분석할 유효한 종목이 없습니다.")
     return
 
-  print(f"\n{'='*50}\n시장별 결과 정리\n{'='*50}")
+  print(f"\n{'='*50}\n전체 시장 결과 통합 및 랭킹\n{'='*50}")
 
-  # 결과 정리 함수
-  def format_results(df, market_name):
-    if df.empty:
-      print(f"\n{market_name} 시장: 분석 결과 없음")
-      return df
+  # 결과 통합
+  all_results = []
+  if not kospi_df.empty:
+    all_results.extend(kospi_df.to_dict('records'))
+  if not kosdaq_df.empty:
+    all_results.extend(kosdaq_df.to_dict('records'))
 
-    print(f"\n{market_name} 시장 분석 종목 수: {len(df)}")
+  if not all_results:
+    print("\n분석할 유효한 종목이 없습니다.")
+    return
 
-    # 최종 결과 정리
-    final_cols = [
-      'Ticker', 'Name', 'Market',
-      'Current_Marcap', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled',
-      'RS_Price', 'RS_Marcap',
-      'Stock_Price_Return', 'Stock_Marcap_Return',
-    ]
+  print(f"총 분석 종목 수 (KOSPI+KOSDAQ): {len(all_results)}")
 
-    result_df = df[final_cols].copy()
+  # 전체 통합 데이터프레임 생성 (RS 값만 다시 추출)
+  result_df = pd.DataFrame(all_results)
 
-    # 시가총액 포맷팅
-    result_df['Current_Marcap_Formatted'] = result_df['Current_Marcap'].apply(format_marcap)
+  # RS 원본 값들로 전체 종목 대상 재랭킹
+  result_df = scale_rank(result_df, 'RS_Marcap')
+  result_df = scale_rank(result_df, 'RS_Price')
 
-    # 수익률 포맷팅
-    for col in ['Stock_Price_Return', 'Stock_Marcap_Return']:
-      result_df[col] = result_df[col].apply(lambda x: f"{x:.2%}")
+  # 최종 결과 정리
+  final_cols = [
+    'Ticker', 'Name', 'Market',
+    'Current_Marcap', 'Is_Trading_Halt',
+    'RS_Price_Scaled', 'RS_Marcap_Scaled',
+    'RS_Price', 'RS_Marcap',
+    'Stock_Price_Return', 'Stock_Marcap_Return',
+  ]
+  result_df = result_df[final_cols]
 
-    # 최종 정렬 (수익률 기준 RS 점수)
-    result_df = result_df.sort_values(by='RS_Price_Scaled', ascending=False)
+  # 시가총액 포맷팅
+  result_df['Current_Marcap_Formatted'] = result_df['Current_Marcap'].apply(format_marcap)
 
-    print(f"\n--- {market_name} 시장 상대강도(RS) 상위 20개 종목 (0~98점) ---")
-    display_cols = [
-      'Ticker', 'Name', 'Current_Marcap_Formatted', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled', 'Stock_Price_Return', 'Stock_Marcap_Return'
-    ]
-    print(result_df[display_cols].head(20).to_string(index=False))
+  # 수익률 포맷팅
+  for col in ['Stock_Price_Return', 'Stock_Marcap_Return']:
+    result_df[col] = result_df[col].apply(lambda x: f"{x:.2%}")
 
-    return result_df
+  # 최종 정렬 (수익률 기준 RS 점수)
+  result_df = result_df.sort_values(by='RS_Price_Scaled', ascending=False)
 
-  # 각 시장별 결과 포맷팅 및 출력
-  kospi_formatted = format_results(kospi_df, 'KOSPI')
-  kosdaq_formatted = format_results(kosdaq_df, 'KOSDAQ')
+  print("\n--- 전체 시장 통합 상대강도(RS) 상위 20개 종목 (0~98점) ---")
+  display_cols = [
+    'Ticker', 'Name', 'Market', 'Current_Marcap_Formatted', 'Is_Trading_Halt',
+    'RS_Price_Scaled', 'RS_Marcap_Scaled', 'Stock_Price_Return', 'Stock_Marcap_Return'
+  ]
+  print(result_df[display_cols].head(20).to_string(index=False))
 
   # 결과 저장
-  if not kospi_formatted.empty:
-    kospi_filename = 'kospi_relative_strength.csv'
-    # CSV 저장용 컬럼 정리
-    kospi_save_cols = [
-      'Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled', 'RS_Price', 'RS_Marcap',
-      'Stock_Price_Return', 'Stock_Marcap_Return'
-    ]
-    kospi_formatted[kospi_save_cols].to_csv(kospi_filename, index=False, encoding='utf-8-sig')
-    print(f"\nKOSPI 결과가 '{kospi_filename}' 파일로 저장되었습니다.")
-
-  if not kosdaq_formatted.empty:
-    kosdaq_filename = 'kosdaq_relative_strength.csv'
-    # CSV 저장용 컬럼 정리
-    kosdaq_save_cols = [
-      'Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt',
-      'RS_Price_Scaled', 'RS_Marcap_Scaled', 'RS_Price', 'RS_Marcap',
-      'Stock_Price_Return', 'Stock_Marcap_Return'
-    ]
-    kosdaq_formatted[kosdaq_save_cols].to_csv(kosdaq_filename, index=False, encoding='utf-8-sig')
-    print(f"KOSDAQ 결과가 '{kosdaq_filename}' 파일로 저장되었습니다.")
+  output_filename = 'korea_market_relative_strength.csv'
+  save_cols = [
+    'Ticker', 'Name', 'Market', 'Current_Marcap', 'Is_Trading_Halt',
+    'RS_Price_Scaled', 'RS_Marcap_Scaled', 'RS_Price', 'RS_Marcap',
+    'Stock_Price_Return', 'Stock_Marcap_Return'
+  ]
+  result_df[save_cols].to_csv(output_filename, index=False, encoding='utf-8-sig')
 
   end_time = time.time()
-  print(f"\n총 실행 시간: {end_time - start_time:.2f}초")
+  print(f"\n결과가 '{output_filename}' 파일로 저장되었습니다.")
+  print(f"총 실행 시간: {end_time - start_time:.2f}초")
 
 if __name__ == '__main__':
   main()
