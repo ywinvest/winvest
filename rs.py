@@ -185,7 +185,7 @@ def main():
   print("\n--- 수익률 기준 상대강도(RS) 상위 10개 종목 (0~98점) ---")
   print(result_df.head(10).to_string())
 
-  output_filename = 'kospi_relative_strength_final.csv'
+  output_filename = 'kospi_traderlion_relative_strength.csv'
   result_df.to_csv(output_filename, index=False, encoding='utf-8-sig')
 
   end_time = time.time()
