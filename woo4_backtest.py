@@ -45,14 +45,48 @@ def calculate_indicators(df):
   # df['First_52WeekHigh_Break'] = is_first_break.groupby(breaks).cumsum() == 1
   # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(is_52weekhigh_break, False)
   # 39주 신고가 첫 돌파여부
-  df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
+  # df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
   # 52주 신고가 첫 돌파여부
-  df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
+  # df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
   # 첫 돌파 이후 10일 동안 추가 돌파 무시
   # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(
   #     ~df['First_52WeekHigh_Break'].rolling(window=10, min_periods=1).sum().shift(1).fillna(0).astype(bool),
   #     False
   # )
+
+  def calculate_stable_high_break(df, window_days='364D', stable_days=10):
+    """
+    일정 기간 동안 유지된 고정 신고가를 기준으로 돌파 여부 판단
+
+    Args:
+        df (pd.DataFrame): 주가 데이터
+        window_days (str): 신고가 기준 기간 (예: '364D'는 52주)
+        stable_days (int): 며칠 이상 같은 신고가가 유지되었을 때만 기준으로 사용
+
+    Returns:
+        pd.Series: First_Stable_High_Break (boolean)
+    """
+    # 1. 신고가 계산 (예: 52주 기준)
+    pre_high = df['High'].shift(1).rolling(window=window_days, min_periods=1).max()
+
+    # 2. 이 신고가가 얼마나 오래 유지되었는지 계산
+    high_streak = (pre_high == pre_high.shift(1)).astype(int)
+    high_streak = high_streak.where(high_streak == 1, 0)
+    high_streak = high_streak.groupby((high_streak != 1).cumsum()).cumsum()
+
+    # 3. 기준 신고가는 stable_days 이상 유지된 경우에만 인정
+    stable_high = pre_high.where(high_streak >= stable_days)
+
+    # 4. 돌파 판단: stable_high가 존재하고, 종가가 이를 처음 초과
+    break_signal = (df['Close'] >= stable_high) & (df['Close'].shift(1) < stable_high.shift(1))
+
+    # NaN은 False로 채움
+    return break_signal.fillna(False)
+
+  # 52주 신고가 돌파 (안정된 기준 사용)
+  df['First_52WeekHigh_Break'] = calculate_stable_high_break(df, window_days='364D', stable_days=10)
+  # 39주 신고가 돌파 (273일 기준)
+  df['First_39WeekHigh_Break'] = calculate_stable_high_break(df, window_days='273D', stable_days=10)
 
   # 이동평균선 추세 상승 여부 (기울기 > 0)
   # df['MA20_Uptrend'] = df['MA20'] > df['MA20'].shift(1)
