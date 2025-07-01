@@ -271,7 +271,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 (after_partial_sell_data['Change'] < -0.02)
             )
             second_sell_dates = after_partial_sell_data.index[second_sell_cond]
-            second_stop_loss_dates = after_partial_sell_data.index[after_partial_sell_data['Close'] < stop_loss_price]
+            second_stop_loss_dates = after_partial_sell_data.index[after_partial_sell_data['Low'] < stop_loss_price]
 
             final_sell_date = second_sell_dates[0] if not second_sell_dates.empty else None
             final_stop_loss_date = second_stop_loss_dates[0] if not second_stop_loss_dates.empty else None
