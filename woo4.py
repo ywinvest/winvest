@@ -226,18 +226,19 @@ def send_to_slack(result_data):
       for _, row in group.iterrows():
         name = row['Name']
         marcap = row['Marcap']
+        ma20_gap = row['MA20_Gap']
         rs_1m = row['RS_1M']
         rs_3m = row['RS_3M']
         rs_6m = row['RS_6M']
 
-        message = f"{name} : {format_market_cap(marcap)}, RS_1M: {rs_1m}, RS_3M: {rs_3m}, RS_6M: {rs_6m}"
+        message = f"{name} : {format_market_cap(marcap)}, MA20_Gap: {ma20_gap * 100:.2f}%, RS_1M: {rs_1m}, RS_3M: {rs_3m}, RS_6M: {rs_6m}"
 
         # Rich Text 아이템 생성
         item = create_rich_text_with_imoji(
             "question", message, False
         )
 
-        if rs_1m >=70 and rs_1m >= rs_3m and rs_1m >= rs_6m:
+        if ma20_gap < 0.3 and rs_1m >= 70 and rs_1m >= rs_3m and rs_1m >= rs_6m:
           item = create_rich_text_with_imoji(
               "first_place_medal", message, False
           )
