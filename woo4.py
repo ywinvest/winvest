@@ -78,6 +78,21 @@ def calculate_indicators(df):
   df['MA120_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA120_Slope'] > 0)
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
+
+  df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
+  df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
+  df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
+  return df
+
+
+def calculate_relative_strength(df):
+  for period in ["1M", "3M", "6M"]:
+    return_col = f'Return_{period}'
+    rs_col = f'RS_{period}'
+
+    df[rs_col] = df.groupby('Market')[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
+
   return df
 
 def filter_common_stocks(df):
@@ -89,19 +104,20 @@ def filter_common_stocks(df):
             # & (df['Name'].str.contains("나무기술", na=False, regex=True))
             ]
 
-def buy_condition(df, market):
+def buy_condition(df):
   # 벡터화된 연산 사용
   conditions = pd.Series(True, index=df.index)
   # conditions &= (df['MA60_Uptrend'])
   # conditions &= (df['MA120_Uptrend'])
   # conditions &= (df['MA20_Cross'])
   # conditions &= (df['Close'] > df['Pre52WeekHigh'])
-  if market == 'KOSPI' or market == 'KOSDAQ GLOBAL':
-    conditions &= (df['Pre52WeekHigh'] != 0)
-    conditions &= (df['First_52WeekHigh_Break'])
-  elif market == 'KOSDAQ':
-    conditions &= (df['Pre39WeekHigh'] != 0)
-    conditions &= (df['First_39WeekHigh_Break'])
+  kospi_or_kosdaq_global = df['Market'].isin(['KOSPI', 'KOSDAQ GLOBAL'])
+  kosdaq = df['Market'] == 'KOSDAQ'
+
+  conditions &= (
+      ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
+      ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
+  )
   # conditions &= (df['MA20_Uptrend'] == True)
   # conditions &= (df['MA60_Uptrend'] == True)
   # conditions &= (df['MA120_Uptrend'] == True)
@@ -210,16 +226,21 @@ def send_to_slack(result_data):
       for _, row in group.iterrows():
         name = row['Name']
         marcap = row['Marcap']
-        open = row['Open']
-        close = row['Close']
-        high = row['High']
+        rs_1m = row['RS_1M']
+        rs_3m = row['RS_3M']
+        rs_6m = row['RS_6M']
 
-        message = f"{name} : {format_market_cap(marcap)}"
+        message = f"{name} : {format_market_cap(marcap)}, RS_1M: {rs_1m}, RS_3M: {rs_3m}, RS_6M: {rs_6m}"
 
         # Rich Text 아이템 생성
         item = create_rich_text_with_imoji(
             "question", message, False
         )
+
+        if rs_1m >=70 and rs_1m >= rs_3m and rs_1m >= rs_6m:
+          item = create_rich_text_with_imoji(
+              "first_place_medal", message, False
+          )
 
         rich_text_elements.append(item)
 
@@ -236,32 +257,29 @@ def send_to_slack(result_data):
   except Exception as e:
     print(f"Error sending Slack message: {e}")
 
-def process_stock(row, two_years_ago, today):
+def process_stock(row, two_years_ago):
   try:
-    ticker = row['Code']
+    symbol = row['Code']
     name = row['Name']
     marcap = row['Marcap']
     market = row['Market']
 
-    df = fdr.DataReader(ticker, two_years_ago)
+    df = fdr.DataReader(symbol, two_years_ago)
     df = calculate_indicators(df)
 
-    buys = df[buy_condition(df, market)]
-    buys = buys[buys.index.date == today.date()]
-
-    if not buys.empty:
-      buys['Ticker'] = ticker
-      buys['Name'] = name
-      buys['Marcap'] = marcap
-      buys['Market'] = market
-      return buys
+    if not df.empty:
+      df['Code'] = symbol
+      df['Name'] = name
+      df['Marcap'] = marcap
+      df['Market'] = market
+      return df
     return None
   except Exception as e:
-    print(f"Error processing {ticker}: {e}")
+    print(f"Error processing {symbol}: {e}")
     return None
 
-def parallel_process_stocks(all_stocks, two_years_ago, today):
-  process_func = partial(process_stock, two_years_ago=two_years_ago, today=today)
+def parallel_process_stocks(all_stocks, two_years_ago):
+  process_func = partial(process_stock, two_years_ago=two_years_ago)
   results = []
 
   with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -280,21 +298,23 @@ if __name__ == "__main__":
   load_dotenv()
 
   try:
-    # 종목 리스트 가져오기 및 필터링
-    all_stocks = pd.concat([
-      filter_common_stocks(fdr.StockListing('KOSPI')),
-      filter_common_stocks(fdr.StockListing('KOSDAQ'))
-    ], ignore_index=True)
+    kospi = fdr.StockListing('KOSPI')
+    kosdaq = fdr.StockListing('KOSDAQ')
+    all_stocks = pd.concat([kospi, kosdaq], ignore_index=True)
 
     # 날짜 설정
     today = datetime.today()
     two_years_ago = today.year - 2
 
     # 병렬 처리로 데이터 분석
-    result_data = parallel_process_stocks(all_stocks, two_years_ago, today)
+    result_data = parallel_process_stocks(all_stocks, two_years_ago)
+    result_data = calculate_relative_strength(result_data)
+    filtered_data = filter_common_stocks(result_data)
+    final_data = filtered_data[buy_condition(filtered_data)]
+    final_data = final_data[final_data.index.date == today.date()]
 
     # Slack 메시지 전송
-    send_to_slack(result_data)
+    send_to_slack(final_data)
 
   except Exception as e:
     print(f"Error in main execution: {e}")
