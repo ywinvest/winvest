@@ -94,10 +94,9 @@ def calculate_indicators(df):
 
     return is_breakout_day.fillna(False)
 
-  # 52주 신고가 돌파 (안정된 기준 사용)
-  df['First_52WeekHigh_Break'] = calculate_stable_high_break(df, window_days='364D', cooldown_days=10)
-  # 39주 신고가 돌파 (273일 기준)
-  df['First_39WeekHigh_Break'] = calculate_stable_high_break(df, window_days='273D', cooldown_days=10)
+  # 52주/39주 신고가 돌파 신호
+  df['First_52WeekHigh_Break'] = calculate_stable_high_break(df, window_days='364D', cooldown_days=5)
+  df['First_39WeekHigh_Break'] = calculate_stable_high_break(df, window_days='273D', cooldown_days=5)
 
   # 이동평균선 추세 상승 여부 (기울기 > 0)
   # df['MA20_Uptrend'] = df['MA20'] > df['MA20'].shift(1)
