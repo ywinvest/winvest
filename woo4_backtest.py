@@ -240,6 +240,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # 익절/손절 가격 정의
         take_profit_price = buy_price * 1.3
         stop_loss_price = buy_price * 0.92
+        trailing_stop_loss_price = buy_price * 1.1
 
         # 1차 매도 (분할 익절 또는 전체 손절)
         take_profit_dates = trade_data.index[trade_data['High'] >= take_profit_price]
@@ -270,8 +271,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 (after_partial_sell_data['Bullish'] == False) &
                 (after_partial_sell_data['Change'] < -0.02)
             )
+            second_stop_loss_cond = (
+                (after_partial_sell_data['Close'] < trailing_stop_loss_price)
+            )
             second_sell_dates = after_partial_sell_data.index[second_sell_cond]
-            second_stop_loss_dates = after_partial_sell_data.index[after_partial_sell_data['Close'] < stop_loss_price]
+            second_stop_loss_dates = after_partial_sell_data.index[second_stop_loss_cond]
 
             final_sell_date = second_sell_dates[0] if not second_sell_dates.empty else None
             final_stop_loss_date = second_stop_loss_dates[0] if not second_stop_loss_dates.empty else None
