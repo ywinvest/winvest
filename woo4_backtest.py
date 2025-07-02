@@ -54,43 +54,50 @@ def calculate_indicators(df):
   #     False
   # )
 
-  def calculate_stable_high_break(df, window_days='364D', lookback_days=10):
+  def calculate_stable_high_break(df, window_days='364D', cooldown_days=10):
     """
-    N거래일 이전의 신고가를 기준으로 돌파 여부 판단
+    고가 돌파 후 종가가 마감하지 못했을 때, 특정 기간 기준가를 고정하여 돌파 신호를 계산합니다.
+    (This is the improved function)
 
     Args:
-        df (pd.DataFrame): 주가 데이터
-        window_days (str): 신고가 기준 기간 (예: '364D'는 52주, '273D'는 39주)
-        lookback_days (int): 몇 거래일 이전의 신고가를 기준으로 할지
+        df (pd.DataFrame): 'High', 'Close' 컬럼을 포함한 데이터프레임
+        window_days (str): 신고가 판단을 위한 기간 (예: '364D'는 52주)
+        cooldown_days (int): 기준가를 고정할 거래일 수
 
     Returns:
-        pd.Series: 돌파 여부 (boolean)
+        pd.Series: 돌파 신호가 발생한 날을 True로 표시하는 boolean 시리즈
     """
-    # 1. 각 시점에서 과거 N일간의 최고가 계산
-    rolling_high = df['High'].rolling(window=window_days, min_periods=1).max()
+    # 1. 각 거래일 직전까지의 'window_days' 기간 동안의 최고가를 계산합니다.
+    # shift(1)을 사용하여 당일의 고가는 포함하지 않습니다.
+    prev_period_high = df['High'].shift(1).rolling(window=window_days, min_periods=1).max()
 
-    # 2. lookback_days 거래일 이전의 신고가를 기준으로 사용
-    # shift(lookback_days + 1)을 사용하는 이유:
-    # - shift(1): 전일 기준
-    # - shift(lookback_days + 1): lookback_days 거래일 이전 기준
-    stable_high = rolling_high.shift(lookback_days + 1)
+    # 2. '실패한 돌파'를 감지합니다. (고가는 넘었지만, 종가는 넘지 못함)
+    is_failed_breakout = (df['High'] > prev_period_high) & (df['Close'] <= prev_period_high)
 
-    # 3. 돌파 조건: 현재 종가가 기준 신고가를 처음으로 초과
-    # 현재 종가 > 기준 신고가 AND 전일 종가 <= 기준 신고가
-    current_break = df['Close'] > stable_high
-    prev_break = df['Close'].shift(1) <= stable_high.shift(1)
+    # 3. '실패한 돌파'가 발생한 날의 'prev_period_high' 값을 저장합니다. 이 값이 '고정 기준가'가 됩니다.
+    # where 함수를 사용해 조건이 False인 날은 NaN으로 처리합니다.
+    freeze_high_marker = prev_period_high.where(is_failed_breakout)
 
-    break_signal = current_break & prev_break
+    # 4. '고정 기준가'를 'cooldown_days' 동안 유지합니다.
+    # ffill(limit=...)을 사용해 NaN 값을 직전의 유효한 값으로 채웁니다.
+    # limit는 채울 수 있는 최대 연속 NaN 개수를 의미하며, cooldown_days-1로 설정하여 총 10일간 값이 유지되도록 합니다.
+    frozen_high_series = freeze_high_marker.ffill(limit=cooldown_days - 1)
 
-    # 4. NaN 값 처리
-    break_signal = break_signal.fillna(False)
+    # 5. 최종 '돌파 기준가'를 결정합니다.
+    # '고정 기준가'가 존재하면(NaN이 아니면) 그 값을 사용하고, 아니면 일반 'prev_period_high'를 사용합니다.
+    # combine_first는 frozen_high_series의 non-NaN 값을 우선적으로 사용하고, 나머지를 prev_period_high로 채웁니다.
+    baseline_high = frozen_high_series.combine_first(prev_period_high)
 
-    return break_signal
+    # 6. '돌파 기준가'를 처음으로 상향 돌파하는 날을 찾습니다.
+    # 현재 종가가 기준가를 넘고, 바로 전날 종가는 기준가보다 아래여야 합니다.
+    is_breakout_day = (df['Close'] > baseline_high) & (df['Close'].shift(1) <= baseline_high.shift(1))
+
+    return is_breakout_day.fillna(False)
 
   # 52주 신고가 돌파 (안정된 기준 사용)
-  df['First_52WeekHigh_Break'] = calculate_stable_high_break(df, window_days='364D', lookback_days=10)
+  df['First_52WeekHigh_Break'] = calculate_stable_high_break(df, window_days='364D', cooldown_days=10)
   # 39주 신고가 돌파 (273일 기준)
-  df['First_39WeekHigh_Break'] = calculate_stable_high_break(df, window_days='273D', lookback_days=10)
+  df['First_39WeekHigh_Break'] = calculate_stable_high_break(df, window_days='273D', cooldown_days=10)
 
   # 이동평균선 추세 상승 여부 (기울기 > 0)
   # df['MA20_Uptrend'] = df['MA20'] > df['MA20'].shift(1)
