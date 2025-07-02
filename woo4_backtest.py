@@ -238,7 +238,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
       if not trade_data.empty:
         # 익절/손절 가격 정의
-        take_profit_price = buy_price * 1.3
+        take_profit_price = buy_price * 1.295
         stop_loss_price = buy_price * 0.92
 
         # 1차 매도 (분할 익절 또는 전체 손절)
