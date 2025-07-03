@@ -6,6 +6,7 @@ from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
+import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
 
@@ -82,6 +83,9 @@ def calculate_indicators(df):
   df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
   df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
   df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
+  df['Weighted_Return'] = (df['Return_1M'] * 0.5 +
+                           df['Return_3M'] * 0.3 +
+                           df['Return_6M'] * 0.2)
   return df
 
 
@@ -92,6 +96,9 @@ def calculate_relative_strength(df):
 
     df[rs_col] = df.groupby('Market')[return_col].rank(pct=True) * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
+
+  df['RS'] = df.groupby('Market')['Weighted_Return'].rank(pct=True) * 98 + 1
+  df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   return df
 
@@ -132,7 +139,7 @@ def buy_condition(df):
   # conditions &= (df['MA20_Gap'] < 0.3)
   return conditions
 
-def create_rich_text_with_imoji(emoji, text, bold=True):
+def create_rich_text_with_emoji(emoji, text, bold=True):
   return {
     "type": "rich_text_section",
     "elements": [
@@ -197,52 +204,62 @@ def format_market_cap(marcap):
   else:  # 억 단위
     return f"{marcap/1e8:.0f}억"
 
-def send_to_slack(result_data):
+def truncate_name(name, max_length=10):
+  """종목명을 max_length자로 제한하고, 길면 말줄임표 추가"""
+  return name[:max_length-1] + '…' if len(name) > max_length else name
+
+def send_to_slack(result_data, kospi, kosdaq):
   try:
     if result_data.empty:
       blocks = [
         {
-          "type": "section",
-          "text": {
-            "type": "plain_text",
-            "text": "오늘은 매수 후보가 없습니다.",
-            "emoji": True
-          }
+          "type": "rich_text",
+          "elements": create_rich_text_item("오늘은 매수 후보가 없습니다.")
         }
       ]
       send_slack_message(blocks)
       print("No stocks match the buying conditions")
       return
 
-    # 결과를 Market과 High_Change를 기준으로 정렬
-    # result_data = result_data.sort_values(['Market', 'High_Change'], ascending=[True, False])
+    result_data = result_data.sort_values(['Market', 'RS'], ascending=[True, False])
+
+    # 시장별 RSI 값 가져오기 (오늘 날짜 기준)
+    kospi_rsi = kospi[kospi.index.date == today.date()]['RSI'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
+    kosdaq_rsi = kosdaq[kosdaq.index.date == today.date()]['RSI'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
 
     # 시장별로 데이터 구성
     rich_text_elements = []
     rich_text_elements.append(create_rich_text_item(
-        f" {today.year}년 {today.month}월 {today.day}일 매수 후보\n", True
+        f" {today.year}년 {today.month}월 {today.day}일 신고가 돌파", True
     ))
     for market, group in result_data.groupby('Market'):
+      rsi_emoji = "large_green_circle" if 50 <= (kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80 else "red_circle"
+      rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
+      if rsi_value is not None:
+        rich_text_elements.append(create_rich_text_with_emoji(
+            rsi_emoji, f"{market} ({rsi_value:.2f})", True
+        ))
       for _, row in group.iterrows():
         name = row['Name']
         marcap = row['Marcap']
+        rs = row['RS']
         rs_1m = row['RS_1M']
         rs_3m = row['RS_3M']
         rs_6m = row['RS_6M']
 
-        message = f"{name} : {format_market_cap(marcap)}, RS_1M: {rs_1m}, RS_3M: {rs_3m}, RS_6M: {rs_6m}"
+        name_truncated = truncate_name(name, 10)
+        emoji = "first_place_medal" if rs_1m >= 70 and rs_1m >= rs_3m and rs_1m >= rs_6m else "question"
 
-        # Rich Text 아이템 생성
-        item = create_rich_text_with_imoji(
-            "question", message, False
-        )
-
-        if rs_1m >=70 and rs_1m >= rs_3m and rs_1m >= rs_6m:
-          item = create_rich_text_with_imoji(
-              "first_place_medal", message, False
-          )
-
-        rich_text_elements.append(item)
+        # 한 줄에 종목명과 값 출력, 종목명과 ":" 사이에 공백 2개
+        rich_text_elements.append({
+          "type": "rich_text_section",
+          "elements": [
+            {"type": "emoji", "name": emoji},
+            {"type": "text", "text": f"{name_truncated}",
+             "style": {"code": True}},
+            {"type": "text", "text": f" {rs} ({rs_1m}, {rs_3m}, {rs_6m}), {format_market_cap(marcap)}"}
+          ]
+        })
 
     blocks = [
       {
@@ -298,13 +315,20 @@ if __name__ == "__main__":
   load_dotenv()
 
   try:
-    kospi = fdr.StockListing('KOSPI')
-    kosdaq = fdr.StockListing('KOSDAQ')
-    all_stocks = pd.concat([kospi, kosdaq], ignore_index=True)
+    all_stocks = pd.concat([
+      fdr.StockListing('KOSPI'),
+      fdr.StockListing('KOSDAQ')
+    ], ignore_index=True)
 
     # 날짜 설정
     today = datetime.today()
     two_years_ago = today.year - 2
+
+    kospi = fdr.DataReader('KS11', two_years_ago)
+    kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
+
+    kosdaq = fdr.DataReader('KQ11', two_years_ago)
+    kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
@@ -314,7 +338,7 @@ if __name__ == "__main__":
     final_data = final_data[final_data.index.date == today.date()]
 
     # Slack 메시지 전송
-    send_to_slack(final_data)
+    send_to_slack(final_data, kospi, kosdaq)
 
   except Exception as e:
     print(f"Error in main execution: {e}")

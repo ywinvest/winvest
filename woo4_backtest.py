@@ -12,108 +12,6 @@ import woo1
 import woo4
 
 
-def calculate_indicators(df):
-  # df['MA5'] = df['Close'].rolling(window=5).mean()
-  # df['MA10'] = df['Close'].rolling(window=10).mean()
-  df['MA20'] = df['Close'].rolling(window=20).mean()
-  df['MA60'] = df['Close'].rolling(window=60).mean()
-  df['MA120'] = df['Close'].rolling(window=120).mean()
-  df['MA20_Cross'] = (df['Close'].gt(df['MA20'], axis=0)) & (df['Close'].shift(1).le(df['MA20'].shift(1), axis=0))
-  df['MA20_Break'] = (df['Close'].lt(df['MA20'], axis=0)) & (df['Close'].shift(1).ge(df['MA20'].shift(1), axis=0))
-  df['Bullish'] = df['Close'] > df['Open']
-  df['Volume_Change'] = df['Volume'] / df['Volume'].shift(1) - 1
-  # df['High_Change'] = (df['High'] / df['Close'].shift(1) - 1) * 100
-  # df['Pre_Change'] = df['Change'].shift(1)
-  # # df['Pre_Bullish'] = df['Close'].shift(1) > df['Open'].shift(1)
-  # df['Pre_High_Change'] = df['High_Change'].shift(1)
-  # df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
-  # df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
-  # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
-  df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
-
-  df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
-
-  # 39주 신고가 돌파 여부
-  is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
-  # 52주 신고가 돌파 여부
-  is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
-
-  # 연속적인 신고가 돌파를 그룹화하여 첫 돌파만 선택
-  # 돌파가 시작되는 지점을 그룹화 기준으로 사용
-  # breaks = (~is_52weekhigh_break).cumsum()  # 돌파가 끊기는 지점으로 그룹화
-  # is_first_break = is_52weekhigh_break & (~is_52weekhigh_break.shift(1).fillna(False))
-  # df['First_52WeekHigh_Break'] = is_first_break.groupby(breaks).cumsum() == 1
-  # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(is_52weekhigh_break, False)
-  # 39주 신고가 첫 돌파여부
-  df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
-  # 52주 신고가 첫 돌파여부
-  df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
-  # 첫 돌파 이후 10일 동안 추가 돌파 무시
-  # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(
-  #     ~df['First_52WeekHigh_Break'].rolling(window=10, min_periods=1).sum().shift(1).fillna(0).astype(bool),
-  #     False
-  # )
-
-  # 이동평균선 추세 상승 여부 (기울기 > 0)
-  # df['MA20_Uptrend'] = df['MA20'] > df['MA20'].shift(1)
-  # df['MA60_Uptrend'] = df['MA60'] > df['MA60'].shift(1)
-  # df['MA120_Uptrend'] = df['MA120'] > df['MA120'].shift(1)
-  df['MA20_Slope'] = df['MA20'].pct_change(fill_method=None)
-  df['MA60_Slope'] = df['MA60'].pct_change(fill_method=None)
-  df['MA120_Slope'] = df['MA120'].pct_change(fill_method=None)
-
-  # 벡터화된 연속 상승 일수 계산
-  def calculate_uptrend_days_vec(uptrend_series):
-    """벡터화 방식으로 연속 상승 일수를 계산"""
-    # 상승 추세가 끊기는 지점을 그룹화 기준으로 사용
-    breaks = (~uptrend_series).cumsum()
-    # 각 그룹 내에서 연속된 True의 개수 계산
-    uptrend_days = uptrend_series.groupby(breaks).cumsum()
-    # 상승 추세가 아닌 경우(False)는 0으로 설정
-    uptrend_days = uptrend_days.where(uptrend_series, 0)
-    return uptrend_days
-
-  # 각 MA에 대해 추세 상승 유지 일수 추가
-  df['MA20_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA20_Slope'] > 0)
-  df['MA60_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA60_Slope'] > 0)
-  df['MA120_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA120_Slope'] > 0)
-
-  df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
-
-  df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
-  df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
-  df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
-  return df
-
-def buy_condition(df):
-  # 벡터화된 연산 사용
-  conditions = pd.Series(True, index=df.index)
-  # conditions &= (df['MA60_Uptrend'])
-  # conditions &= (df['MA120_Uptrend'])
-  # conditions &= (df['MA20_Cross'])
-  # conditions &= (df['Close'] > df['Pre52WeekHigh'])
-  kospi_or_kosdaq_global = df['Market'].isin(['KOSPI', 'KOSDAQ GLOBAL'])
-  kosdaq = df['Market'] == 'KOSDAQ'
-
-  conditions &= (
-      ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
-      ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
-  )
-  # conditions &= (df['MA20_Uptrend'] == True)
-  # conditions &= (df['MA60_Uptrend'] == True)
-  # conditions &= (df['MA120_Uptrend'] == True)
-  conditions &= (df['MA20_Slope'] > 0)
-  conditions &= (df['MA60_Slope'] > 0)
-  conditions &= (df['MA120_Slope'] > 0)
-  conditions &= (df['Change'] < 0.295)
-  conditions &= (df['Volume'] > 0)
-  conditions &= (df['Volume'].shift(1) > 0)
-  conditions &= (df['MA120_Uptrend_Days'] < 400) # 120일 상승 추세 장기 연속 제외
-  conditions &= ((df['Close'] - df['Open'])/df['Close'] > -0.05) # 긴 음봉 제외
-  # conditions &= (df['MA20_Gap'] < 0.3)
-  return conditions
-
-# 매도 조건 함수들
 def calculate_trading_days(df, start_date, end_date):
   """
   실제 거래일 기준으로 보유기간을 계산하는 함수
@@ -166,7 +64,7 @@ def process_stock(row):
       print(f"No data after listing date for {code}")
       return None
 
-    df = calculate_indicators(df)
+    df = woo4.calculate_indicators(df)
 
     if not df.empty:
       df['Code'] = code
@@ -181,7 +79,7 @@ def process_stock(row):
 
 def buy_and_sell(df, kospi_df, kosdaq_df):
   # 매수 신호가 발생한 모든 거래를 가져옵니다.
-  buy_signals = df[buy_condition(df)].copy()
+  buy_signals = df[woo4.buy_condition(df)].copy()
   buy_signals = buy_signals[buy_signals.index >= '2015-06-15']
 
   if buy_signals.empty:
