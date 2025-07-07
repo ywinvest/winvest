@@ -55,7 +55,7 @@ def buy_condition(df):
   conditions &= (df['Low'] != df['52WeekLow']) # 52주 신저가 경신 제외
   return conditions
 
-def create_rich_text_with_imoji(emoji, text, bold=True):
+def create_rich_text_with_emoji(emoji, text, bold=True):
   return {
     "type": "rich_text_section",
     "elements": [
@@ -161,15 +161,15 @@ def send_to_slack(result_data):
         message = f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%, 고가-종가: {diff_high_close * 100:.2f}%, 종가-시가: {diff_close_open * 100:.2f}%, 거래량: {volume_change * 100:.2f}%"
 
         # Rich Text 아이템 생성
-        item = create_rich_text_with_imoji(
+        item = create_rich_text_with_emoji(
             "question", message, False
         )
         if high_change >= 10 and volume_change > 5 and diff_high_close >= 0 and diff_high_close <= 0.025:
-          item = create_rich_text_with_imoji(
+          item = create_rich_text_with_emoji(
               "first_place_medal", message, False
           )
         elif high_change >= 10 and volume_change > 5 and diff_high_close > 0.1 and diff_close_open >= 0.01:
-          item = create_rich_text_with_imoji(
+          item = create_rich_text_with_emoji(
               "second_place_medal", message, False
           )
 
