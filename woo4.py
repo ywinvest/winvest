@@ -242,13 +242,14 @@ def send_to_slack(result_data, kospi, kosdaq):
       for _, row in group.iterrows():
         name = row['Name']
         marcap = row['Marcap']
+        ma20_gap = row['MA20_Gap']
         rs = row['RS']
         rs_1m = row['RS_1M']
         rs_3m = row['RS_3M']
         rs_6m = row['RS_6M']
 
         name_truncated = truncate_name(name, 10)
-        emoji = "first_place_medal" if rs_1m >= 70 and rs_1m >= rs_3m and rs_1m >= rs_6m else "question"
+        emoji = "first_place_medal" if ma20_gap < 0.3 and rs_1m >= 70 and rs_1m >= rs_3m and rs_1m >= rs_6m else "question"
 
         # 한 줄에 종목명과 값 출력, 종목명과 ":" 사이에 공백 2개
         rich_text_elements.append({
@@ -257,7 +258,7 @@ def send_to_slack(result_data, kospi, kosdaq):
             {"type": "emoji", "name": emoji},
             {"type": "text", "text": f"{name_truncated}",
              "style": {"code": True}},
-            {"type": "text", "text": f" {rs} ({rs_1m}, {rs_3m}, {rs_6m}), {format_market_cap(marcap)}"}
+            {"type": "text", "text": f" {ma20_gap * 100:.2f}%, {rs} ({rs_1m}, {rs_3m}, {rs_6m}), {format_market_cap(marcap)}"}
           ]
         })
 
