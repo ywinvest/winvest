@@ -106,6 +106,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       market = buy_row['Market']
       index_rsi = None
       index_ma60_up = None
+      index_adx = None
 
       rsi_source_df = None
       if market == 'KOSPI':
@@ -116,8 +117,10 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       if rsi_source_df is not None and buy_date in rsi_source_df.index:
         rsi_val = rsi_source_df.loc[buy_date, 'RSI']
         index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-        ma60_up_val = rsi_source_df.loc[buy_date, 'MA60_Up']
-        index_ma60_up = ma60_up_val.iloc[0] if isinstance(ma60_up_val, pd.Series) else ma60_up_val
+        # ma60_up_val = rsi_source_df.loc[buy_date, 'MA60_Up']
+        # index_ma60_up = ma60_up_val.iloc[0] if isinstance(ma60_up_val, pd.Series) else ma60_up_val
+        adx_val = rsi_source_df.loc[buy_date, 'ADX']
+        index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
 
       # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
       #   continue
@@ -194,7 +197,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
         'Index_RSI': index_rsi,
-        'Index_MA60_Up': index_ma60_up,
+        # 'Index_MA60_Up': index_ma60_up,
+        'Index_ADX': index_adx,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Full_Sell_Date': full_sell_date,
@@ -247,11 +251,16 @@ if __name__ == "__main__":
 
     kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
-    kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
+    # kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
+    adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
+    kospi['ADX'] = adx_data['ADX_14']
+
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
-    kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
+    # kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
+    adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
+    kosdaq['ADX'] = adx_data['ADX_14']
 
     result_file = "woo4_backtest_results.csv"
 

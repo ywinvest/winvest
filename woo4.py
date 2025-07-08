@@ -226,6 +226,8 @@ def send_to_slack(result_data, kospi, kosdaq):
     # 시장별 RSI 값 가져오기 (오늘 날짜 기준)
     kospi_rsi = kospi[kospi.index.date == today.date()]['RSI'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
     kosdaq_rsi = kosdaq[kosdaq.index.date == today.date()]['RSI'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
+    kospi_adx = kospi[kospi.index.date == today.date()]['ADX'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
+    kosdaq_adx = kosdaq[kosdaq.index.date == today.date()]['ADX'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
 
     # 시장별로 데이터 구성
     rich_text_elements = []
@@ -233,12 +235,14 @@ def send_to_slack(result_data, kospi, kosdaq):
         f" {today.year}년 {today.month}월 {today.day}일 신고가 돌파", True
     ))
     for market, group in result_data.groupby('Market'):
-      rsi_emoji = "large_green_circle" if 50 <= (kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80 else "red_circle"
+      rsi_emoji = "large_green_circle" if (50 <= (
+        kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80) and (
+                                            kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25 else "red_circle"
       rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
-      if rsi_value is not None:
-        rich_text_elements.append(create_rich_text_with_emoji(
-            rsi_emoji, f"{market} ({rsi_value:.2f})", True
-        ))
+      adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
+      rich_text_elements.append(create_rich_text_with_emoji(
+          rsi_emoji, f"{market} ({rsi_value:.2f}, {adx_value:.2f})", True
+      ))
       for _, row in group.iterrows():
         name = row['Name']
         marcap = row['Marcap']
@@ -327,9 +331,13 @@ if __name__ == "__main__":
 
     kospi = fdr.DataReader('KS11', two_years_ago)
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
+    adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
+    kospi['ADX'] = adx_data['ADX_14']
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
+    adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
+    kosdaq['ADX'] = adx_data['ADX_14']
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
