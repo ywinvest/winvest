@@ -107,6 +107,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       index_rsi = None
       index_ma60_up = None
       index_adx = None
+      index_di = None
 
       rsi_source_df = None
       if market == 'KOSPI':
@@ -121,6 +122,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # index_ma60_up = ma60_up_val.iloc[0] if isinstance(ma60_up_val, pd.Series) else ma60_up_val
         adx_val = rsi_source_df.loc[buy_date, 'ADX']
         index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+        di_val = rsi_source_df.loc[buy_date, 'DI']
+        index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
       # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
       #   continue
@@ -199,6 +202,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Index_RSI': index_rsi,
         # 'Index_MA60_Up': index_ma60_up,
         'Index_ADX': index_adx,
+        'Index_DI': index_di,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Full_Sell_Date': full_sell_date,
@@ -254,13 +258,14 @@ if __name__ == "__main__":
     # kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
-
+    kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     # kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
+    kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
 
     result_file = "woo4_backtest_results.csv"
 

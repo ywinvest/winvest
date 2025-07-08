@@ -228,6 +228,8 @@ def send_to_slack(result_data, kospi, kosdaq):
     kosdaq_rsi = kosdaq[kosdaq.index.date == today.date()]['RSI'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
     kospi_adx = kospi[kospi.index.date == today.date()]['ADX'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
     kosdaq_adx = kosdaq[kosdaq.index.date == today.date()]['ADX'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
+    kospi_di = kospi[kospi.index.date == today.date()]['DI'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
+    kosdaq_di = kosdaq[kosdaq.index.date == today.date()]['DI'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
 
     # 시장별로 데이터 구성
     rich_text_elements = []
@@ -237,7 +239,8 @@ def send_to_slack(result_data, kospi, kosdaq):
     for market, group in result_data.groupby('Market'):
       rsi_emoji = "large_green_circle" if (50 <= (
         kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80) and (
-                                            kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25 else "red_circle"
+          (kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
+        kospi_di if market == 'KOSPI' else kosdaq_di) else "red_circle"
       rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
       adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
       rich_text_elements.append(create_rich_text_with_emoji(
@@ -333,11 +336,13 @@ if __name__ == "__main__":
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
+    kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
+    kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
