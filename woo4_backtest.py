@@ -144,9 +144,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
       if not trade_data.empty:
         # 익절/손절 가격 정의
-        take_profit_price = buy_price * 1.3
+        take_profit_price = buy_price * 1.24
         stop_loss_price = buy_price * 0.92
-        trailing_stop_loss_price = buy_price * 1.1
+        trailing_stop_loss_price = buy_price * 1.08
 
         # 1차 매도 (분할 익절 또는 전체 손절)
         take_profit_dates = trade_data.index[trade_data['High'] >= take_profit_price]
