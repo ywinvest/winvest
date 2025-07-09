@@ -9,6 +9,7 @@ import pandas as pd
 import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
+from pykrx import stock
 
 import woo1
 import woo4
@@ -65,6 +66,17 @@ def process_stock(row):
     if df.empty:
       print(f"No data after listing date for {code}")
       return None
+
+    start_date_str = df.index.min().strftime('%Y%m%d')
+    end_date_str = df.index.max().strftime('%Y%m%d')
+    df_marcap = stock.get_market_cap_by_date(start_date_str, end_date_str, code)
+
+    df_marcap.index = pd.to_datetime(df_marcap.index)
+    df_marcap = df_marcap.rename(columns={'시가총액': 'Actual_Marcap'})
+
+    df = pd.merge(df, df_marcap['Actual_Marcap'], left_index=True, right_index=True, how='left')
+
+    df['Actual_Marcap'].fillna(method='ffill', inplace=True)
 
     df = woo4.calculate_indicators(df)
 
@@ -131,6 +143,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_price = buy_row['Close']
       current_price = stock_group['Close'].iloc[-1]
       estimated_marcap = buy_row['Marcap'] * (buy_price / current_price)
+      actual_marcap = buy_row['Actual_Marcap']
 
       if estimated_marcap < 2e+11:
         continue
@@ -199,6 +212,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Date': buy_date,
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
+        'Actual_Marcap': actual_marcap,
         'Index_RSI': index_rsi,
         # 'Index_MA60_Up': index_ma60_up,
         'Index_ADX': index_adx,
