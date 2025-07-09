@@ -76,7 +76,7 @@ def process_stock(row):
 
     df = pd.merge(df, df_marcap['Actual_Marcap'], left_index=True, right_index=True, how='left')
 
-    df['Actual_Marcap'].fillna(method='ffill', inplace=True)
+    df['Actual_Marcap'].ffill()
 
     df = woo4.calculate_indicators(df)
 
