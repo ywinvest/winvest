@@ -81,6 +81,7 @@ def process_stock(row):
 
         partial_sell_date = None
         partial_sell_price = None
+        high_in_sell_date = None
 
         # 1일차 (T+1)
         if not data_1.empty:
@@ -92,6 +93,7 @@ def process_stock(row):
           if next_day['Open'] >= buy_price * PARTIAL_TARGET_RETURN:
             partial_sell_date = next_date
             partial_sell_price = next_day['Open']
+            high_in_sell_date = next_day['High']
 
           # 시가에 매도 실패 시
           if not partial_sell_date:
@@ -99,6 +101,7 @@ def process_stock(row):
             if next_day['High'] >= buy_price * PARTIAL_TARGET_RETURN:
               partial_sell_date = next_date
               partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+              high_in_sell_date = next_day['High']
         else:
           print(f"{name} buy in {buy_date}")
 
@@ -131,15 +134,19 @@ def process_stock(row):
               if condition == 'open':
                 partial_sell_date = earliest_date
                 partial_sell_price = data_2_22.loc[earliest_date, 'Open']
+                high_in_sell_date = data_2_22.loc[earliest_date, 'High']
               elif condition == 'high':
                 partial_sell_date = earliest_date
                 partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
+                high_in_sell_date = data_2_22.loc[earliest_date, 'High']
               elif condition == 'stop2':
                 partial_sell_date = earliest_date
                 partial_sell_price = data_2_22.loc[earliest_date, 'Close']
+                high_in_sell_date = data_2_22.loc[earliest_date, 'High']
               else:  # condition == 'stop'
                 partial_sell_date = earliest_date
                 partial_sell_price = data_2_22.loc[earliest_date, 'Close']
+                high_in_sell_date = data_2_22.loc[earliest_date, 'High']
 
         # 22일차 (T+22)
         if not partial_sell_date:
@@ -149,6 +156,7 @@ def process_stock(row):
 
             partial_sell_date = final_date
             partial_sell_price = final_data.loc[final_date, 'Close']
+            high_in_sell_date = final_data.loc[final_date, 'High']
           else:
             print(f"{name} no sell condition met. {buy_date}, {buy_price}")
 
@@ -162,6 +170,7 @@ def process_stock(row):
         buys.loc[buy_date, 'Partial_Sell_Price'] = partial_sell_price
         buys.loc[buy_date, 'Full_Sell_Date'] = partial_sell_date
         buys.loc[buy_date, 'Full_Sell_Price'] = partial_sell_price
+        buys.loc[buy_date, 'High_In_Sell_Date'] = high_in_sell_date
 
         # 보유기간 계산 (영업일 기준)
         if partial_sell_date:
