@@ -83,14 +83,15 @@ def calculate_indicators(df):
   df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
   df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
   df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
-  df['Weighted_Return'] = (df['Return_1M'] * 0.5 +
-                           df['Return_3M'] * 0.3 +
-                           df['Return_6M'] * 0.2)
+  df['Return_12M'] = df['Close'] / df['Close'].shift(240) - 1
+  df['Weighted_Return'] = (df['Return_3M'] * 0.5 +
+                           df['Return_6M'] * 0.3 +
+                           df['Return_12M'] * 0.2)
   return df
 
 
 def calculate_relative_strength(df):
-  for period in ["1M", "3M", "6M"]:
+  for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
