@@ -31,20 +31,22 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  """전체 종목에 대한 상대강도를 계산합니다."""
   df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-    # qcut으로 균등한 백분위 계산
+    # NaN 값을 중앙값으로 채움
+    df[return_col] = df.groupby('Market_Group')[return_col].transform(lambda x: x.fillna(x.median()))
+    # 순위 기반 정규화 (1~99로 스케일링)
     df[rs_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop')
+        lambda x: ((x.rank(method='dense') - 1) / (x.rank(method='dense').max() - 1) * 98 + 1).round().astype(int)
     )
-    df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
+    df[rs_col] = df[rs_col].clip(1, 99)
+  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(lambda x: x.fillna(x.median()))
   df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop')
+      lambda x: ((x.rank(method='dense') - 1) / (x.rank(method='dense').max() - 1) * 98 + 1).round().astype(int)
   )
-  df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
+  df['RS'] = df['RS'].clip(1, 99)
   df = df.drop('Market_Group', axis=1)
   return df
 
@@ -122,6 +124,7 @@ if __name__ == "__main__":
     result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
 
     print(f"총 {len(result_data)}개 종목의 최신 RS 데이터가 {result_file}에 저장되었습니다.")
+    print(result_data.groupby('Market')['RS'].value_counts(bins=10))
 
   except Exception as e:
     print(f"Error in main execution: {e}")
