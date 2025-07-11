@@ -43,7 +43,7 @@ def calculate_relative_strength(df):
         lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
     )
     df[rs_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1).round().astype(int)
+        lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
     )
     df[rs_col] = df[rs_col].clip(1, 99)
 
@@ -54,7 +54,7 @@ def calculate_relative_strength(df):
       lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
   )
   df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1).round().astype(int)
+      lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
   )
   df['RS'] = df['RS'].clip(1, 99)
 
