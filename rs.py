@@ -124,25 +124,25 @@ if __name__ == "__main__":
 
     all_stocks = filter_common_stocks(all_stocks)
 
-    # 날짜 설정
     today = datetime.today()
-    yesterday = datetime.today() - timedelta(days=1) # yesterdate는 2025-07-13 (일요일)이 됨
-
+    yesterday = today - timedelta(days=1)
     two_years_ago = today.year - 2
-
     result_file = "rs.csv"
-
-    # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
     result_data = calculate_relative_strength(result_data)
 
+    # 날짜 필터링 전후 RS 분포 확인
+    print("Before date filter:", result_data['RS'].value_counts(bins=10))
+    print(result_data.groupby('Market')['RS'].value_counts(bins=10))
     result_data = result_data[result_data.index.date == yesterday.date()]
-
-    result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
-
-    print(f"총 {len(result_data)}개 종목의 최신 RS 데이터가 {result_file}에 저장되었습니다.")
+    print("After date filter:", result_data['RS'].value_counts(bins=10))
     print(result_data.groupby('Market')['RS'].value_counts(bins=10))
 
+    # 수익률 데이터 고유값 수 확인
+    print(result_data[['Return_1M', 'Return_3M', 'Return_6M', 'Return_12M', 'Weighted_Return']].nunique())
+
+    result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
+    print(f"총 {len(result_data)}개 종목의 최신 RS 데이터가 {result_file}에 저장되었습니다.")
   except Exception as e:
     print(f"Error in main execution: {e}")
 
