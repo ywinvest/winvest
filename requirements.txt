@@ -6,3 +6,4 @@ finance-datareader
 plotly
 python-dotenv
 numpy~=1.24
+scipy
