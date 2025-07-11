@@ -47,18 +47,10 @@ def calculate_relative_strength(df):
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    # 더 정확한 1-99 분포를 위한 계산
-    ranks = df.groupby('Market_Group')[return_col].rank(method='min')
-    group_sizes = df.groupby('Market_Group')[return_col].count()
-
-    # 각 그룹별로 정확한 백분위 계산
-    df[rs_col] = ranks.div(group_sizes, level=0) * 98 + 1
+    df[rs_col] = df.groupby('Market_Group')[return_col].rank(method='min', pct=True) * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).round().astype(int).clip(1, 99)
 
-  # Weighted_Return에 대해서도 동일하게 처리
-  ranks = df.groupby('Market_Group')['Weighted_Return'].rank(method='min')
-  group_sizes = df.groupby('Market_Group')['Weighted_Return'].count()
-  df['RS'] = ranks.div(group_sizes, level=0) * 98 + 1
+  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].rank(method='min', pct=True) * 98 + 1
   df['RS'] = df['RS'].fillna(1).round().astype(int).clip(1, 99)
 
   # Market_Group 컬럼 제거 (원본 Market 컬럼 유지)
@@ -90,7 +82,6 @@ def process_stock(row, two_years_ago):
     df['Market'] = market
     df['Marcap'] = marcap
 
-    df.reset_index()
     return df
   except Exception as e:
     print(f"Error processing {symbol}: {e}")
