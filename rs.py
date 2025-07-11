@@ -21,15 +21,15 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  """전체 종목에 대한 상대강도를 계산합니다."""
+  """전체 종목에 대한 상대강도를 계산합니다. (Market 구분 없음)"""
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    df[rs_col] = df.groupby('Market')[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = df[return_col].rank(pct=True) * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  df['RS'] = df.groupby('Market')['Weighted_Return'].rank(pct=True) * 98 + 1
+  df['RS'] = df['Weighted_Return'].rank(pct=True) * 98 + 1
   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   return df
@@ -83,6 +83,7 @@ if __name__ == "__main__":
   try:
     all_stocks = pd.concat([
       fdr.StockListing('KOSPI'),
+      fdr.StockListing('KOSDAQ'),
     ], ignore_index=True)
 
     all_stocks = filter_common_stocks(all_stocks)
