@@ -10,10 +10,28 @@ from dotenv import load_dotenv
 
 def calculate_indicators(df):
   """개별 종목의 보조지표를 계산합니다."""
-  df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
-  df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
-  df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
-  df['Return_12M'] = df['Close'] / df['Close'].shift(240) - 1
+  # 최초 상장일의 종가
+  first_day_close = df['Close'].iloc[0]
+
+  for period_days in [20, 60, 120, 240]:
+    # period_days에 따른 컬럼 이름 설정 (1M, 3M, 6M, 12M)
+    period_str = f"{period_days // 20}M" if period_days < 240 else "12M"
+    return_col = f'Return_{period_str}'
+
+    # period_days 이전의 종가 데이터 (과거 데이터가 없으면 NaN)
+    base_price = df['Close'].shift(period_days)
+
+    # NaN 값을 최초 상장일 종가로 채워서 기준 가격 설정
+    # 이렇게 하면 과거 데이터가 있는 날은 과거 종가를, 없는 날은 최초 상장일 종가를 사용
+    base_price.fillna(first_day_close, inplace=True)
+
+    # 수익률 계산
+    df[return_col] = df['Close'] / base_price - 1
+
+  # df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
+  # df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
+  # df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
+  # df['Return_12M'] = df['Close'] / df['Close'].shift(240) - 1
   df['Weighted_Return'] = (df['Return_3M'] * 0.5 +
                            df['Return_6M'] * 0.3 +
                            df['Return_12M'] * 0.2)
