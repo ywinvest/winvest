@@ -47,10 +47,18 @@ def calculate_relative_strength(df):
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    df[rs_col] = df.groupby('Market_Group')[return_col].rank(method='min', pct=True) * 98 + 1
+    # 더 정확한 백분위 계산을 위한 방법
+    def calculate_percentile_rank(group):
+      return (group.rank(method='average') - 1) / (len(group) - 1) * 98 + 1
+
+    df[rs_col] = df.groupby('Market_Group')[return_col].transform(calculate_percentile_rank)
     df[rs_col] = df[rs_col].fillna(1).round().astype(int).clip(1, 99)
 
-  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].rank(method='min', pct=True) * 98 + 1
+  # Weighted_Return에 대해서도 동일하게 처리
+  def calculate_percentile_rank(group):
+    return (group.rank(method='average') - 1) / (len(group) - 1) * 98 + 1
+
+  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(calculate_percentile_rank)
   df['RS'] = df['RS'].fillna(1).round().astype(int).clip(1, 99)
 
   # Market_Group 컬럼 제거 (원본 Market 컬럼 유지)
