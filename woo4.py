@@ -347,10 +347,10 @@ if __name__ == "__main__":
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
+    result_data = result_data[result_data.index.date == today.date()]
     result_data = calculate_relative_strength(result_data)
     filtered_data = filter_common_stocks(result_data)
     final_data = filtered_data[buy_condition(filtered_data)]
-    final_data = final_data[final_data.index.date == today.date()]
 
     # Slack 메시지 전송
     send_to_slack(final_data, kospi, kosdaq)
