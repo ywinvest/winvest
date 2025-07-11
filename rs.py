@@ -18,11 +18,11 @@ def calculate_indicators(df):
     base_price = df['Close'].shift(period_days)
     base_price.fillna(first_day_close, inplace=True)
     df[return_col] = df['Close'] / base_price - 1
-    df[return_col] = np.log1p(df[return_col].clip(lower=-0.99))
-    df[return_col] = df[return_col].clip(
-        lower=df[return_col].quantile(0.01),
-        upper=df[return_col].quantile(0.99)
-    )
+    # df[return_col] = np.log1p(df[return_col].clip(lower=-0.99))
+    # df[return_col] = df[return_col].clip(
+    #     lower=df[return_col].quantile(0.01),
+    #     upper=df[return_col].quantile(0.99)
+    # )
   df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
                            df['Return_3M'] * 0.3 +
                            df['Return_6M'] * 0.2 +
