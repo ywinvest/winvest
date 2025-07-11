@@ -1,6 +1,6 @@
 import concurrent.futures
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 
 import FinanceDataReader as fdr
@@ -90,6 +90,8 @@ if __name__ == "__main__":
 
     # 날짜 설정
     today = datetime.today()
+    yesterday = datetime.today() - timedelta(days=1) # yesterdate는 2025-07-13 (일요일)이 됨
+
     two_years_ago = today.year - 2
 
     result_file = "rs.csv"
@@ -98,21 +100,11 @@ if __name__ == "__main__":
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
     result_data = calculate_relative_strength(result_data)
 
-    # <<<--- 변경된 부분 시작 --->>>
-    # 데이터프레임의 인덱스(날짜)를 'Date' 컬럼으로 변환
-    result_data.reset_index(inplace=True)
+    result_data = result_data[result_data.index.date == yesterday.date()]
 
-    # 가장 최신 날짜(오늘 또는 최근 거래일)를 찾음
-    latest_date = result_data['Date'].max()
+    result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
 
-    # 최신 날짜에 해당하는 데이터만 필터링
-    latest_data = result_data[result_data['Date'] == latest_date].copy()
-    # <<<--- 변경된 부분 끝 --->>>
-
-    # 필터링된 최신 데이터만 CSV 파일로 저장
-    latest_data.to_csv(result_file, index=False, encoding='utf-8-sig')
-
-    print(f"총 {len(latest_data)}개 종목의 최신 RS 데이터가 {result_file}에 저장되었습니다.")
+    print(f"총 {len(result_data)}개 종목의 최신 RS 데이터가 {result_file}에 저장되었습니다.")
 
   except Exception as e:
     print(f"Error in main execution: {e}")
