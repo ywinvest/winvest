@@ -32,9 +32,10 @@ def calculate_indicators(df):
   # df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
   # df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
   # df['Return_12M'] = df['Close'] / df['Close'].shift(240) - 1
-  df['Weighted_Return'] = (df['Return_3M'] * 0.5 +
-                           df['Return_6M'] * 0.3 +
-                           df['Return_12M'] * 0.2)
+  df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
+                           df['Return_3M'] * 0.3 +
+                           df['Return_6M'] * 0.2 +
+                           df['Return_12M'] * 0.1)
   return df
 
 
@@ -72,7 +73,7 @@ def filter_common_stocks(df):
   return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
             & (~df['Code'].str.endswith(("5", "7", "9", "K", "L", "M", "N", "O"))) # 우선주, 일부 ETN/ETF 등 제외
             & (df['Code'] != '0030R0')
-            # & (df['Marcap'] >= 200_000_000_000)
+            & (df['Marcap'] >= 200_000_000_000)
     # & (df['Name'].str.contains("나무기술", na=False, regex=True))
             ]
 def process_stock(row, two_years_ago):
