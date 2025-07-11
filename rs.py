@@ -31,25 +31,40 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
+  # KOSDAQ GLOBAL → KOSDAQ 병합
+  df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
+
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-    df[return_col] = df[return_col].fillna(df[return_col].mean())
-    df[return_col] = (df[return_col] - df[return_col].mean()) / df[return_col].std() if df[return_col].std() > 0 else 0
-    df[rs_col] = pd.Series(
-        rankdata(df[return_col], method='average') / len(df) * 98 + 1,
-        index=df.index
-    ).round().astype(int)
+
+    # 평균 대체 및 표준화
+    df[return_col] = df.groupby('Market_Group')[return_col].transform(
+        lambda x: x.fillna(x.mean()) if x.notna().any() else 0
+    )
+    df[return_col] = df.groupby('Market_Group')[return_col].transform(
+        lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
+    )
+
+    # 순위 기반 정규화
+    df[rs_col] = df.groupby('Market_Group')[return_col].transform(
+        lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
+    )
     df[rs_col] = df[rs_col].clip(1, 99)
 
-  df['Weighted_Return'] = df['Weighted_Return'].fillna(df['Weighted_Return'].mean())
-  df['Weighted_Return'] = (df['Weighted_Return'] - df['Weighted_Return'].mean()) / df['Weighted_Return'].std() if df['Weighted_Return'].std() > 0 else 0
-  df['RS'] = pd.Series(
-      rankdata(df['Weighted_Return'], method='average') / len(df) * 98 + 1,
-      index=df.index
-  ).round().astype(int)
+  # Weighted_Return도 동일 처리
+  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+      lambda x: x.fillna(x.mean()) if x.notna().any() else 0
+  )
+  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+      lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
+  )
+  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+      lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
+  )
   df['RS'] = df['RS'].clip(1, 99)
 
+  df = df.drop('Market_Group', axis=1)
   return df
 
 def filter_common_stocks(df):
