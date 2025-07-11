@@ -38,31 +38,41 @@ def calculate_relative_strength(df):
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    # 평균 대체 및 표준화
-    df[return_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: x.fillna(x.mean()) if x.notna().any() else 0
-    )
-    df[return_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
-    )
+    df[rs_col] = df.groupby('Market_Group')[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-    # 순위 기반 정규화
-    df[rs_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
-    )
-    df[rs_col] = df[rs_col].clip(1, 99)
+  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].rank(pct=True) * 98 + 1
+  df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
-  # Weighted_Return도 동일 처리
-  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: x.fillna(x.mean()) if x.notna().any() else 0
-  )
-  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
-  )
-  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
-  )
-  df['RS'] = df['RS'].clip(1, 99)
+  # for period in ["1M", "3M", "6M", "12M"]:
+  #   return_col = f'Return_{period}'
+  #   rs_col = f'RS_{period}'
+  #
+  #   # 평균 대체 및 표준화
+  #   df[return_col] = df.groupby('Market_Group')[return_col].transform(
+  #       lambda x: x.fillna(x.mean()) if x.notna().any() else 0
+  #   )
+  #   df[return_col] = df.groupby('Market_Group')[return_col].transform(
+  #       lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
+  #   )
+  #
+  #   # 순위 기반 정규화
+  #   df[rs_col] = df.groupby('Market_Group')[return_col].transform(
+  #       lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
+  #   )
+  #   df[rs_col] = df[rs_col].clip(1, 99)
+  #
+  # # Weighted_Return도 동일 처리
+  # df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+  #     lambda x: x.fillna(x.mean()) if x.notna().any() else 0
+  # )
+  # df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+  #     lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
+  # )
+  # df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+  #     lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
+  # )
+  # df['RS'] = df['RS'].clip(1, 99)
 
   df = df.drop('Market_Group', axis=1)
   return df
