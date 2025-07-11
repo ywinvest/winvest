@@ -40,31 +40,19 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  """전체 종목에 대한 상대강도를 계산합니다. (KOSDAQ GLOBAL은 KOSDAQ과 합쳐서 계산)"""
-  # KOSDAQ GLOBAL을 KOSDAQ으로 변경하여 합쳐서 계산
   df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
-
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-
-    # 더 정확한 백분위 계산을 위한 방법
-    def calculate_percentile_rank(group):
-      return (group.rank(method='average') - 1) / (len(group) - 1) * 98 + 1
-
-    df[rs_col] = df.groupby('Market_Group')[return_col].transform(calculate_percentile_rank)
-    df[rs_col] = df[rs_col].fillna(1).round().astype(int).clip(1, 99)
-
-  # Weighted_Return에 대해서도 동일하게 처리
-  def calculate_percentile_rank(group):
-    return (group.rank(method='average') - 1) / (len(group) - 1) * 98 + 1
-
-  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(calculate_percentile_rank)
-  df['RS'] = df['RS'].fillna(1).round().astype(int).clip(1, 99)
-
-  # Market_Group 컬럼 제거 (원본 Market 컬럼 유지)
+    df[rs_col] = df.groupby('Market_Group')[return_col].transform(
+        lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop') if len(x) >= 10 else 50
+    )
+    df[rs_col] = df[rs_col].fillna(50).astype(int).clip(1, 99)
+  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+      lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop') if len(x) >= 10 else 50
+  )
+  df['RS'] = df['RS'].fillna(50).astype(int).clip(1, 99)
   df = df.drop('Market_Group', axis=1)
-
   return df
 
 def filter_common_stocks(df):
