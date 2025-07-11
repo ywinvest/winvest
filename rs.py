@@ -85,10 +85,12 @@ def process_stock(row, two_years_ago):
 
     df = fdr.DataReader(symbol, two_years_ago)
     df = calculate_indicators(df)
+    df['Code'] = symbol
     df['Name'] = name
     df['Market'] = market
     df['Marcap'] = marcap
 
+    df.reset_index()
     return df
   except Exception as e:
     print(f"Error processing {symbol}: {e}")
