@@ -7,6 +7,7 @@ import FinanceDataReader as fdr
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
+from scipy.stats import rankdata
 
 
 def calculate_indicators(df):
@@ -30,40 +31,33 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  # KOSDAQ GLOBAL을 KOSDAQ으로 병합
   df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
 
-  # 시장 그룹별로 수익률 표준화
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-    # NaN을 시장 그룹별 평균으로 채움
     df[return_col] = df.groupby('Market_Group')[return_col].transform(
         lambda x: x.fillna(x.mean()) if x.notna().any() else 0
     )
-    # 표준화 (평균 0, 표준편차 1)
     df[return_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: (x - x.mean()) / x.std() if x.std() != 0 else x
+        lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
     )
-    # 순위 기반 정규화 (1~99)
     df[rs_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: ((x.rank(method='dense') - 1) / (x.rank(method='dense').max() - 1) * 98 + 1).round().astype(int)
+        lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1).round().astype(int)
     )
     df[rs_col] = df[rs_col].clip(1, 99)
 
-  # Weighted_Return도 동일하게 처리
   df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
       lambda x: x.fillna(x.mean()) if x.notna().any() else 0
   )
   df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: (x - x.mean()) / x.std() if x.std() != 0 else x
+      lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
   )
   df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: ((x.rank(method='dense') - 1) / (x.rank(method='dense').max() - 1) * 98 + 1).round().astype(int)
+      lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1).round().astype(int)
   )
   df['RS'] = df['RS'].clip(1, 99)
 
-  # KOSDAQ GLOBAL이 KOSDAQ으로 병합되었는지 확인
   df = df.drop('Market_Group', axis=1)
   return df
 
