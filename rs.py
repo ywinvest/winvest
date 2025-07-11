@@ -17,7 +17,6 @@ def calculate_indicators(df):
     base_price = df['Close'].shift(period_days)
     base_price.fillna(first_day_close, inplace=True)
     df[return_col] = df['Close'] / base_price - 1
-    # 로그 변환 및 Winsorization
     df[return_col] = np.log1p(df[return_col].clip(lower=-0.99))
     df[return_col] = df[return_col].clip(
         lower=df[return_col].quantile(0.01),
@@ -31,22 +30,40 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
+  # KOSDAQ GLOBAL을 KOSDAQ으로 병합
   df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
+
+  # 시장 그룹별로 수익률 표준화
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-    # NaN 값을 중앙값으로 채움
-    df[return_col] = df.groupby('Market_Group')[return_col].transform(lambda x: x.fillna(x.median()))
-    # 순위 기반 정규화 (1~99로 스케일링)
+    # NaN을 시장 그룹별 평균으로 채움
+    df[return_col] = df.groupby('Market_Group')[return_col].transform(
+        lambda x: x.fillna(x.mean()) if x.notna().any() else 0
+    )
+    # 표준화 (평균 0, 표준편차 1)
+    df[return_col] = df.groupby('Market_Group')[return_col].transform(
+        lambda x: (x - x.mean()) / x.std() if x.std() != 0 else x
+    )
+    # 순위 기반 정규화 (1~99)
     df[rs_col] = df.groupby('Market_Group')[return_col].transform(
         lambda x: ((x.rank(method='dense') - 1) / (x.rank(method='dense').max() - 1) * 98 + 1).round().astype(int)
     )
     df[rs_col] = df[rs_col].clip(1, 99)
-  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(lambda x: x.fillna(x.median()))
+
+  # Weighted_Return도 동일하게 처리
+  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+      lambda x: x.fillna(x.mean()) if x.notna().any() else 0
+  )
+  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
+      lambda x: (x - x.mean()) / x.std() if x.std() != 0 else x
+  )
   df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
       lambda x: ((x.rank(method='dense') - 1) / (x.rank(method='dense').max() - 1) * 98 + 1).round().astype(int)
   )
   df['RS'] = df['RS'].clip(1, 99)
+
+  # KOSDAQ GLOBAL이 KOSDAQ으로 병합되었는지 확인
   df = df.drop('Market_Group', axis=1)
   return df
 
