@@ -39,16 +39,22 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  """전체 종목에 대한 상대강도를 계산합니다. (Market 구분 없음)"""
+  """전체 종목에 대한 상대강도를 계산합니다. (KOSDAQ GLOBAL은 KOSDAQ과 합쳐서 계산)"""
+  # KOSDAQ GLOBAL을 KOSDAQ으로 변경하여 합쳐서 계산
+  df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
+
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    df[rs_col] = df[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = df.groupby('Market_Group')[return_col].rank(pct=True) * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  df['RS'] = df['Weighted_Return'].rank(pct=True) * 98 + 1
+  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].rank(pct=True) * 98 + 1
   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
+
+  # Market_Group 컬럼 제거 (원본 Market 컬럼 유지)
+  df = df.drop('Market_Group', axis=1)
 
   return df
 
