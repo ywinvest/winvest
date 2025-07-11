@@ -91,15 +91,58 @@ def calculate_indicators(df):
   return df
 
 
+# def calculate_relative_strength(df):
+#   for period in ["1M", "3M", "6M", "12M"]:
+#     return_col = f'Return_{period}'
+#     rs_col = f'RS_{period}'
+#
+#     df[rs_col] = df.groupby('Market')[return_col].rank(pct=True) * 98 + 1
+#     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
+#
+#   df['RS'] = df.groupby('Market')['Weighted_Return'].rank(pct=True) * 98 + 1
+#   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
+#
+#   return df
+
 def calculate_relative_strength(df):
+  """
+  Calculate Relative Strength (RS) for each trading day (index) and market using vectorized operations.
+  RS is computed as the percentile rank within each market for specified return periods.
+
+  Args:
+      df (pandas.DataFrame): DataFrame with stock data, including 'Market', 'Return_1M', 'Return_3M',
+                            'Return_6M', 'Return_12M', and 'Weighted_Return' columns.
+
+  Returns:
+      pandas.DataFrame: DataFrame with added RS columns ('RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M').
+  """
+  # Ensure required columns exist
+  required_cols = ['Return_1M', 'Return_3M', 'Return_6M', 'Return_12M', 'Weighted_Return']
+  if not all(col in df.columns for col in required_cols):
+    raise ValueError("Required return columns are missing in the DataFrame.")
+
+  # Initialize RS columns
+  for period in ["1M", "3M", "6M", "12M"]:
+    df[f'RS_{period}'] = pd.NA
+  df['RS'] = pd.NA
+
+  # Ensure the index is datetime
+  if not isinstance(df.index, pd.DatetimeIndex):
+    df.index = pd.to_datetime(df.index)
+
+  # Create a MultiIndex to group by date and Market
+  df = df.sort_index()  # Ensure index is sorted for groupby
+  grouped = df.groupby([df.index, 'Market'])
+
+  # Calculate RS for each period using vectorized rank
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-
-    df[rs_col] = df.groupby('Market')[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  df['RS'] = df.groupby('Market')['Weighted_Return'].rank(pct=True) * 98 + 1
+  # Calculate RS for Weighted_Return
+  df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   return df
