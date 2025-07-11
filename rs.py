@@ -4,10 +4,8 @@ from datetime import datetime, timedelta
 from functools import partial
 
 import FinanceDataReader as fdr
-import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from scipy.stats import rankdata
 
 
 def calculate_indicators(df):
@@ -83,7 +81,7 @@ def filter_common_stocks(df):
   return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
             & (~df['Code'].str.endswith(("5", "7", "9", "K", "L", "M", "N", "O"))) # 우선주, 일부 ETN/ETF 등 제외
             & (df['Code'] != '0030R0')
-            # & (df['Marcap'] >= 200_000_000_000)
+            & (df['Marcap'] >= 200_000_000_000)
     # & (df['Name'].str.contains("나무기술", na=False, regex=True))
             ]
 def process_stock(row, two_years_ago):
