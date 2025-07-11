@@ -31,34 +31,25 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
-
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-    df[return_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: x.fillna(x.mean()) if x.notna().any() else 0
-    )
-    df[return_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
-    )
-    df[rs_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
-    )
+    df[return_col] = df[return_col].fillna(df[return_col].mean())
+    df[return_col] = (df[return_col] - df[return_col].mean()) / df[return_col].std() if df[return_col].std() > 0 else 0
+    df[rs_col] = pd.Series(
+        rankdata(df[return_col], method='average') / len(df) * 98 + 1,
+        index=df.index
+    ).round().astype(int)
     df[rs_col] = df[rs_col].clip(1, 99)
 
-  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: x.fillna(x.mean()) if x.notna().any() else 0
-  )
-  df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
-  )
-  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
-  )
+  df['Weighted_Return'] = df['Weighted_Return'].fillna(df['Weighted_Return'].mean())
+  df['Weighted_Return'] = (df['Weighted_Return'] - df['Weighted_Return'].mean()) / df['Weighted_Return'].std() if df['Weighted_Return'].std() > 0 else 0
+  df['RS'] = pd.Series(
+      rankdata(df['Weighted_Return'], method='average') / len(df) * 98 + 1,
+      index=df.index
+  ).round().astype(int)
   df['RS'] = df['RS'].clip(1, 99)
 
-  df = df.drop('Market_Group', axis=1)
   return df
 
 def filter_common_stocks(df):
@@ -123,20 +114,17 @@ if __name__ == "__main__":
     two_years_ago = today.year - 2
     result_file = "rs.csv"
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
+    # 오늘 날짜만 필터링
+    result_data = result_data[result_data.index.date == today.date()]
+
+    # 오늘 데이터만 기준으로 RS 계산
     result_data = calculate_relative_strength(result_data)
 
-    # 날짜 필터링 전후 RS 분포 확인
-    print("Before date filter:", result_data['RS'].value_counts(bins=10))
-    print(result_data.groupby('Market')['RS'].value_counts(bins=10))
-    result_data = result_data[result_data.index.date == yesterday.date()]
-    print("After date filter:", result_data['RS'].value_counts(bins=10))
-    print(result_data.groupby('Market')['RS'].value_counts(bins=10))
+    print("RS 분포:", result_data['RS'].dropna().value_counts(bins=10))
 
-    # 수익률 데이터 고유값 수 확인
     print(result_data[['Return_1M', 'Return_3M', 'Return_6M', 'Return_12M', 'Weighted_Return']].nunique())
 
     result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
-    print(f"총 {len(result_data)}개 종목의 최신 RS 데이터가 {result_file}에 저장되었습니다.")
   except Exception as e:
     print(f"Error in main execution: {e}")
 
