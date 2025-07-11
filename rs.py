@@ -136,7 +136,7 @@ if __name__ == "__main__":
     result_data = calculate_relative_strength(result_data)
 
     print("RS 분포 (전체):", result_data['RS'].dropna().value_counts(bins=10))
-    print("RS 분포 (시장별):", result_data.groupby('Market')['RS'].dropna().value_counts(bins=10))
+    # print("RS 분포 (시장별):", result_data.groupby('Market')['RS'].dropna().value_counts(bins=10))
 
     result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
     print(f"총 {len(result_data)}개 종목의 오늘자 RS 데이터가 {result_file}에 저장되었습니다.")
