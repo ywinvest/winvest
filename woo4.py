@@ -84,9 +84,10 @@ def calculate_indicators(df):
   df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
   df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
   df['Return_12M'] = df['Close'] / df['Close'].shift(240) - 1
-  df['Weighted_Return'] = (df['Return_3M'] * 0.5 +
-                           df['Return_6M'] * 0.3 +
-                           df['Return_12M'] * 0.2)
+  df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
+                           df['Return_3M'] * 0.3 +
+                           df['Return_6M'] * 0.2 +
+                           df['Return_12M'] * 0.1)
   return df
 
 
