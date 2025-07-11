@@ -4,34 +4,25 @@ from datetime import datetime, timedelta
 from functools import partial
 
 import FinanceDataReader as fdr
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 
 
 def calculate_indicators(df):
-  """개별 종목의 보조지표를 계산합니다."""
-  # 최초 상장일의 종가
   first_day_close = df['Close'].iloc[0]
-
   for period_days in [20, 60, 120, 240]:
-    # period_days에 따른 컬럼 이름 설정 (1M, 3M, 6M, 12M)
     period_str = f"{period_days // 20}M" if period_days < 240 else "12M"
     return_col = f'Return_{period_str}'
-
-    # period_days 이전의 종가 데이터 (과거 데이터가 없으면 NaN)
     base_price = df['Close'].shift(period_days)
-
-    # NaN 값을 최초 상장일 종가로 채워서 기준 가격 설정
-    # 이렇게 하면 과거 데이터가 있는 날은 과거 종가를, 없는 날은 최초 상장일 종가를 사용
     base_price.fillna(first_day_close, inplace=True)
-
-    # 수익률 계산
     df[return_col] = df['Close'] / base_price - 1
-
-  # df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
-  # df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
-  # df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
-  # df['Return_12M'] = df['Close'] / df['Close'].shift(240) - 1
+    # 로그 변환 및 Winsorization
+    df[return_col] = np.log1p(df[return_col].clip(lower=-0.99))
+    df[return_col] = df[return_col].clip(
+        lower=df[return_col].quantile(0.01),
+        upper=df[return_col].quantile(0.99)
+    )
   df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
                            df['Return_3M'] * 0.3 +
                            df['Return_6M'] * 0.2 +
@@ -40,18 +31,20 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
+  """전체 종목에 대한 상대강도를 계산합니다."""
   df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
+    # qcut으로 균등한 백분위 계산
     df[rs_col] = df.groupby('Market_Group')[return_col].transform(
-        lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop') if len(x) >= 10 else 50
+        lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop')
     )
-    df[rs_col] = df[rs_col].fillna(50).astype(int).clip(1, 99)
+    df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
   df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-      lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop') if len(x) >= 10 else 50
+      lambda x: pd.qcut(x, q=99, labels=range(1, 100), duplicates='drop')
   )
-  df['RS'] = df['RS'].fillna(50).astype(int).clip(1, 99)
+  df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
   df = df.drop('Market_Group', axis=1)
   return df
 
