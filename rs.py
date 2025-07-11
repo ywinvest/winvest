@@ -73,11 +73,13 @@ def process_stock(row, two_years_ago):
     symbol = row['Code']
     name = row['Name']
     market = row['Market']
+    marcap = row['Marcap']
 
     df = fdr.DataReader(symbol, two_years_ago)
     df = calculate_indicators(df)
     df['Name'] = name
     df['Market'] = market
+    df['Marcap'] = marcap
 
     return df
   except Exception as e:
