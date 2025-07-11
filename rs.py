@@ -47,9 +47,11 @@ def process_stock(row, two_years_ago):
   """개별 종목의 시세 데이터를 가져와 보조지표를 계산합니다."""
   try:
     symbol = row['Code']
+    market = row['Market']
 
     df = fdr.DataReader(symbol, two_years_ago)
     df = calculate_indicators(df)
+    df['Market'] = market
 
     return df
   except Exception as e:
