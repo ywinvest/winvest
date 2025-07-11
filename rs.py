@@ -47,10 +47,10 @@ def calculate_relative_strength(df):
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    df[rs_col] = df.groupby('Market_Group')[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = df.groupby('Market_Group')[return_col].rank(pct=True) * 99
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].rank(pct=True) * 98 + 1
+  df['RS'] = df.groupby('Market_Group')['Weighted_Return'].rank(pct=True) * 99
   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   # Market_Group 컬럼 제거 (원본 Market 컬럼 유지)
