@@ -133,7 +133,7 @@ if __name__ == "__main__":
     all_stocks = filter_common_stocks(all_stocks)
 
     today = datetime.today()
-    yesterday = today - timedelta(days=3)
+    yesterday = today - timedelta(days=2)
     two_years_ago = today.year - 2
     result_file = "rs.csv"
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
