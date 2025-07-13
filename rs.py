@@ -5,22 +5,57 @@ from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
+from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 
 
 def calculate_indicators(df):
+  # first_day_close = df['Close'].iloc[0]
+  # for period_days in [20, 60, 120, 240]:
+  #   period_str = f"{period_days // 20}M" if period_days < 240 else "12M"
+  #   return_col = f'Return_{period_str}'
+  #   base_price = df['Close'].shift(period_days)
+  #   base_price.fillna(first_day_close, inplace=True)
+  #   df[return_col] = df['Close'] / base_price - 1
+  """실제 달력 기준(1, 3, 6, 12개월)으로 수익률 보조지표를 계산합니다."""
+  # 인덱스를 DatetimeIndex로 변환하고 정렬 (merge_asof를 위해 필수)
+  df.index = pd.to_datetime(df.index)
+  df.sort_index(inplace=True)
+
+  # 기준 가격 조회를 위한 DataFrame 준비
+  base_prices_df = df[['Close']].rename(columns={'Close': 'Base_Price'})
   first_day_close = df['Close'].iloc[0]
-  for period_days in [20, 60, 120, 240]:
-    period_str = f"{period_days // 20}M" if period_days < 240 else "12M"
+
+  # 기간 설정 (개월)
+  periods = {1: '1M', 3: '3M', 6: '6M', 12: '12M'}
+
+  # 각 기간에 대해 루프 실행
+  for period_months, period_str in periods.items():
     return_col = f'Return_{period_str}'
-    base_price = df['Close'].shift(period_days)
+
+    # 조회할 기준 날짜(target_date) 계산
+    lookup_df = pd.DataFrame(index=df.index)
+    lookup_df['target_date'] = lookup_df.index - relativedelta(months=period_months)
+
+    # merge_asof를 사용하여 각 target_date에 대한 기준 가격 찾기
+    # direction='backward'는 target_date와 같거나 그 이전의 가장 최근 날짜를 찾음
+    merged = pd.merge_asof(
+        left=lookup_df,
+        right=base_prices_df,
+        left_on='target_date',
+        right_index=True,
+        direction='backward'
+    )
+    # 인덱스를 원래 DataFrame과 맞춤
+    merged.index = df.index
+    base_price = merged['Base_Price']
+
+    # 조회 기간 이전이라 데이터가 없는 경우(NaN), 첫날 종가로 대체
     base_price.fillna(first_day_close, inplace=True)
+
+    # 수익률 계산
     df[return_col] = df['Close'] / base_price - 1
-    # df[return_col] = np.log1p(df[return_col].clip(lower=-0.99))
-    # df[return_col] = df[return_col].clip(
-    #     lower=df[return_col].quantile(0.01),
-    #     upper=df[return_col].quantile(0.99)
-    # )
+
   df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
                            df['Return_3M'] * 0.3 +
                            df['Return_6M'] * 0.2 +
