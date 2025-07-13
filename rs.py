@@ -164,8 +164,6 @@ if __name__ == "__main__":
       fdr.StockListing('KOSDAQ'),
     ], ignore_index=True)
 
-    all_stocks = filter_common_stocks(all_stocks)
-
     today = datetime.today()
     yesterday = today - timedelta(days=2)
     two_years_ago = today.year - 2
@@ -176,6 +174,8 @@ if __name__ == "__main__":
 
     # 오늘 데이터만 기준으로 RS 계산
     result_data = calculate_relative_strength(result_data)
+
+    result_data = filter_common_stocks(result_data)
 
     print("RS 분포 (전체):", result_data['RS'].dropna().value_counts(bins=10))
     # print("RS 분포 (시장별):", result_data.groupby('Market')['RS'].dropna().value_counts(bins=10))
