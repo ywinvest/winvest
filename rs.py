@@ -5,7 +5,6 @@ from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
-from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 
 
@@ -35,7 +34,7 @@ def calculate_indicators(df):
 
     # 조회할 기준 날짜(target_date) 계산
     lookup_df = pd.DataFrame(index=df.index)
-    lookup_df['target_date'] = lookup_df.index - relativedelta(months=period_months)
+    lookup_df['target_date'] = lookup_df.index - pd.DateOffset(months=period_months)
 
     # merge_asof를 사용하여 각 target_date에 대한 기준 가격 찾기
     # direction='backward'는 target_date와 같거나 그 이전의 가장 최근 날짜를 찾음
