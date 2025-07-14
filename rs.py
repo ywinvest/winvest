@@ -17,9 +17,9 @@ def calculate_indicators(df):
     base_price.fillna(first_day_close, inplace=True)
     df[return_col] = df['Close'] / base_price - 1
 
-  df['Weighted_Return'] = (df['Return_3M'] * 2 +
+  df['Weighted_Return'] = (df['Return_1M'] * 2 +
+                           df['Return_3M'] +
                            df['Return_6M'] +
-                           df['Return_9M'] +
                            df['Return_12M'])
   return df
 
@@ -126,12 +126,12 @@ if __name__ == "__main__":
     ], ignore_index=True)
 
     today = datetime.today()
-    yesterday = today - timedelta(days=3)
+    yesterday = today - timedelta(days=1)
     two_years_ago = today.year - 2
     result_file = "rs.csv"
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
     # 오늘 날짜만 필터링
-    result_data = result_data[result_data.index.date == today.date()]
+    result_data = result_data[result_data.index.date == yesterday.date()]
 
     # 오늘 데이터만 기준으로 RS 계산
     result_data = calculate_relative_strength(result_data)
