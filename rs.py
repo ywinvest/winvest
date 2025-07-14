@@ -70,10 +70,10 @@ def calculate_relative_strength(df):
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    df[rs_col] = df[return_col].rank(pct=True, average='min') * 98 + 1
+    df[rs_col] = df[return_col].rank(pct=True, method='min') * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  df['RS'] = df['Weighted_Return'].rank(pct=True, average='min') * 98 + 1
+  df['RS'] = df['Weighted_Return'].rank(pct=True, method='min') * 98 + 1
   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   # for period in ["1M", "3M", "6M", "12M"]:
