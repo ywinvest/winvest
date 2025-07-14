@@ -165,7 +165,7 @@ if __name__ == "__main__":
     ], ignore_index=True)
 
     today = datetime.today()
-    yesterday = today - timedelta(days=2)
+    yesterday = today - timedelta(days=3)
     two_years_ago = today.year - 2
     result_file = "rs.csv"
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
