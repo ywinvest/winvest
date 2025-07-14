@@ -17,35 +17,11 @@ def calculate_indicators(df):
     base_price.fillna(first_day_close, inplace=True)
     df[return_col] = df['Close'] / base_price - 1
 
-  current_close = df['Close']
-
-  # 각 기간별 종가 (3M, 6M, 9M, 12M)
-  close_3m = df['Close'].shift(63)   # 3개월 전 (63일)
-  close_6m = df['Close'].shift(126)  # 6개월 전 (126일)
-  close_9m = df['Close'].shift(189)  # 9개월 전 (189일)
-  close_12m = df['Close'].shift(252) # 12개월 전 (252일)
-
-  # 결측값을 첫날 종가로 대체
-  close_3m.fillna(first_day_close, inplace=True)
-  close_6m.fillna(first_day_close, inplace=True)
-  close_9m.fillna(first_day_close, inplace=True)
-  close_12m.fillna(first_day_close, inplace=True)
-
-  # 각 기간별 종가와 현재 종가의 차이 계산
-  diff_3m = current_close - close_3m
-  diff_6m = current_close - close_6m
-  diff_9m = current_close - close_9m
-  diff_12m = current_close - close_12m
-
-  # 3개월 전 종가 차이에 2배 가중치 적용하여 합산
-  weighted_diff_sum = (diff_3m * 2) + diff_6m + diff_9m + diff_12m
-
   # 현재 종가 대비 수익률로 계산
-  df['Weighted_Return'] = weighted_diff_sum / current_close
-  # df['Weighted_Return'] = (df['Return_1M'] * 2 +
-  #                          df['Return_3M'] +
-  #                          df['Return_6M'] +
-  #                          df['Return_12M'])
+  df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
+                           df['Return_3M'] * 0.2 +
+                           df['Return_6M'] * 0.2 +
+                           df['Return_12M'] * 0.2)
   return df
 
 
