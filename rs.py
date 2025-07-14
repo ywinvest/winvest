@@ -16,44 +16,6 @@ def calculate_indicators(df):
     base_price = df['Close'].shift(period_days)
     base_price.fillna(first_day_close, inplace=True)
     df[return_col] = df['Close'] / base_price - 1
-  # """실제 달력 기준(1, 3, 6, 12개월)으로 수익률 보조지표를 계산합니다."""
-  # # 인덱스를 DatetimeIndex로 변환하고 정렬 (merge_asof를 위해 필수)
-  # df.index = pd.to_datetime(df.index)
-  # df.sort_index(inplace=True)
-  #
-  # # 기준 가격 조회를 위한 DataFrame 준비
-  # base_prices_df = df[['Close']].rename(columns={'Close': 'Base_Price'})
-  # first_day_close = df['Close'].iloc[0]
-  #
-  # # 기간 설정 (개월)
-  # periods = {1: '1M', 3: '3M', 6: '6M', 12: '12M'}
-  #
-  # # 각 기간에 대해 루프 실행
-  # for period_months, period_str in periods.items():
-  #   return_col = f'Return_{period_str}'
-  #
-  #   # 조회할 기준 날짜(target_date) 계산
-  #   lookup_df = pd.DataFrame(index=df.index)
-  #   lookup_df['target_date'] = lookup_df.index - pd.DateOffset(months=period_months)
-  #
-  #   # merge_asof를 사용하여 각 target_date에 대한 기준 가격 찾기
-  #   # direction='backward'는 target_date와 같거나 그 이전의 가장 최근 날짜를 찾음
-  #   merged = pd.merge_asof(
-  #       left=lookup_df,
-  #       right=base_prices_df,
-  #       left_on='target_date',
-  #       right_index=True,
-  #       direction='backward'
-  #   )
-  #   # 인덱스를 원래 DataFrame과 맞춤
-  #   merged.index = df.index
-  #   base_price = merged['Base_Price']
-  #
-  #   # 조회 기간 이전이라 데이터가 없는 경우(NaN), 첫날 종가로 대체
-  #   base_price.fillna(first_day_close, inplace=True)
-  #
-  #   # 수익률 계산
-  #   df[return_col] = df['Close'] / base_price - 1
 
   df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
                            df['Return_3M'] * 0.3 +
@@ -63,19 +25,48 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  # KOSDAQ GLOBAL → KOSDAQ 병합
-  # df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
+  # Group by the date index to perform calculations on each day's data
+  grouped = df.groupby(df.index)
 
-  grouped = df.groupby([df.index])
+  # Define a reusable function for scaling ranks
+  def scale_rank(x):
+    # Handle groups with one or zero valid entries to avoid division by zero
+    if x.notna().sum() <= 1:
+      return pd.Series(1, index=x.index) # Assign a default low score
+
+    # This is the core scaling logic
+    # 1. Get the rank (1, 2, 3, ...)
+    # 2. Scale it to a 0-1 range: (rank - 1) / (count - 1)
+    # 3. Scale it to a 0-98 range: * 98
+    # 4. Shift it to a 1-99 range: + 1
+    count = x.notna().sum()
+    scaled_rs = (x.rank(method='average') - 1) / (count - 1) * 98 + 1
+    return scaled_rs
+
+  # Apply the scaling function to each return period
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
+    df[rs_col] = grouped[return_col].transform(scale_rank)
 
-    df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
-    df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
+  # Also apply it to the final weighted return
+  df['RS'] = grouped['Weighted_Return'].transform(scale_rank)
 
-  df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
-  df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
+  # Round, fill any remaining NaNs, convert to integer, and clip to the 1-99 range
+  rs_cols = [f'RS_{p}' for p in ["1M", "3M", "6M", "12M"]] + ['RS']
+  for col in rs_cols:
+    df[col] = df[col].round().fillna(1).astype(int).clip(1, 99)
+
+  # grouped = df.groupby([df.index])
+  # for period in ["1M", "3M", "6M", "12M"]:
+  #   return_col = f'Return_{period}'
+  #   rs_col = f'RS_{period}'
+  #
+  #   df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
+  #   df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
+  #
+  # df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
+  # df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   # for period in ["1M", "3M", "6M", "12M"]:
   #   return_col = f'Return_{period}'
