@@ -66,6 +66,7 @@ def calculate_relative_strength(df):
   # KOSDAQ GLOBAL → KOSDAQ 병합
   # df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
 
+  df = df.sort_index()
   grouped = df.groupby([df.index])
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
