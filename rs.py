@@ -162,7 +162,7 @@ if __name__ == "__main__":
     result_file = "rs.csv"
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
     # 오늘 날짜만 필터링
-    result_data = result_data[result_data.index.date == yesterday.date()]
+    result_data = result_data[result_data.index.date == today.date()]
 
     # 오늘 데이터만 기준으로 RS 계산
     result_data = calculate_relative_strength(result_data)
