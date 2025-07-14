@@ -64,9 +64,9 @@ def calculate_indicators(df):
 
 def calculate_relative_strength(df):
   # KOSDAQ GLOBAL → KOSDAQ 병합
-  df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
+  # df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
 
-  grouped = df.groupby([df.index, 'Market_Group'])
+  grouped = df.groupby([df.index])
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
@@ -107,7 +107,7 @@ def calculate_relative_strength(df):
   # )
   # df['RS'] = df['RS'].clip(1, 99)
 
-  df = df.drop('Market_Group', axis=1)
+  # df = df.drop('Market_Group', axis=1)
   return df
 
 def filter_common_stocks(df):
