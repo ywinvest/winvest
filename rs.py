@@ -66,14 +66,15 @@ def calculate_relative_strength(df):
   # KOSDAQ GLOBAL → KOSDAQ 병합
   df['Market_Group'] = df['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
 
+  grouped = df.groupby([df.index, 'Market_Group'])
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    df[rs_col] = df.groupby([df.index, 'Market_Group', return_col]).rank(pct=True) * 98 + 1
+    df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  df['RS'] = df.groupby([df.index, 'Market_Group', 'Weighted_Return']).rank(pct=True) * 98 + 1
+  df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   # for period in ["1M", "3M", "6M", "12M"]:
