@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 
 def calculate_indicators(df):
   first_day_close = df['Close'].iloc[0]
-  for period_days in [20, 60, 120, 240]:
-    period_str = f"{period_days // 20}M" if period_days < 240 else "12M"
+  for period_days in [21, 63, 126, 252]:
+    period_str = f"{period_days // 21}M" if period_days < 252 else "12M"
     return_col = f'Return_{period_str}'
     base_price = df['Close'].shift(period_days)
     base_price.fillna(first_day_close, inplace=True)
