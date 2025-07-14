@@ -25,80 +25,49 @@ def calculate_indicators(df):
 
 
 def calculate_relative_strength(df):
-  # Group by the date index to perform calculations on each day's data
-  grouped = df.groupby(df.index)
+  # # Group by the date index to perform calculations on each day's data
+  # grouped = df.groupby(df.index)
+  #
+  # # Define a reusable function for scaling ranks
+  # def scale_rank(x):
+  #   # Handle groups with one or zero valid entries to avoid division by zero
+  #   if x.notna().sum() <= 1:
+  #     return pd.Series(1, index=x.index) # Assign a default low score
+  #
+  #   # This is the core scaling logic
+  #   # 1. Get the rank (1, 2, 3, ...)
+  #   # 2. Scale it to a 0-1 range: (rank - 1) / (count - 1)
+  #   # 3. Scale it to a 0-98 range: * 98
+  #   # 4. Shift it to a 1-99 range: + 1
+  #   count = x.notna().sum()
+  #   scaled_rs = (x.rank(method='average') - 1) / (count - 1) * 98 + 1
+  #   return scaled_rs
+  #
+  # # Apply the scaling function to each return period
+  # for period in ["1M", "3M", "6M", "9M", "12M"]:
+  #   return_col = f'Return_{period}'
+  #   rs_col = f'RS_{period}'
+  #   df[rs_col] = grouped[return_col].transform(scale_rank)
+  #
+  # # Also apply it to the final weighted return
+  # df['RS'] = grouped['Weighted_Return'].transform(scale_rank)
+  #
+  # # Round, fill any remaining NaNs, convert to integer, and clip to the 1-99 range
+  # rs_cols = [f'RS_{p}' for p in ["1M", "3M", "6M", "9M", "12M"]] + ['RS']
+  # for col in rs_cols:
+  #   df[col] = df[col].round().fillna(1).astype(int).clip(1, 99)
 
-  # Define a reusable function for scaling ranks
-  def scale_rank(x):
-    # Handle groups with one or zero valid entries to avoid division by zero
-    if x.notna().sum() <= 1:
-      return pd.Series(1, index=x.index) # Assign a default low score
-
-    # This is the core scaling logic
-    # 1. Get the rank (1, 2, 3, ...)
-    # 2. Scale it to a 0-1 range: (rank - 1) / (count - 1)
-    # 3. Scale it to a 0-98 range: * 98
-    # 4. Shift it to a 1-99 range: + 1
-    count = x.notna().sum()
-    scaled_rs = (x.rank(method='average') - 1) / (count - 1) * 98 + 1
-    return scaled_rs
-
-  # Apply the scaling function to each return period
+  grouped = df.groupby([df.index])
   for period in ["1M", "3M", "6M", "9M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
-    df[rs_col] = grouped[return_col].transform(scale_rank)
 
-  # Also apply it to the final weighted return
-  df['RS'] = grouped['Weighted_Return'].transform(scale_rank)
+    df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  # Round, fill any remaining NaNs, convert to integer, and clip to the 1-99 range
-  rs_cols = [f'RS_{p}' for p in ["1M", "3M", "6M", "9M", "12M"]] + ['RS']
-  for col in rs_cols:
-    df[col] = df[col].round().fillna(1).astype(int).clip(1, 99)
+  df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
+  df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
-  # grouped = df.groupby([df.index])
-  # for period in ["1M", "3M", "6M", "12M"]:
-  #   return_col = f'Return_{period}'
-  #   rs_col = f'RS_{period}'
-  #
-  #   df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
-  #   df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
-  #
-  # df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
-  # df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
-
-  # for period in ["1M", "3M", "6M", "12M"]:
-  #   return_col = f'Return_{period}'
-  #   rs_col = f'RS_{period}'
-  #
-  #   # 평균 대체 및 표준화
-  #   df[return_col] = df.groupby('Market_Group')[return_col].transform(
-  #       lambda x: x.fillna(x.mean()) if x.notna().any() else 0
-  #   )
-  #   df[return_col] = df.groupby('Market_Group')[return_col].transform(
-  #       lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
-  #   )
-  #
-  #   # 순위 기반 정규화
-  #   df[rs_col] = df.groupby('Market_Group')[return_col].transform(
-  #       lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
-  #   )
-  #   df[rs_col] = df[rs_col].clip(1, 99)
-  #
-  # # Weighted_Return도 동일 처리
-  # df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-  #     lambda x: x.fillna(x.mean()) if x.notna().any() else 0
-  # )
-  # df['Weighted_Return'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-  #     lambda x: (x - x.mean()) / x.std() if x.std() > 0 else 0
-  # )
-  # df['RS'] = df.groupby('Market_Group')['Weighted_Return'].transform(
-  #     lambda x: pd.Series(rankdata(x, method='average') / len(x) * 98 + 1, index=x.index).round().astype(int)
-  # )
-  # df['RS'] = df['RS'].clip(1, 99)
-
-  # df = df.drop('Market_Group', axis=1)
   return df
 
 def filter_common_stocks(df):
