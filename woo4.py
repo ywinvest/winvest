@@ -263,7 +263,12 @@ def send_to_slack(result_data, kospi, kosdaq):
         rs_6m = row['RS_6M']
 
         name_truncated = truncate_name(name, 10)
-        emoji = "first_place_medal" if ma20_gap < 0.3 and rs_1m >= 70 and rs_1m >= rs_3m and rs_1m >= rs_6m else "question"
+        emoji = "question"
+        if ma20_gap < 0.3 and rs_1m >= rs_3m and rs_1m >= rs_6m:
+          if 80 <= rs <= 95:
+            emoji = "first_place_medal"
+          elif (75 <= rs <= 89) or (96 <= rs <= 99):
+            emoji = "second_place_medal"
 
         # 한 줄에 종목명과 값 출력, 종목명과 ":" 사이에 공백 2개
         rich_text_elements.append({
