@@ -18,9 +18,9 @@ def calculate_indicators(df):
     df[return_col] = df['Close'] / base_price - 1
 
   # 현재 종가 대비 수익률로 계산
-  df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
-                           df['Return_3M'] * 0.2 +
+  df['Weighted_Return'] = (df['Return_3M'] * 0.4 +
                            df['Return_6M'] * 0.2 +
+                           df['Return_9M'] * 0.2 +
                            df['Return_12M'] * 0.2)
   return df
 
