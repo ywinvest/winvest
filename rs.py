@@ -131,10 +131,10 @@ if __name__ == "__main__":
     two_years_ago = today.year - 2
     result_file = "rs.csv"
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
-    # 오늘 날짜만 필터링
-    result_data = result_data[result_data.index.date == yesterday.date()]
+    previous_trading_day = sorted(result_data.index.unique())[-2]
+    result_data = result_data[result_data.index == previous_trading_day]
+    # result_data = result_data[result_data.index.date == yesterday.date()]
 
-    # 오늘 데이터만 기준으로 RS 계산
     result_data = calculate_relative_strength(result_data)
 
     result_data = filter_common_stocks(result_data)
