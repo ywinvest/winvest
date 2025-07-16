@@ -7,8 +7,14 @@ from functools import partial
 import FinanceDataReader as fdr
 import pandas as pd
 import pandas_ta as ta
-import requests
 from dotenv import load_dotenv
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+from slack_sdk.models.blocks import (
+  RichTextBlock,
+  RichTextSectionElement,
+  RichTextElementParts
+)
 
 SLACK_API_URL = "https://slack.com/api"
 
@@ -309,62 +315,32 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
   return pd.DataFrame(trades)
 
 def create_rich_text_with_emoji(emoji, text, bold=True):
-  return {
-    "type": "rich_text_section",
-    "elements": [
-      {
-        "type": "emoji",
-        "name": emoji,
-      },
-      {
-        "type": "text",
-        "text": text,
-        "style": {
-          "bold": bold
-        }
-      }
-    ]
-  }
+  """Create a Slack rich text section with an emoji and text."""
+  return RichTextSectionElement(
+      elements=[
+        RichTextElementParts.Emoji(name=emoji),
+        RichTextElementParts.Text(text=text, style=RichTextElementParts.TextStyle(bold=bold)),
+      ]
+  )
 
 def create_rich_text_item(text, bold=False):
-  return {
-    "type": "rich_text_section",
-    "elements": [
-      {
-        "type": "text",
-        "text": text,
-        "style": {
-          "bold": bold
-        }
-      }
-    ]
-  }
+  """Create a Slack rich text section with plain text."""
+  return RichTextSectionElement(
+      elements=[
+        RichTextElementParts.Text(text=text, style=RichTextElementParts.TextStyle(bold=bold)),
+      ]
+  )
 
 def send_slack_message(blocks):
-  # 설정 로드
-  # with open("config-woo1.json", "r") as config_file:
-  #   config = json.load(config_file)
-
-  # slack_token = config["slack_bot_token"]
-  # slack_channel = config["slack_channel"]
-  bot_token = os.getenv("SLACK_BOT_TOKEN")
-  channel = os.getenv("SLACK_CHANNEL")
-
-  headers = {
-    "Authorization": f"Bearer {bot_token}",
-    "Content-Type": "application/json"
-  }
-
-  payload = {
-    "channel": channel,
-    "blocks": blocks
-  }
-
-  response = requests.post(f"{SLACK_API_URL}/chat.postMessage", headers=headers, json=payload)
-  response_data = response.json()
-  if not response_data.get("ok"):
-    raise Exception(f"Failed to send message: {response_data.get('error')}")
-  return response_data.get("ts")
+  client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
+  try:
+    response = client.chat_postMessage(
+        channel=os.getenv("SLACK_CHANNEL"),
+        blocks=blocks
+    )
+    return response["ts"]
+  except SlackApiError as e:
+    raise Exception(f"Failed to send message: {e.response['error']}")
 
 def format_market_cap(marcap):
   """시가총액을 조 또는 억 단위로 포맷팅"""
@@ -386,12 +362,9 @@ def send_to_slack(trades_data, kospi, kosdaq):
     today_trades = trades_data[trades_data['Buy_Date'].dt.date == today.date()] if not trades_data.empty else pd.DataFrame()
 
     if today_trades.empty:
-      blocks = [
-        {
-          "type": "rich_text",
-          "elements": [create_rich_text_item("오늘은 매수 후보가 없습니다.")]
-        }
-      ]
+      blocks = [RichTextBlock(elements=[
+        create_rich_text_item("오늘은 매수 후보가 없습니다.")
+      ]).to_dict()]
       send_slack_message(blocks)
       print("No stocks match the buying conditions today")
       return
@@ -439,22 +412,16 @@ def send_to_slack(trades_data, kospi, kosdaq):
             emoji = "second_place_medal"
 
         # 한 줄에 종목명과 값 출력, 종목명과 ":" 사이에 공백 2개
-        rich_text_elements.append({
-          "type": "rich_text_section",
-          "elements": [
-            {"type": "emoji", "name": emoji},
-            {"type": "text", "text": f"{name_truncated}",
-             "style": {"code": True}},
-            {"type": "text", "text": f" {ma20_gap * 100:.2f}%, {rs} ({rs_1m}, {rs_3m}, {rs_6m}), {format_market_cap(marcap)}"}
-          ]
-        })
+        element = RichTextSectionElement(
+            elements=[
+              RichTextElementParts.Emoji(name=emoji),
+              RichTextElementParts.Text(text=f"{name_truncated}", style=RichTextElementParts.TextStyle(code=True)),
+              RichTextElementParts.Text(text=f" {ma20_gap * 100:.2f}%, {rs} ({rs_1m}, {rs_3m}, {rs_6m}), {format_market_cap(marcap)}"),
+            ]
+        )
+        rich_text_elements.append(element)
 
-    blocks = [
-      {
-        "type": "rich_text",
-        "elements": rich_text_elements
-      }
-    ]
+    blocks = [RichTextBlock(elements=rich_text_elements).to_dict()]
 
     # Slack 메시지 전송
     send_slack_message(blocks)
