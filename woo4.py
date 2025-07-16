@@ -8,6 +8,8 @@ import FinanceDataReader as fdr
 import pandas as pd
 import pandas_ta as ta
 from dotenv import load_dotenv
+from slack_utils import SlackMessageBuilder, send_slack_message
+
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.models.blocks import (
@@ -314,34 +316,6 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
   return pd.DataFrame(trades)
 
-def create_rich_text_with_emoji(emoji, text, bold=True):
-  """Create a Slack rich text section with an emoji and text."""
-  return RichTextSectionElement(
-      elements=[
-        RichTextElementParts.Emoji(name=emoji),
-        RichTextElementParts.Text(text=text, style=RichTextElementParts.TextStyle(bold=bold)),
-      ]
-  )
-
-def create_rich_text_item(text, bold=False):
-  """Create a Slack rich text section with plain text."""
-  return RichTextSectionElement(
-      elements=[
-        RichTextElementParts.Text(text=text, style=RichTextElementParts.TextStyle(bold=bold)),
-      ]
-  )
-
-def send_slack_message(blocks):
-  client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
-  try:
-    response = client.chat_postMessage(
-        channel=os.getenv("SLACK_CHANNEL"),
-        blocks=blocks
-    )
-    return response["ts"]
-  except SlackApiError as e:
-    raise Exception(f"Failed to send message: {e.response['error']}")
-
 def format_market_cap(marcap):
   """시가총액을 조 또는 억 단위로 포맷팅"""
   if marcap >= 1e12:  # 1조 이상
@@ -357,15 +331,17 @@ def send_to_slack(trades_data, kospi, kosdaq):
   try:
     # 오늘 날짜 가져오기
     today = datetime.today()
+    token = os.getenv("SLACK_BOT_TOKEN")
+    channel = os.getenv("SLACK_CHANNEL")
 
     # 오늘 날짜의 매수 신호만 필터링
     today_trades = trades_data[trades_data['Buy_Date'].dt.date == today.date()] if not trades_data.empty else pd.DataFrame()
 
+    builder = SlackMessageBuilder()
+
     if today_trades.empty:
-      blocks = [RichTextBlock(elements=[
-        create_rich_text_item("오늘은 매수 후보가 없습니다.")
-      ]).to_dict()]
-      send_slack_message(blocks)
+      builder.add_line("오늘은 매수 후보가 없습니다.")
+      send_slack_message(builder.build(), token, channel)
       print("No stocks match the buying conditions today")
       return
 
@@ -379,11 +355,11 @@ def send_to_slack(trades_data, kospi, kosdaq):
     kospi_di = kospi[kospi.index.date == today.date()]['DI'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
     kosdaq_di = kosdaq[kosdaq.index.date == today.date()]['DI'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
 
-    # 시장별로 데이터 구성
-    rich_text_elements = []
-    rich_text_elements.append(create_rich_text_item(
-        f" {today.year}년 {today.month}월 {today.day}일 신고가 돌파 매수 후보", True
-    ))
+    builder.add_line(
+        f"{today.year}년 {today.month}월 {today.day}일 신고가 돌파 매수 후보",
+        bold=True
+    )
+
     for market, group in today_trades.groupby('Market'):
       rsi_emoji = "large_green_circle" if (50 <= (
         kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80) and (
@@ -391,9 +367,11 @@ def send_to_slack(trades_data, kospi, kosdaq):
         kospi_di if market == 'KOSPI' else kosdaq_di) else "red_circle"
       rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
       adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
-      rich_text_elements.append(create_rich_text_with_emoji(
-          rsi_emoji, f"{market} ({rsi_value:.2f}, {adx_value:.2f})", True
-      ))
+      builder.add_line(
+          f" {market} (RSI: {rsi_value:.2f}, ADX: {adx_value:.2f})",
+          emoji=rsi_emoji,
+          bold=True
+      )
       for _, row in group.iterrows():
         name = row['Name']
         marcap = row['Marcap']
@@ -403,7 +381,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
         rs_3m = row['RS_3M']
         rs_6m = row['RS_6M']
 
-        name_truncated = truncate_name(name, 10)
+        # name_truncated = truncate_name(name, 10)
         emoji = "question"
         if ma20_gap < 0.3 and rs_1m >= rs_3m and rs_1m >= rs_6m:
           if 80 <= rs <= 95:
@@ -411,20 +389,16 @@ def send_to_slack(trades_data, kospi, kosdaq):
           elif (75 <= rs <= 89) or (96 <= rs <= 99):
             emoji = "second_place_medal"
 
-        # 한 줄에 종목명과 값 출력, 종목명과 ":" 사이에 공백 2개
-        element = RichTextSectionElement(
-            elements=[
-              RichTextElementParts.Emoji(name=emoji),
-              RichTextElementParts.Text(text=f"{name_truncated}", style=RichTextElementParts.TextStyle(code=True)),
-              RichTextElementParts.Text(text=f" {ma20_gap * 100:.2f}%, {rs} ({rs_1m}, {rs_3m}, {rs_6m}), {format_market_cap(marcap)}"),
-            ]
-        )
-        rich_text_elements.append(element)
-
-    blocks = [RichTextBlock(elements=rich_text_elements).to_dict()]
+        builder.start_line() \
+          .with_emoji(emoji) \
+          .with_text(truncate_name(name, 10), code=True) \
+          .with_text(f" Gap20: {ma20_gap * 100:.1f}%") \
+          .with_text(f", RS: {rs} ({rs_1m},{rs_3m},{rs_6m})") \
+          .with_text(f", {format_market_cap(marcap)}") \
+          .commit()
 
     # Slack 메시지 전송
-    send_slack_message(blocks)
+    send_slack_message(builder.build(), token, channel)
 
   except Exception as e:
     print(f"Error sending Slack message: {e}")
