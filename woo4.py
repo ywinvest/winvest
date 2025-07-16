@@ -8,17 +8,9 @@ import FinanceDataReader as fdr
 import pandas as pd
 import pandas_ta as ta
 from dotenv import load_dotenv
+
 from slack_utils import SlackMessageBuilder, send_slack_message
 
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
-from slack_sdk.models.blocks import (
-  RichTextBlock,
-  RichTextSectionElement,
-  RichTextElementParts
-)
-
-SLACK_API_URL = "https://slack.com/api"
 
 def calculate_indicators(df):
   # df['MA5'] = df['Close'].rolling(window=5).mean()
@@ -345,7 +337,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
       print("No stocks match the buying conditions today")
       return
 
-    today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[True, False])
+    today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
 
     # 시장별 RSI 값 가져오기 (오늘 날짜 기준)
     kospi_rsi = kospi[kospi.index.date == today.date()]['RSI'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
@@ -381,7 +373,6 @@ def send_to_slack(trades_data, kospi, kosdaq):
         rs_3m = row['RS_3M']
         rs_6m = row['RS_6M']
 
-        # name_truncated = truncate_name(name, 10)
         emoji = "question"
         if ma20_gap < 0.3 and rs_1m >= rs_3m and rs_1m >= rs_6m:
           if 80 <= rs <= 95:
@@ -389,13 +380,14 @@ def send_to_slack(trades_data, kospi, kosdaq):
           elif (75 <= rs <= 89) or (96 <= rs <= 99):
             emoji = "second_place_medal"
 
-        builder.start_line() \
-          .with_emoji(emoji) \
-          .with_text(truncate_name(name, 10), code=True) \
-          .with_text(f" Gap20: {ma20_gap * 100:.1f}%") \
-          .with_text(f", RS: {rs} ({rs_1m},{rs_3m},{rs_6m})") \
-          .with_text(f", {format_market_cap(marcap)}") \
-          .commit()
+        with builder.line() as line:
+          line \
+            .emoji(emoji) \
+            .text(truncate_name(name, 10), code=True) \
+            .space() \
+            .text(f"Gap20: {ma20_gap * 100:.1f}%") \
+            .text(f", RS: {rs} ({rs_1m},{rs_3m},{rs_6m})") \
+            .text(f", {format_market_cap(marcap)}")
 
     # Slack 메시지 전송
     send_slack_message(builder.build(), token, channel)
