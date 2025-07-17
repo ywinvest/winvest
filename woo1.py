@@ -6,10 +6,10 @@ from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
-import requests
 from dotenv import load_dotenv
 
-SLACK_API_URL = "https://slack.com/api"
+from slack_utils import SlackMessageBuilder, send_slack_message
+
 
 def calculate_indicators(df):
   df['MA5'] = df['Close'].rolling(window=5).mean()
@@ -55,64 +55,6 @@ def buy_condition(df):
   conditions &= (df['Low'] != df['52WeekLow']) # 52주 신저가 경신 제외
   return conditions
 
-def create_rich_text_with_emoji(emoji, text, bold=True):
-  return {
-    "type": "rich_text_section",
-    "elements": [
-      {
-        "type": "emoji",
-        "name": emoji,
-      },
-      {
-        "type": "text",
-        "text": text,
-        "style": {
-          "bold": bold
-        }
-      }
-    ]
-  }
-
-def create_rich_text_item(text, bold=False):
-  return {
-    "type": "rich_text_section",
-    "elements": [
-      {
-        "type": "text",
-        "text": text,
-        "style": {
-          "bold": bold
-        }
-      }
-    ]
-  }
-
-def send_slack_message(blocks):
-  # 설정 로드
-  # with open("config-woo1.json", "r") as config_file:
-  #   config = json.load(config_file)
-
-  # slack_token = config["slack_bot_token"]
-  # slack_channel = config["slack_channel"]
-  bot_token = os.getenv("SLACK_BOT_TOKEN")
-  channel = os.getenv("SLACK_CHANNEL")
-
-  headers = {
-    "Authorization": f"Bearer {bot_token}",
-    "Content-Type": "application/json"
-  }
-
-  payload = {
-    "channel": channel,
-    "blocks": blocks
-  }
-
-  response = requests.post(f"{SLACK_API_URL}/chat.postMessage", headers=headers, json=payload)
-  response_data = response.json()
-  if not response_data.get("ok"):
-    raise Exception(f"Failed to send message: {response_data.get('error')}")
-  return response_data.get("ts")
-
 def format_market_cap(marcap):
   """시가총액을 조 또는 억 단위로 포맷팅"""
   if marcap >= 1e12:  # 1조 이상
@@ -122,29 +64,22 @@ def format_market_cap(marcap):
 
 def send_to_slack(result_data):
   try:
+    token = os.getenv("SLACK_BOT_TOKEN")
+    channel = os.getenv("SLACK_CHANNEL")
+
+    builder = SlackMessageBuilder()
+
     if result_data.empty:
-      blocks = [
-        {
-          "type": "section",
-          "text": {
-            "type": "plain_text",
-            "text": "오늘은 매수 후보가 없습니다.",
-            "emoji": True
-          }
-        }
-      ]
-      send_slack_message(blocks)
+      builder.add_line("오늘은 매수 후보가 없습니다.")
+      send_slack_message(builder.build(), token, channel)
       print("No stocks match the buying conditions")
       return
 
     # 결과를 Market과 High_Change를 기준으로 정렬
     result_data = result_data.sort_values(['Market', 'High_Change'], ascending=[True, False])
 
+    builder.add_line(f" {today.year}년 {today.month}월 {today.day}일 매수 후보", bold=True)
     # 시장별로 데이터 구성
-    rich_text_elements = []
-    rich_text_elements.append(create_rich_text_item(
-        f" {today.year}년 {today.month}월 {today.day}일 매수 후보\n", True
-    ))
     for market, group in result_data.groupby('Market'):
       for _, row in group.iterrows():
         name = row['Name']
@@ -160,30 +95,15 @@ def send_to_slack(result_data):
 
         message = f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%, 고가-종가: {diff_high_close * 100:.2f}%, 종가-시가: {diff_close_open * 100:.2f}%, 거래량: {volume_change * 100:.2f}%"
 
-        # Rich Text 아이템 생성
-        item = create_rich_text_with_emoji(
-            "question", message, False
-        )
         if high_change >= 10 and volume_change > 5 and diff_high_close >= 0 and diff_high_close <= 0.025:
-          item = create_rich_text_with_emoji(
-              "first_place_medal", message, False
-          )
+          builder.add_line(f" {message}", emoji="first_place_medal")
         elif high_change >= 10 and volume_change > 5 and diff_high_close > 0.1 and diff_close_open >= 0.01:
-          item = create_rich_text_with_emoji(
-              "second_place_medal", message, False
-          )
-
-        rich_text_elements.append(item)
-
-    blocks = [
-      {
-        "type": "rich_text",
-        "elements": rich_text_elements
-      }
-    ]
+          builder.add_line(f" {message}", emoji="second_place_medal")
+        else:
+          builder.add_line(f" {message}", emoji="question")
 
     # Slack 메시지 전송
-    send_slack_message(blocks)
+    send_slack_message(builder.build(), token, channel)
 
   except Exception as e:
     print(f"Error sending Slack message: {e}")
