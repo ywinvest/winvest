@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+from typing import Optional, Union, List, Dict, Any
+
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.models.blocks import (
@@ -6,68 +9,95 @@ from slack_sdk.models.blocks import (
   RichTextElementParts
 )
 
+
 class SlackMessageBuilder:
   """
-  Fluent Interface를 사용하여 Slack 메시지를 쉽게 만드는 빌더 클래스.
+  Pythonic Slack Message Builder
   """
   def __init__(self):
     self._elements = []
 
-  def add_line(self, text: str, emoji: str = None, bold: bool = False, code: bool = False):
-    """가장 간단한 형태의 한 줄을 추가합니다."""
-    line_builder = self.start_line()
-    if emoji:
-      line_builder.with_emoji(emoji)
-    line_builder.with_text(text, bold=bold, code=code).commit()
+  def add_line(self, text: str = "", *, emoji: Optional[str] = None,
+      bold: bool = False, code: bool = False, italic: bool = False) -> 'SlackMessageBuilder':
+    """
+    간단한 한 줄 추가 - 가장 일반적인 사용 사례
+
+    Args:
+        text: 표시할 텍스트
+        emoji: 이모지 이름 (예: 'smile', 'wave')
+        bold: 굵게 표시 여부
+        code: 코드 스타일 표시 여부
+        italic: 기울임 표시 여부
+    """
+    with self.line() as line:
+      if emoji:
+        line.emoji(emoji)
+      if text:
+        line.text(text, bold=bold, code=code, italic=italic)
     return self
 
-  def start_line(self):
+  @contextmanager
+  def line(self):
     """
-    복잡한 형식의 줄 생성을 시작합니다.
-    LineBuilder 객체를 반환하며, 메서드 체이닝이 가능합니다.
-    """
-    return self._LineBuilder(self)
+    Context Manager를 사용한 줄 생성
 
-  def build(self) -> list:
-    """최종적으로 Slack API가 요구하는 blocks 리스트를 생성합니다."""
+    Usage:
+        with builder.line() as line:
+            line.emoji('smile').text('Hello', bold=True)
+    """
+    line_builder = self._LineBuilder()
+    try:
+      yield line_builder
+    finally:
+      # 자동으로 commit 처리
+      if line_builder._parts:
+        self._elements.append(RichTextSectionElement(elements=line_builder._parts))
+
+  def build(self) -> List[Dict[str, Any]]:
+    """Slack API가 요구하는 blocks 리스트 반환"""
     if not self._elements:
       return []
     return [RichTextBlock(elements=self._elements).to_dict()]
 
+  # Python의 __call__ 매직 메서드를 활용한 함수형 접근
+  def __call__(self, *lines: Union[str, Dict[str, Any]]) -> 'SlackMessageBuilder':
+    """
+    함수형 스타일로 여러 줄을 한 번에 추가
+
+    Usage:
+        builder("Hello", {"text": "World", "bold": True})
+    """
+    for line in lines:
+      if isinstance(line, str):
+        self.add_line(line)
+      elif isinstance(line, dict):
+        self.add_line(**line)
+    return self
+
   class _LineBuilder:
-    """SlackMessageBuilder 내부에서 한 줄(RichTextSection)을 만드는 도우미 클래스."""
-    def __init__(self, message_builder):
-      self._message_builder = message_builder
+    """내부 Line Builder - Context Manager 내에서만 사용"""
+
+    def __init__(self):
       self._parts = []
 
-    def with_emoji(self, name: str):
-      """줄에 이모지를 추가합니다."""
+    def emoji(self, name: str) -> '_LineBuilder':
+      """이모지 추가"""
       self._parts.append(RichTextElementParts.Emoji(name=name))
       return self
 
-    def with_text(self, text: str, bold: bool = False, code: bool = False, italic: bool = False):
-      """줄에 텍스트를 추가합니다. 다양한 스타일 적용이 가능합니다."""
-      style_obj = None
+    def text(self, text: str, *, bold: bool = False, code: bool = False,
+        italic: bool = False) -> '_LineBuilder':
+      """텍스트 추가"""
+      style = None
       if bold or code or italic:
-        style_obj = RichTextElementParts.TextStyle(bold=bold, code=code, italic=italic)
-
-      text_content = f"{text}" if self._parts else text
-
-      self._parts.append(
-          RichTextElementParts.Text(text=text_content, style=style_obj)
-      )
+        style = RichTextElementParts.TextStyle(bold=bold, code=code, italic=italic)
+      self._parts.append(RichTextElementParts.Text(text=text, style=style))
       return self
 
-    def commit(self):
-      """
-      지금까지 구성한 줄을 확정하여 부모 빌더에 추가하고,
-      계속해서 메시지를 작성할 수 있도록 부모 빌더(SlackMessageBuilder)를 반환합니다.
-      """
-      if self._parts:
-        self._message_builder._elements.append(
-            RichTextSectionElement(elements=self._parts)
-        )
-      return self._message_builder
+    def space(self) -> '_LineBuilder':
+      """공백 추가"""
+      self._parts.append(RichTextElementParts.Text(text=" "))
+      return self
 
 def send_slack_message(blocks: list, token: str, channel: str):
   """Sends a message with the given blocks to the specified Slack channel."""
