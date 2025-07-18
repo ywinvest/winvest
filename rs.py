@@ -89,6 +89,7 @@ def process_stock(row, two_years_ago):
     name = row['Name']
     market = row['Market']
     marcap = row['Marcap']
+    listingDate = row['ListingDate']
 
     df = fdr.DataReader(symbol, two_years_ago)
     df = calculate_indicators(df)
@@ -96,6 +97,7 @@ def process_stock(row, two_years_ago):
     df['Name'] = name
     df['Market'] = market
     df['Marcap'] = marcap
+    df['ListingDate'] = listingDate
 
     return df
   except Exception as e:
@@ -128,14 +130,12 @@ if __name__ == "__main__":
       fdr.StockListing('KOSDAQ'),
     ], ignore_index=True)
 
-    exclude_pattern = r'스팩'
     all_stocks = all_stocks[
-      (~all_stocks['Name'].str.contains(exclude_pattern, na=False, regex=True))
-      & (~all_stocks['Code'].str.endswith(
-          ("5", "7", "9", "K", "L", "M", "N", "O")))
-      & (all_stocks['Name'] != "0030R0")
-      & (all_stocks['Name'] != "0030T0")
+      (all_stocks['Name'] != "0030R0") &
+      (all_stocks['Name'] != "0030T0")
       ]
+    krx_desc = fdr.StockListing('KRX-DESC', "2014")[['Code', 'ListingDate']]
+    all_stocks = all_stocks.merge(krx_desc, on='Code', how='left')
 
     today = datetime.today()
     yesterday = today - timedelta(days=1)
