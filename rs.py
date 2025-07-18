@@ -136,8 +136,8 @@ if __name__ == "__main__":
       (all_stocks['Code'] != "0030R0") &
       (all_stocks['Code'] != "0030T0") &
       (all_stocks['Name'] != "싸이닉솔루션") &
-      (all_stocks['Code'] != "아우토크립트") &
-      (all_stocks['Code'] != "뉴엔AI")
+      (all_stocks['Name'] != "아우토크립트") &
+      (all_stocks['Name'] != "뉴엔AI")
       ]
     url = 'http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
     headers = {
