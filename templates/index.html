@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relative Strength (RS) Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .table th {
+      cursor: pointer;
+      user-select: none;
+    }
+    .table th.sortable:hover {
+      background-color: #f2f2f2;
+    }
+    .sort-indicator {
+      display: inline-block;
+      width: 1em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="container mt-4">
+  <h1 class="mb-4">주식 상대강도(RS) 대시보드</h1>
+
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <form method="get" action="/">
+        <div class="input-group">
+          <input type="text" class="form-control" name="query" placeholder="종목명 또는 종목코드 검색..." value="{{ query }}">
+          <button class="btn btn-primary" type="submit">검색</button>
+        </div>
+      </form>
+    </div>
+    <div class="col-md-6 text-md-end pt-2">
+      <p class="text-muted">총 {{ total_stocks }}개 종목</p>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-striped table-hover">
+      <thead class="table-light">
+      <tr>
+        {% set columns = [
+        ('Name', '종목명'), ('Code', '종목코드'), ('RS', 'RS'),
+        ('RS_1M', 'RS (1M)'), ('RS_3M', 'RS (3M)'), ('RS_6M', 'RS (6M)'),
+        ('Marcap', '시가총액')
+        ] %}
+        {% for col_id, col_name in columns %}
+        <th class="sortable" onclick="window.location.href='{{ url_for('index', query=query, sort_by=col_id, sort_order='desc' if sort_by == col_id and sort_order == 'asc' else 'asc') }}'">
+          {{ col_name }}
+          <span class="sort-indicator">
+                                {% if sort_by == col_id %}
+                                    {{ '▲' if sort_order == 'asc' else '▼' }}
+                                {% endif %}
+                                </span>
+        </th>
+        {% endfor %}
+      </tr>
+      </thead>
+      <tbody>
+      {% for stock in stocks %}
+      <tr>
+        <td>{{ stock.Name }}</td>
+        <td>{{ stock.Code }}</td>
+        <td>{{ stock.RS }}</td>
+        <td>{{ stock.RS_1M }}</td>
+        <td>{{ stock.RS_3M }}</td>
+        <td>{{ stock.RS_6M }}</td>
+        <td>{{ stock.Marcap | format_marcap }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="text-center">결과가 없습니다.</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total_pages > 1 %}
+  <nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if page == 1 %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('index', page=1, query=query, sort_by=sort_by, sort_order=sort_order) }}">처음</a>
+      </li>
+      <li class="page-item {% if page == 1 %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('index', page=page-1, query=query, sort_by=sort_by, sort_order=sort_order) }}">이전</a>
+      </li>
+
+      {% for p in range(start_page, end_page + 1) %}
+      <li class="page-item {% if p == page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('index', page=p, query=query, sort_by=sort_by, sort_order=sort_order) }}">{{ p }}</a>
+      </li>
+      {% endfor %}
+
+      <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('index', page=page+1, query=query, sort_by=sort_by, sort_order=sort_order) }}">다음</a>
+      </li>
+      <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('index', page=total_pages, query=query, sort_by=sort_by, sort_order=sort_order) }}">마지막</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+
+</div>
+</body>
+</html>
