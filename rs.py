@@ -7,6 +7,8 @@ import FinanceDataReader as fdr
 import pandas as pd
 from dotenv import load_dotenv
 
+import woo4
+
 
 def calculate_indicators(df):
   first_day_close = df['Close'].iloc[0]
@@ -130,14 +132,14 @@ if __name__ == "__main__":
     yesterday = today - timedelta(days=1)
     two_years_ago = today.year - 2
     result_file = "rs.csv"
-    result_data = parallel_process_stocks(all_stocks, two_years_ago)
+    result_data = woo4.parallel_process_stocks(all_stocks, two_years_ago)
     previous_trading_day = sorted(result_data.index.unique())[-2]
     result_data = result_data[result_data.index == previous_trading_day]
     # result_data = result_data[result_data.index.date == yesterday.date()]
 
-    result_data = calculate_relative_strength(result_data)
+    result_data = woo4.calculate_relative_strength(result_data)
 
-    result_data = filter_common_stocks(result_data)
+    result_data = woo4.filter_common_stocks(result_data)
 
     print("RS 분포 (전체):", result_data['RS'].dropna().value_counts(bins=10))
     # print("RS 분포 (시장별):", result_data.groupby('Market')['RS'].dropna().value_counts(bins=10))
