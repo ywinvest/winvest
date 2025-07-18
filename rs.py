@@ -128,6 +128,15 @@ if __name__ == "__main__":
       fdr.StockListing('KOSDAQ'),
     ], ignore_index=True)
 
+    exclude_pattern = r'스팩'
+    all_stocks = all_stocks[
+      (~all_stocks['Name'].str.contains(exclude_pattern, na=False, regex=True))
+      & (~all_stocks['Code'].str.endswith(
+          ("5", "7", "9", "K", "L", "M", "N", "O")))
+      & (all_stocks['Name'] != "0030R0")
+      & (all_stocks['Name'] != "0030T0")
+      ]
+
     today = datetime.today()
     yesterday = today - timedelta(days=1)
     two_years_ago = today.year - 2
