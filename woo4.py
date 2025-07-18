@@ -18,6 +18,7 @@ def calculate_indicators(df):
   df['MA20'] = df['Close'].rolling(window=20).mean()
   df['MA60'] = df['Close'].rolling(window=60).mean()
   df['MA120'] = df['Close'].rolling(window=120).mean()
+  df['MA240'] = df['Close'].rolling(window=240).mean()
   df['MA20_Cross'] = (df['Close'].gt(df['MA20'], axis=0)) & (df['Close'].shift(1).le(df['MA20'].shift(1), axis=0))
   df['MA20_Break'] = (df['Close'].lt(df['MA20'], axis=0)) & (df['Close'].shift(1).ge(df['MA20'].shift(1), axis=0))
   df['Bullish'] = df['Close'] > df['Open']
@@ -61,6 +62,7 @@ def calculate_indicators(df):
   df['MA20_Slope'] = df['MA20'].pct_change(fill_method=None)
   df['MA60_Slope'] = df['MA60'].pct_change(fill_method=None)
   df['MA120_Slope'] = df['MA120'].pct_change(fill_method=None)
+  df['MA240_Slope'] = df['MA240'].pct_change(fill_method=None)
 
   # 벡터화된 연속 상승 일수 계산
   def calculate_uptrend_days_vec(uptrend_series):
@@ -77,6 +79,7 @@ def calculate_indicators(df):
   df['MA20_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA20_Slope'] > 0)
   df['MA60_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA60_Slope'] > 0)
   df['MA120_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA120_Slope'] > 0)
+  df['MA240_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA240_Slope'] > 0)
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
@@ -157,6 +160,7 @@ def buy_condition(df):
   conditions &= (df['MA20_Slope'] > 0)
   conditions &= (df['MA60_Slope'] > 0)
   conditions &= (df['MA120_Slope'] > 0)
+  conditions &= (df['MA240_Slope'] > 0)
   conditions &= (df['Change'] < 0.295)
   conditions &= (df['Volume'] > 0)
   conditions &= (df['Volume'].shift(1) > 0)
