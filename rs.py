@@ -1,10 +1,12 @@
 import concurrent.futures
+import io
 import time
 from datetime import datetime, timedelta
 from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 
 import woo4
@@ -134,8 +136,20 @@ if __name__ == "__main__":
       (all_stocks['Name'] != "0030R0") &
       (all_stocks['Name'] != "0030T0")
       ]
-    krx_desc = fdr.StockListing('KRX-DESC', "2014")[['Code', 'ListingDate']]
-    all_stocks = all_stocks.merge(krx_desc, on='Code', how='left')
+    url = 'http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
+    headers = {
+      'User-Agent': 'Chrome/78.0.3904.87 Safari/537.36',
+      'Referer': 'http://data.krx.co.kr/'
+    }
+    r = requests.get(url, headers)
+    dfs = pd.read_html(io.StringIO(r.text), header=0)
+    df_listing = dfs[0]
+    cols_ren = {'종목코드': 'Code', '상장일': 'ListingDate'}
+    df_listing = df_listing.rename(columns = cols_ren)
+    df_listing['Code'] = df_listing['Code'].apply(lambda x: x.zfill(6))
+    df_listing['ListingDate'] = pd.to_datetime(df_listing['ListingDate'])
+
+    all_stocks = all_stocks.merge(df_listing, on='Code', how='left')
 
     today = datetime.today()
     yesterday = today - timedelta(days=1)
