@@ -405,6 +405,7 @@ def process_stock(row, two_years_ago):
     name = row['Name']
     marcap = row['Marcap']
     market = row['Market']
+    listingDate = row['ListingDate']
 
     df = fdr.DataReader(symbol, two_years_ago)
     df = calculate_indicators(df)
@@ -414,6 +415,7 @@ def process_stock(row, two_years_ago):
       df['Name'] = name
       df['Marcap'] = marcap
       df['Market'] = market
+      df['listingDate'] = listingDate
       return df
     return None
   except Exception as e:
