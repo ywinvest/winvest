@@ -7,10 +7,10 @@ from functools import partial
 import FinanceDataReader as fdr
 import pandas as pd
 import pandas_ta as ta
-import requests
 from dotenv import load_dotenv
 
-SLACK_API_URL = "https://slack.com/api"
+from slack_utils import SlackMessageBuilder, send_slack_message
+
 
 def calculate_indicators(df):
   # df['MA5'] = df['Close'].rolling(window=5).mean()
@@ -18,6 +18,7 @@ def calculate_indicators(df):
   df['MA20'] = df['Close'].rolling(window=20).mean()
   df['MA60'] = df['Close'].rolling(window=60).mean()
   df['MA120'] = df['Close'].rolling(window=120).mean()
+  df['MA240'] = df['Close'].rolling(window=240).mean()
   df['MA20_Cross'] = (df['Close'].gt(df['MA20'], axis=0)) & (df['Close'].shift(1).le(df['MA20'].shift(1), axis=0))
   df['MA20_Break'] = (df['Close'].lt(df['MA20'], axis=0)) & (df['Close'].shift(1).ge(df['MA20'].shift(1), axis=0))
   df['Bullish'] = df['Close'] > df['Open']
@@ -61,6 +62,7 @@ def calculate_indicators(df):
   df['MA20_Slope'] = df['MA20'].pct_change(fill_method=None)
   df['MA60_Slope'] = df['MA60'].pct_change(fill_method=None)
   df['MA120_Slope'] = df['MA120'].pct_change(fill_method=None)
+  df['MA240_Slope'] = df['MA240'].pct_change(fill_method=None)
 
   # 벡터화된 연속 상승 일수 계산
   def calculate_uptrend_days_vec(uptrend_series):
@@ -77,31 +79,57 @@ def calculate_indicators(df):
   df['MA20_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA20_Slope'] > 0)
   df['MA60_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA60_Slope'] > 0)
   df['MA120_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA120_Slope'] > 0)
+  df['MA240_Uptrend_Days'] = calculate_uptrend_days_vec(df['MA240_Slope'] > 0)
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
-  df['Return_1M'] = df['Close'] / df['Close'].shift(20) - 1
-  df['Return_3M'] = df['Close'] / df['Close'].shift(60) - 1
-  df['Return_6M'] = df['Close'] / df['Close'].shift(120) - 1
-  df['Return_12M'] = df['Close'] / df['Close'].shift(240) - 1
-  df['Weighted_Return'] = (df['Return_3M'] * 0.5 +
-                           df['Return_6M'] * 0.3 +
-                           df['Return_12M'] * 0.2)
+  first_day_close = df['Close'].iloc[0]
+  for period_days in [21, 63, 126, 252]:
+    period_str = f"{period_days // 21}M"
+    return_col = f'Return_{period_str}'
+    base_price = df['Close'].shift(period_days)
+    base_price.fillna(first_day_close, inplace=True)
+    df[return_col] = df['Close'] / base_price - 1
+
+  df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
+                           df['Return_3M'] * 0.3 +
+                           df['Return_6M'] * 0.2 +
+                           df['Return_12M'] * 0.1)
   return df
 
 
 def calculate_relative_strength(df):
+  grouped = df.groupby([df.index])
   for period in ["1M", "3M", "6M", "12M"]:
     return_col = f'Return_{period}'
     rs_col = f'RS_{period}'
 
-    df[rs_col] = df.groupby('Market')[return_col].rank(pct=True) * 98 + 1
+    df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
     df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
 
-  df['RS'] = df.groupby('Market')['Weighted_Return'].rank(pct=True) * 98 + 1
+  df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
   df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
 
   return df
+
+def calculate_trading_days(df, start_date, end_date):
+  """
+  실제 거래일 기준으로 보유기간을 계산하는 함수
+
+  Args:
+      df (pandas.DataFrame): 주가 데이터
+      start_date (datetime): 시작일
+      end_date (datetime): 종료일
+
+  Returns:
+      int: 실제 거래일 수
+  """
+  if pd.isna(end_date):
+    return None
+
+  # start_date와 end_date 사이의 실제 거래일만 필터링
+  trading_days = df.loc[start_date:end_date].index
+  return len(trading_days) - 1  # 매수일 제외
 
 def filter_common_stocks(df):
   # 스팩 제외
@@ -132,6 +160,7 @@ def buy_condition(df):
   conditions &= (df['MA20_Slope'] > 0)
   conditions &= (df['MA60_Slope'] > 0)
   conditions &= (df['MA120_Slope'] > 0)
+  conditions &= (df['MA240_Slope'] > 0)
   conditions &= (df['Change'] < 0.295)
   conditions &= (df['Volume'] > 0)
   conditions &= (df['Volume'].shift(1) > 0)
@@ -140,63 +169,148 @@ def buy_condition(df):
   # conditions &= (df['MA20_Gap'] < 0.3)
   return conditions
 
-def create_rich_text_with_emoji(emoji, text, bold=True):
-  return {
-    "type": "rich_text_section",
-    "elements": [
-      {
-        "type": "emoji",
-        "name": emoji,
-      },
-      {
-        "type": "text",
-        "text": text,
-        "style": {
-          "bold": bold
-        }
-      }
-    ]
-  }
+def buy_and_sell(df, kospi_df, kosdaq_df):
+  # 매수 신호가 발생한 모든 거래를 가져옵니다.
+  buy_signals = df[buy_condition(df)].copy()
+  buy_signals = buy_signals[buy_signals.index >= '2015-06-15']
 
-def create_rich_text_item(text, bold=False):
-  return {
-    "type": "rich_text_section",
-    "elements": [
-      {
-        "type": "text",
-        "text": text,
-        "style": {
-          "bold": bold
-        }
-      }
-    ]
-  }
+  if buy_signals.empty:
+    return pd.DataFrame()
 
-def send_slack_message(blocks):
-  # 설정 로드
-  # with open("config-woo1.json", "r") as config_file:
-  #   config = json.load(config_file)
+  trades = []
+  # 종목별로 순회하며 처리합니다.
+  for code, stock_group in df.groupby('Code'):
+    # 해당 종목의 매수 신호만 필터링합니다.
+    stock_buy_signals = buy_signals[buy_signals['Code'] == code]
+    if stock_buy_signals.empty:
+      continue
 
-  # slack_token = config["slack_bot_token"]
-  # slack_channel = config["slack_channel"]
-  bot_token = os.getenv("SLACK_BOT_TOKEN")
-  channel = os.getenv("SLACK_CHANNEL")
+    prev_sell_date = pd.Timestamp.min
 
-  headers = {
-    "Authorization": f"Bearer {bot_token}",
-    "Content-Type": "application/json"
-  }
+    for buy_date, buy_row in stock_buy_signals.iterrows():
+      # 이전 거래가 끝나기 전의 신호는 무시합니다.
+      if buy_date <= prev_sell_date:
+        continue
 
-  payload = {
-    "channel": channel,
-    "blocks": blocks
-  }
+      # --- RSI 및 시가총액 조건 검사 (수정된 로직) ---
+      market = buy_row['Market']
+      index_rsi = None
+      index_ma60_up = None
+      index_adx = None
+      index_di = None
 
-  response = requests.post(f"{SLACK_API_URL}/chat.postMessage", headers=headers, json=payload)
-  response_data = response.json()
-  if not response_data.get("ok"):
-    raise Exception(f"Failed to send message: {response_data.get('error')}")
-  return response_data.get("ts")
+      rsi_source_df = None
+      if market == 'KOSPI':
+        rsi_source_df = kospi_df
+      elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
+        rsi_source_df = kosdaq_df
+
+      if rsi_source_df is not None and buy_date in rsi_source_df.index:
+        rsi_val = rsi_source_df.loc[buy_date, 'RSI']
+        index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
+        # ma60_up_val = rsi_source_df.loc[buy_date, 'MA60_Up']
+        # index_ma60_up = ma60_up_val.iloc[0] if isinstance(ma60_up_val, pd.Series) else ma60_up_val
+        adx_val = rsi_source_df.loc[buy_date, 'ADX']
+        index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+        di_val = rsi_source_df.loc[buy_date, 'DI']
+        index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+
+      # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
+      #   continue
+
+      buy_price = buy_row['Close']
+      current_price = stock_group['Close'].iloc[-1]
+      estimated_marcap = buy_row['Marcap'] * (buy_price / current_price)
+
+      if estimated_marcap < 2e+11:
+        continue
+
+      # 매수일 이후의 데이터만 사용합니다.
+      trade_data = stock_group.loc[buy_date:].iloc[1:]
+
+      # 매도 조건 초기화
+      sell_date, sell_price = None, None
+      full_sell_date, full_sell_price = None, None
+
+      if not trade_data.empty:
+        # 익절/손절 가격 정의
+        take_profit_price = buy_price * 1.3
+        stop_loss_price = buy_price * 0.92
+        trailing_stop_loss_price = buy_price * 1.1
+
+        # 1차 매도 (분할 익절 또는 전체 손절)
+        take_profit_dates = trade_data.index[trade_data['High'] >= take_profit_price]
+        stop_loss_dates = trade_data.index[trade_data['Close'] < stop_loss_price]
+
+        first_take_profit_date = take_profit_dates[0] if not take_profit_dates.empty else None
+        first_stop_loss_date = stop_loss_dates[0] if not stop_loss_dates.empty else None
+
+        # 어떤 매도 조건이 먼저 충족되었는지 확인
+        if first_stop_loss_date and (first_take_profit_date is None or first_stop_loss_date < first_take_profit_date):
+          # 손절 조건이 먼저 발생하면 즉시 전체 매도
+          sell_date = first_stop_loss_date
+          sell_price = trade_data.loc[sell_date, 'Close']
+          full_sell_date, full_sell_price = sell_date, sell_price
+        elif first_take_profit_date:
+          # 익절 조건이 먼저 발생하면 1차 분할 매도
+          sell_date = first_take_profit_date
+          sell_price = take_profit_price
+
+          # 2차 매도 (남은 물량) 조건 탐색
+          after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
+          if not after_partial_sell_data.empty:
+            # 2차 매도 조건: 20일선 하향 돌파 등
+            second_sell_cond = (
+                (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
+                (after_partial_sell_data['MA20_Slope'] < 0) &
+                (after_partial_sell_data['MA20_Gap'] < -0.05) &
+                (after_partial_sell_data['Bullish'] == False) &
+                (after_partial_sell_data['Change'] < -0.02)
+            )
+            second_stop_loss_cond = (
+              (after_partial_sell_data['Close'] < trailing_stop_loss_price)
+            )
+            second_sell_dates = after_partial_sell_data.index[second_sell_cond]
+            second_stop_loss_dates = after_partial_sell_data.index[second_stop_loss_cond]
+
+            final_sell_date = second_sell_dates[0] if not second_sell_dates.empty else None
+            final_stop_loss_date = second_stop_loss_dates[0] if not second_stop_loss_dates.empty else None
+
+            if final_stop_loss_date and (final_sell_date is None or final_stop_loss_date < final_sell_date):
+              full_sell_date = final_stop_loss_date
+              full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
+            elif final_sell_date:
+              full_sell_date = final_sell_date
+              full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
+
+      # 최종 거래 결과 기록
+      trade_info = buy_row.to_dict()
+      trade_info.update({
+        'Buy_Date': buy_date,
+        'Buy_Price': buy_price,
+        'Estimated_Marcap': estimated_marcap,
+        'Index_RSI': index_rsi,
+        # 'Index_MA60_Up': index_ma60_up,
+        'Index_ADX': index_adx,
+        'Index_DI': index_di,
+        'Sell_Date': sell_date,
+        'Sell_Price': sell_price,
+        'Full_Sell_Date': full_sell_date,
+        'Full_Sell_Price': full_sell_price,
+        'Return': (sell_price / buy_price - 1) if sell_price else (current_price / buy_price - 1),
+        'Full_Return': (full_sell_price / buy_price - 1) if full_sell_price else ((current_price / buy_price - 1) if sell_date else None),
+        'Holding_Days': calculate_trading_days(stock_group, buy_date, sell_date),
+        'Full_Holding_Days': calculate_trading_days(stock_group, buy_date, full_sell_date),
+      })
+      trades.append(trade_info)
+
+      # 다음 거래가 이 거래의 종료일 이후에 시작되도록 설정
+      if full_sell_date:
+        prev_sell_date = full_sell_date
+      else: # 매도가 일어나지 않았다면 이 종목은 더 이상 거래하지 않음
+        prev_sell_date = pd.Timestamp.max
+
+  return pd.DataFrame(trades)
 
 def format_market_cap(marcap):
   """시가총액을 조 또는 억 단위로 포맷팅"""
@@ -209,20 +323,25 @@ def truncate_name(name, max_length=10):
   """종목명을 max_length자로 제한하고, 길면 말줄임표 추가"""
   return name[:max_length-1] + '…' if len(name) > max_length else name
 
-def send_to_slack(result_data, kospi, kosdaq):
+def send_to_slack(trades_data, kospi, kosdaq):
   try:
-    if result_data.empty:
-      blocks = [
-        {
-          "type": "rich_text",
-          "elements": create_rich_text_item("오늘은 매수 후보가 없습니다.")
-        }
-      ]
-      send_slack_message(blocks)
-      print("No stocks match the buying conditions")
+    # 오늘 날짜 가져오기
+    today = datetime.today()
+    token = os.getenv("SLACK_BOT_TOKEN")
+    channel = os.getenv("SLACK_CHANNEL")
+
+    # 오늘 날짜의 매수 신호만 필터링
+    today_trades = trades_data[trades_data['Buy_Date'].dt.date == today.date()] if not trades_data.empty else pd.DataFrame()
+
+    builder = SlackMessageBuilder()
+
+    if today_trades.empty:
+      builder.add_line("오늘은 매수 후보가 없습니다.")
+      send_slack_message(builder.build(), token, channel)
+      print("No stocks match the buying conditions today")
       return
 
-    result_data = result_data.sort_values(['Market', 'RS'], ascending=[True, False])
+    today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
 
     # 시장별 RSI 값 가져오기 (오늘 날짜 기준)
     kospi_rsi = kospi[kospi.index.date == today.date()]['RSI'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
@@ -232,21 +351,23 @@ def send_to_slack(result_data, kospi, kosdaq):
     kospi_di = kospi[kospi.index.date == today.date()]['DI'].iloc[-1] if not kospi[kospi.index.date == today.date()].empty else None
     kosdaq_di = kosdaq[kosdaq.index.date == today.date()]['DI'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
 
-    # 시장별로 데이터 구성
-    rich_text_elements = []
-    rich_text_elements.append(create_rich_text_item(
-        f" {today.year}년 {today.month}월 {today.day}일 신고가 돌파", True
-    ))
-    for market, group in result_data.groupby('Market'):
+    builder.add_line(
+        f"{today.year}년 {today.month}월 {today.day}일 신고가 돌파 매수 후보",
+        bold=True
+    )
+
+    for market, group in today_trades.groupby('Market'):
       rsi_emoji = "large_green_circle" if (50 <= (
         kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80) and (
           (kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
         kospi_di if market == 'KOSPI' else kosdaq_di) else "red_circle"
       rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
       adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
-      rich_text_elements.append(create_rich_text_with_emoji(
-          rsi_emoji, f"{market} ({rsi_value:.2f}, {adx_value:.2f})", True
-      ))
+      builder.add_line(
+          f" {market} (RSI: {rsi_value:.2f}, ADX: {adx_value:.2f})",
+          emoji=rsi_emoji,
+          bold=True
+      )
       for _, row in group.iterrows():
         name = row['Name']
         marcap = row['Marcap']
@@ -256,29 +377,24 @@ def send_to_slack(result_data, kospi, kosdaq):
         rs_3m = row['RS_3M']
         rs_6m = row['RS_6M']
 
-        name_truncated = truncate_name(name, 10)
-        emoji = "first_place_medal" if ma20_gap < 0.3 and rs_1m >= 70 and rs_1m >= rs_3m and rs_1m >= rs_6m else "question"
+        emoji = "question"
+        if ma20_gap < 0.3 and rs_1m >= rs_3m and rs_1m >= rs_6m:
+          if 80 <= rs <= 95:
+            emoji = "first_place_medal"
+          elif (75 <= rs <= 89) or (96 <= rs <= 99):
+            emoji = "second_place_medal"
 
-        # 한 줄에 종목명과 값 출력, 종목명과 ":" 사이에 공백 2개
-        rich_text_elements.append({
-          "type": "rich_text_section",
-          "elements": [
-            {"type": "emoji", "name": emoji},
-            {"type": "text", "text": f"{name_truncated}",
-             "style": {"code": True}},
-            {"type": "text", "text": f" {ma20_gap * 100:.2f}%, {rs} ({rs_1m}, {rs_3m}, {rs_6m}), {format_market_cap(marcap)}"}
-          ]
-        })
-
-    blocks = [
-      {
-        "type": "rich_text",
-        "elements": rich_text_elements
-      }
-    ]
+        with builder.line() as line:
+          line \
+            .emoji(emoji) \
+            .text(truncate_name(name, 10), code=True) \
+            .space() \
+            .text(f"Gap20: {ma20_gap * 100:.1f}%") \
+            .text(f", RS: {rs} ({rs_1m},{rs_3m},{rs_6m})") \
+            .text(f", {format_market_cap(marcap)}")
 
     # Slack 메시지 전송
-    send_slack_message(blocks)
+    send_slack_message(builder.build(), token, channel)
 
   except Exception as e:
     print(f"Error sending Slack message: {e}")
@@ -349,12 +465,12 @@ if __name__ == "__main__":
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
     result_data = calculate_relative_strength(result_data)
     filtered_data = filter_common_stocks(result_data)
-    final_data = filtered_data[buy_condition(filtered_data)]
-    final_data = final_data[final_data.index.date == today.date()]
 
-    # Slack 메시지 전송
-    send_to_slack(final_data, kospi, kosdaq)
+    # buy_and_sell 함수를 사용하여 매수 후보 찾기
+    trades_data = buy_and_sell(filtered_data, kospi, kosdaq)
 
+    # Slack 메시지 전송 (오늘 날짜 매수 신호만)
+    send_to_slack(trades_data, kospi, kosdaq)
   except Exception as e:
     print(f"Error in main execution: {e}")
 
