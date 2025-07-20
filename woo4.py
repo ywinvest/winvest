@@ -151,8 +151,8 @@ def buy_condition(df):
   kosdaq = df['Market'] == 'KOSDAQ'
 
   conditions &= (
-      ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
-      ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
+      ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break'].shift(1)) |
+      ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'].shift(1))
   )
   # conditions &= (df['MA20_Uptrend'] == True)
   # conditions &= (df['MA60_Uptrend'] == True)
@@ -161,12 +161,13 @@ def buy_condition(df):
   conditions &= (df['MA60_Slope'] > 0)
   conditions &= (df['MA120_Slope'] > 0)
   conditions &= (df['MA240_Slope'] > 0)
-  conditions &= (df['Change'] < 0.295)
+  # conditions &= (df['Change'] < 0.295)
   conditions &= (df['Volume'] > 0)
   conditions &= (df['Volume'].shift(1) > 0)
   conditions &= (df['MA120_Uptrend_Days'] < 400) # 120일 상승 추세 장기 연속 제외
   conditions &= ((df['Close'] - df['Open'])/df['Close'] > -0.05) # 긴 음봉 제외
   # conditions &= (df['MA20_Gap'] < 0.3)
+  conditions &= (df['Change'] < 0)
   return conditions
 
 def buy_and_sell(df, kospi_df, kosdaq_df):
