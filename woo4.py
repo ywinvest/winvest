@@ -198,6 +198,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       index_ma60_up = None
       index_adx = None
       index_di = None
+      index_distribution_day = None
+      index_cum_dist_days = None
 
       rsi_source_df = None
       if market == 'KOSPI':
@@ -214,6 +216,12 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
         di_val = rsi_source_df.loc[buy_date, 'DI']
         index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+
+        distribution_day_val = rsi_source_df.loc[buy_date, 'Distribution_Day']
+        index_distribution_day = distribution_day_val.iloc[0] if isinstance(distribution_day_val, pd.Series) else distribution_day_val
+
+        cum_dist_days_val = rsi_source_df.loc[buy_date, 'Cum_Dist_Days']
+        index_cum_dist_days = cum_dist_days_val.iloc[0] if isinstance(cum_dist_days_val, pd.Series) else cum_dist_days_val
 
       # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
       #   continue
@@ -293,6 +301,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # 'Index_MA60_Up': index_ma60_up,
         'Index_ADX': index_adx,
         'Index_DI': index_di,
+        'Index_Dist_Day': index_distribution_day,
+        'Index_Cum_Dist_Days': index_cum_dist_days,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Full_Sell_Date': full_sell_date,
@@ -454,12 +464,20 @@ if __name__ == "__main__":
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kospi['Volume_Change'] = kospi['Volume'] / kospi['Volume'].shift(1) - 1
+    price_threshold = -0.2
+    kospi['Distribution_Day'] = (kospi['Change'] <= price_threshold) & (kospi['Volume_Change'] > 0)
+    kospi['Cum_Dist_Days'] = kospi['Distribution_Day'].rolling(window=20, min_periods=1).sum()
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kosdaq['Volume_Change'] = kosdaq['Volume'] / kosdaq['Volume'].shift(1) - 1
+    price_threshold = -0.2
+    kosdaq['Distribution_Day'] = (kosdaq['Change'] <= price_threshold) & (kosdaq['Volume_Change'] > 0)
+    kosdaq['Cum_Dist_Days'] = kosdaq['Distribution_Day'].rolling(window=20, min_periods=1).sum()
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
