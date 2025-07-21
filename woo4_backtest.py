@@ -98,7 +98,7 @@ if __name__ == "__main__":
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['Volume_Change'] = kospi['Volume'] / kospi['Volume'].shift(1) - 1
-    price_threshold = -0.2
+    price_threshold = -0.002
     kospi['Distribution_Day'] = (kospi['Change'] <= price_threshold) & (kospi['Volume_Change'] > 0)
     kospi['Cum_Dist_Days'] = kospi['Distribution_Day'].rolling(window=20, min_periods=1).sum()
 
@@ -109,7 +109,6 @@ if __name__ == "__main__":
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['Volume_Change'] = kosdaq['Volume'] / kosdaq['Volume'].shift(1) - 1
-    price_threshold = -0.2
     kosdaq['Distribution_Day'] = (kosdaq['Change'] <= price_threshold) & (kosdaq['Volume_Change'] > 0)
     kosdaq['Cum_Dist_Days'] = kosdaq['Distribution_Day'].rolling(window=20, min_periods=1).sum()
 
