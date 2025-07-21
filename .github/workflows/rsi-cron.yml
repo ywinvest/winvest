@@ -31,18 +31,36 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Set SLACK_CHANNEL based on branch
+      id: set-channel
+      run: |
+        if [ "${{ github.ref_name }}" = "${{ github.event.repository.default_branch }}" ]; then
+          echo "SLACK_CHANNEL=rsi" >> $GITHUB_ENV
+        else
+          echo "SLACK_CHANNEL=rsi-dev" >> $GITHUB_ENV
+        fi
+
     # Python 스크립트 실행
     - name: Run RSI script (Global Market)
       if: ${{ github.event.schedule == '20 23 * * 0-4' }}
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
       run: |
         python rsi.py --market global
 
     - name: Run RSI script (Korea Market - 11:40)
       if: ${{ github.event.schedule == '40 2 * * 1-5' }}
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
       run: |
         python rsi.py --market korea
 
     - name: Run RSI script (Korea Market - 15:00)
       if: ${{ github.event.schedule == '0 6 * * 1-5' }}
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
       run: |
         python rsi.py --market korea
