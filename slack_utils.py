@@ -94,12 +94,21 @@ class SlackMessageBuilder:
       self._parts.append(RichTextElementParts.Text(text=text, style=style))
       return self
 
+    def link(self, url: str, text: str, *, bold: bool = False, code: bool = False,
+        italic: bool = False) -> '_LineBuilder':
+      """하이퍼링크 추가"""
+      style = None
+      if bold or code or italic:
+        style = RichTextElementParts.TextStyle(bold=bold, code=code, italic=italic)
+      self._parts.append(RichTextElementParts.Link(url=url, text=text, style=style))
+      return self
+
     def space(self) -> '_LineBuilder':
       """공백 추가"""
       self._parts.append(RichTextElementParts.Text(text=" "))
       return self
 
-def send_slack_message(blocks: list, token: str, channel: str):
+def send_slack_message(blocks: list, token: str, channel: str, thread_ts: str = None):
   """Sends a message with the given blocks to the specified Slack channel."""
   if not blocks:
     print("Message blocks are empty, nothing to send.")
@@ -109,7 +118,8 @@ def send_slack_message(blocks: list, token: str, channel: str):
   try:
     response = client.chat_postMessage(
         channel=channel,
-        blocks=blocks
+        blocks=blocks,
+        thread_ts=thread_ts,
     )
     return response["ts"]
   except SlackApiError as e:

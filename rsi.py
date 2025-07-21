@@ -1,10 +1,13 @@
 import argparse
 import json
+import os
 
+import pandas as pd
 import pandas_ta as ta
-import requests
 import yfinance as yf
 from pykrx import stock
+
+from slack_utils import SlackMessageBuilder, send_slack_message
 
 
 def calculate_indicators(df, period='14'):
@@ -34,36 +37,38 @@ def determine_ticker_suffix(ticker):
   else:
     return ticker + ".KS"
 
-def fetch_and_process_ticker(ticker, name):
+def fetch_and_process_ticker(ticker):
+  """지정된 티커의 시세 데이터와 기술 지표를 포함하는 DataFrame을 가져옵니다."""
   try:
     stock = yf.Ticker(ticker)
-    data = stock.history(period="6mo", interval="1d")
+    df = stock.history(period="6mo", interval="1d")
+    if df.empty:
+      print(f"No history data for {ticker}")
+      return pd.DataFrame()
 
-    data = calculate_indicators(data)
-    if data is None or data.empty:
-      raise ValueError("Failed to calculate indicators or data is empty")
-
-    latest_rsi = data['RSI'].iloc[-1]
-    latest_change = data['Change_Rate'].iloc[-1]
-    candle_type = "양봉" if data['Bullish'].iloc[-1] else "음봉"
-
-    ticker_link = f"<https://finance.yahoo.com/quote/{ticker}|{name}>"
-    change_value = float(latest_change)
-    emoji = ":red_circle:" if change_value > 0 else ":large_blue_circle:"
-    return (float(latest_rsi), f"{emoji} `{change_value:+.2f}%` `{latest_rsi:.2f}` {candle_type} _{ticker_link}_")
+    return calculate_indicators(df)
   except Exception as e:
     print(f"Error processing {ticker}: {e}")
-    ticker_link = f"<https://finance.yahoo.com/quote/{ticker}|{name}>"
-    return (float('inf'), f":grey_question: `N/A` `N/A` _{ticker_link}_")
+    return pd.DataFrame()
 
 def process_and_sort_tickers(tickers):
-  results = [
-    fetch_and_process_ticker(ticker, name)
-    for ticker, name in tickers.items()
-  ]
-  return sorted(results, key=lambda x: x[0])
+  """
+  티커 목록을 처리하고 각 티커의 DataFrame을 포함하는 딕셔너리 리스트를 반환합니다.
+  결과는 최신 RSI를 기준으로 정렬됩니다.
+  """
+  results = []
+  for ticker, name in tickers.items():
+    df = fetch_and_process_ticker(ticker)
+    if not df.empty and 'RSI' in df.columns and not df['RSI'].dropna().empty:
+      results.append({"ticker": ticker, "name": name, "df": df})
+
+  results.sort(key=lambda x: x['df']['RSI'].iloc[-1] if pd.notna(x['df']['RSI'].iloc[-1]) else float('inf'))
+  return results
 
 def process_etf_components(etf_tickers):
+  """
+  ETF 구성 종목을 처리하고 각 종목의 DataFrame을 포함하는 데이터 구조를 반환합니다.
+  """
   etf_results = []
   for ticker, name in etf_tickers.items():
     try:
@@ -74,72 +79,100 @@ def process_etf_components(etf_tickers):
         continue
 
       krx_ticker = convert_ticker(ticker)
-      components = stock.get_etf_portfolio_deposit_file(krx_ticker)
-      exclude_tickers = ['010010', '010000', '010140']  # 원화현금, 외화현금 등
-      exclude_mask = ~components.index.isin(exclude_tickers)
+      components_df = stock.get_etf_portfolio_deposit_file(krx_ticker)
+      exclude_tickers = ['010010', '010000', '010140']  # 원화현금 등 제외
+      exclude_mask = ~components_df.index.isin(exclude_tickers)
 
-      # 두 조건을 모두 적용
-      components = components[exclude_mask]
-      components = components.sort_values(by='비중', ascending=False).head(10)
+      components_df = components_df[exclude_mask]
+      components_df = components_df.sort_values(by='비중', ascending=False).head(10)
 
       component_details = []
-      for component in components.index:
-        component_name = stock.get_market_ticker_name(component)
-        component_ticker_name = determine_ticker_suffix(component)
-        component_result = fetch_and_process_ticker(component_ticker_name, component_name)
-        component_details.append(component_result)
+      for component_code in components_df.index:
+        component_name = stock.get_market_ticker_name(component_code)
+        component_ticker_name = determine_ticker_suffix(component_code)
+        df = fetch_and_process_ticker(component_ticker_name)
 
-      component_details = sorted(component_details, key=lambda x: x[0])
-      component_list = [
-        f"{detail[1]}"
-        for detail in component_details
-      ]
-      etf_results.append((name, component_list))
+        if not df.empty and 'RSI' in df.columns and not df['RSI'].dropna().empty:
+          component_details.append({
+            "ticker": component_ticker_name,
+            "name": component_name,
+            "df": df
+          })
+
+      component_details.sort(key=lambda x: x['df']['RSI'].iloc[-1] if pd.notna(x['df']['RSI'].iloc[-1]) else float('inf'))
+      etf_results.append({"name": name, "components": component_details})
     except Exception as e:
       print(f"Error processing ETF {ticker}: {e}")
 
   return etf_results
 
-SLACK_API_URL = "https://slack.com/api"
+def send_to_slack_market(sorted_tickers, etf_components, name, token, channel, emoji):
+  """
+  처리된 DataFrame 데이터를 기반으로 Slack 메시지를 구성하고 전송합니다.
+  """
+  builder = SlackMessageBuilder()
 
-def send_slack_message(token, channel, text):
-  headers = {
-    "Authorization": f"Bearer {token}",
-    "Content-Type": "application/json"
-  }
-  payload = {"channel": channel, "text": text}
-  response = requests.post(f"{SLACK_API_URL}/chat.postMessage", headers=headers, json=payload)
-  response_data = response.json()
-  if not response_data.get("ok"):
-    raise Exception(f"Failed to send message: {response_data.get('error')}")
-  return response_data.get("ts")  # 메시지의 timestamp 반환
-
-def send_slack_thread_reply(token, channel, text, thread_ts):
-  headers = {
-    "Authorization": f"Bearer {token}",
-    "Content-Type": "application/json"
-  }
-  payload = {"channel": channel, "text": text, "thread_ts": thread_ts}
-  response = requests.post(f"{SLACK_API_URL}/chat.postMessage", headers=headers, json=payload)
-  response_data = response.json()
-  if not response_data.get("ok"):
-    raise Exception(f"Failed to send thread reply: {response_data.get('error')}")
-
-def send_to_slack_market(sorted_tickers, etf_components, name, token, channel, icon):
   try:
-    # 메인 메시지 작성
-    message_lines = [f"{icon} *{name}*"]
-    for _, line in sorted_tickers:
-      message_lines.append(line)
-    main_message = "\n".join(message_lines)
+    with builder.line() as line:
+      line.emoji(emoji).space().text(name, bold=True)
 
-    # 메인 메시지 전송 및 ts 반환
-    main_ts = send_slack_message(token, channel, main_message)
+    # 기본 티커 목록 메시지 생성
+    for data in sorted_tickers:
+      df = data.get('df')
+      if df is None or df.empty:
+        continue
 
-    # ETF 구성 종목을 쓰레드로 전송
-    for etf_name, components in etf_components:
-      thread_message = f"*{etf_name} 구성 종목:*\n" + "\n".join(components)
-      send_slack_thread_reply(token, channel, thread_message, main_ts)
+      latest = df.iloc[-1]
+      rsi = latest.get('RSI')
+      change_rate = latest.get('Change_Rate')
+      is_bullish = latest.get('Bullish')
+      ticker_url = f"https://finance.yahoo.com/quote/{data['ticker']}"
+      name = data['name']
+
+      change_value = float(change_rate)
+      emoji = "red_circle" if change_value > 0 else "large_blue_circle"
+      candle_type = "양봉" if is_bullish else "음봉"
+
+      with builder.line() as line:
+        line.emoji(emoji).space()
+        line.text(f"{change_value:+.2f}%", code=True).space()
+        line.text(f"{rsi:.2f}", code=True).space()
+        line.text(candle_type).space()
+        line.link(ticker_url, name, italic=True)
+
+    main_ts = send_slack_message(builder.build(), token, channel)
+
+    # ETF 구성 종목 쓰레드 메시지 생성
+    for etf_data in etf_components:
+      etf_builder = SlackMessageBuilder()
+      with etf_builder.line() as line:
+        line.text(f"{etf_data['name']} 구성 종목:", bold=True)
+
+      for component in etf_data['components']:
+        df = component.get('df')
+        if df is None or df.empty:
+          continue
+
+        latest = df.iloc[-1]
+        rsi = latest.get('RSI')
+        change_rate = latest.get('Change_Rate')
+        is_bullish = latest.get('Bullish')
+        ticker_url = f"https://finance.yahoo.com/quote/{component['ticker']}"
+        name = component['name']
+
+        change_value = float(change_rate)
+        emoji = "red_circle" if change_value > 0 else "large_blue_circle"
+        candle_type = "양봉" if is_bullish else "음봉"
+
+        with etf_builder.line() as line:
+          line.emoji(emoji).space()
+          line.text(f"{change_value:+.2f}%", code=True).space()
+          line.text(f"{rsi:.2f}", code=True).space()
+          line.text(candle_type).space()
+          line.link(ticker_url, name, italic=True)
+
+      send_slack_message(etf_builder.build(), token, channel, main_ts)
+
   except Exception as e:
     print(f"Error sending Slack message: {e}")
 
@@ -152,6 +185,9 @@ if __name__ == "__main__":
     with open("config.json", "r") as config_file:
       config = json.load(config_file)
 
+    token = os.getenv("SLACK_BOT_TOKEN")
+    channel = os.getenv("SLACK_CHANNEL")
+
     slack_token = config["slack_bot_token"]
     slack_channel = config["slack_channel"]
 
@@ -160,15 +196,15 @@ if __name__ == "__main__":
       tickers = market_config["tickers"]
       name = market_config["name"]
       icon = market_config["icon"]
+      emoji = market_config["emoji"]
 
       sorted_tickers = process_and_sort_tickers(tickers)
 
+      etf_components = []
       if args.market == "korea":
         etf_components = process_etf_components(tickers)
-      else:
-        etf_components = []
 
-      send_to_slack_market(sorted_tickers, etf_components, name, slack_token, slack_channel, icon)
+      send_to_slack_market(sorted_tickers, etf_components, name, token, channel, emoji)
     else:
       print(f"Market configuration for {args.market} not found.")
   except Exception as e:

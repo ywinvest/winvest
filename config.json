@@ -5,6 +5,7 @@
   "korea": {
     "name": "Korea Market",
     "icon": ":kr:",
+    "emoji": "kr",
     "tickers": {
       "^KS11": "KOSPI",
       "^KQ11": "KOSDAQ",
@@ -17,6 +18,7 @@
   "global": {
     "name": "Global Market",
     "icon": ":earth_americas:",
+    "emoji": "earth_americas",
     "tickers": {
       "^IXIC": "NASDAQ",
       "^DJI": "DOW",
