@@ -323,6 +323,74 @@ def truncate_name(name, max_length=10):
   """종목명을 max_length자로 제한하고, 길면 말줄임표 추가"""
   return name[:max_length-1] + '…' if len(name) > max_length else name
 
+def find_sell_candidates(trades_data):
+  """
+  trades_data에서 오늘 날짜에 1차 또는 최종 매도가 발생한 거래를 필터링합니다.
+  """
+  if trades_data.empty:
+    return pd.DataFrame()
+
+  # NaT(결측값)를 제외하고 날짜 비교
+  sell_today = pd.to_datetime(trades_data['Sell_Date']).dt.date == today.date()
+  full_sell_today = pd.to_datetime(trades_data['Full_Sell_Date']).dt.date == today.date()
+
+  # fillna(False)를 통해 NaT 값으로 인한 오류 방지
+  return trades_data[sell_today.fillna(False) | full_sell_today.fillna(False)].copy()
+
+def send_sell_to_slack(sell_data):
+  """오늘의 매도 후보 종목을 슬랙으로 전송합니다."""
+
+  token = os.getenv("SLACK_BOT_TOKEN")
+  channel = os.getenv("SLACK_CHANNEL")
+  builder = SlackMessageBuilder()
+
+  try:
+    if sell_data.empty:
+      builder.add_line("오늘은 매도 후보가 없습니다.")
+      send_slack_message(builder.build(), token, channel)
+      print("No stocks to sell today.")
+      return
+
+    builder.add_line(
+        f"{today.year}년 {today.month}월 {today.day}일 신고가 돌파 매도 후보",
+        bold=True
+    )
+
+    sell_data['return_val'] = sell_data.apply(
+        lambda row: (row['Full_Sell_Price'] / row['Buy_Price'] - 1) * 100
+        if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date()
+        else (row['Sell_Price'] / row['Buy_Price'] - 1) * 100,
+        axis=1
+    )
+    sell_data = sell_data.sort_values(by='return_val', ascending=False).copy()
+
+    for _, row in sell_data.iterrows():
+      sell_type = "🔥 완전 매도" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "💰 1차 매도"
+      sell_price = row['Full_Sell_Price'] if sell_type == "🔥 완전 매도" else row['Sell_Price']
+      holding_days = row['Full_Holding_Days'] if sell_type == "🔥 완전 매도" else row['Holding_Days']
+      return_val = row['return_val']
+      emoji = "red_triangle_up" if return_val > 0 else "blue_triangle_down"
+
+      name = truncate_name(row['Name'], 12)
+      buy_price = row['Buy_Price']
+      buy_date = row['Buy_Date'].strftime('%y-%m-%d')
+
+      with builder.line() as line:
+        line \
+          .emoji(emoji) \
+          .space() \
+          .text(f"{name}", code=True) \
+          .space() \
+          .text(f"{return_val:+.2f}%") \
+          .space() \
+          .text(f"{buy_date}, {buy_price:,.0f}원에 매수하여 {holding_days}일 보유하고 {sell_price:,.0f}원에 매도") \
+
+    send_slack_message(builder.build(), token, channel)
+    print(f"Sent {len(sell_data)} sell candidates to Slack.")
+
+  except Exception as e:
+    print(f"Error sending sell candidates to Slack: {e}")
+
 def send_to_slack(trades_data, kospi, kosdaq):
   try:
     # 오늘 날짜 가져오기
@@ -471,6 +539,9 @@ if __name__ == "__main__":
 
     # Slack 메시지 전송 (오늘 날짜 매수 신호만)
     send_to_slack(trades_data, kospi, kosdaq)
+
+    sell_candidates = find_sell_candidates(trades_data)
+    send_sell_to_slack(sell_candidates)
   except Exception as e:
     print(f"Error in main execution: {e}")
 
