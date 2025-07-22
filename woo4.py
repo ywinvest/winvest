@@ -365,25 +365,46 @@ def send_sell_to_slack(sell_data):
     sell_data = sell_data.sort_values(by='return_val', ascending=False).copy()
 
     for _, row in sell_data.iterrows():
-      sell_type = "🔥 완전 매도" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "💰 1차 매도"
-      sell_price = row['Full_Sell_Price'] if sell_type == "🔥 완전 매도" else row['Sell_Price']
-      holding_days = row['Full_Holding_Days'] if sell_type == "🔥 완전 매도" else row['Holding_Days']
+      sell_type = "full_moon" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "last_quarter_moon"
       return_val = row['return_val']
-      emoji = "red_triangle_up" if return_val > 0 else "blue_triangle_down"
+      return_emoji = "red_circle" if return_val > 0 else "large_blue_circle"
 
       name = truncate_name(row['Name'], 12)
-      buy_price = row['Buy_Price']
       buy_date = row['Buy_Date'].strftime('%y-%m-%d')
+      holding_days = row['Full_Holding_Days'] if sell_type == "full_moon" else row['Holding_Days']
 
       with builder.line() as line:
         line \
-          .emoji(emoji) \
+          .emoji(sell_type) \
           .space() \
-          .text(f"{name}", code=True) \
+          .emoji(return_emoji) \
           .space() \
-          .text(f"{return_val:+.2f}%") \
+          .text(f"{name}") \
           .space() \
-          .text(f"{buy_date}, {buy_price:,.0f}원에 매수하여 {holding_days}일 보유하고 {sell_price:,.0f}원에 매도") \
+          .text(f"{return_val:+.1f}%") \
+          .space() \
+          .text(f"{buy_date}") \
+          .space() \
+          .text(f"{holding_days:.0f}일")
+      # sell_type = "🔥 완전 매도" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "💰 1차 매도"
+      # sell_price = row['Full_Sell_Price'] if sell_type == "🔥 완전 매도" else row['Sell_Price']
+      # holding_days = row['Full_Holding_Days'] if sell_type == "🔥 완전 매도" else row['Holding_Days']
+      # return_val = row['return_val']
+      # emoji = "red_triangle_up" if return_val > 0 else "blue_triangle_down"
+      #
+      # name = truncate_name(row['Name'], 12)
+      # buy_price = row['Buy_Price']
+      # buy_date = row['Buy_Date'].strftime('%y-%m-%d')
+      #
+      # with builder.line() as line:
+      #   line \
+      #     .emoji(emoji) \
+      #     .space() \
+      #     .text(f"{name}", code=True) \
+      #     .space() \
+      #     .text(f"{return_val:+.2f}%") \
+      #     .space() \
+      #     .text(f"{buy_date}, {buy_price:,.0f}원에 매수하여 {holding_days}일 보유하고 {sell_price:,.0f}원에 매도") \
 
     send_slack_message(builder.build(), token, channel)
     print(f"Sent {len(sell_data)} sell candidates to Slack.")
