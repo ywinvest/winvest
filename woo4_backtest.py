@@ -99,8 +99,8 @@ if __name__ == "__main__":
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['Pre_Avg_Volume'] = kospi['Volume'].shift(1).rolling(window=20).mean()
     kospi['Volume_Change'] = kospi['Volume'] / kospi['Volume'].shift(1) - 1
-    price_threshold = -0.002
-    kospi['Distribution_Day'] = (kospi['Change'] <= price_threshold) & (kospi['Volume'] > kospi['Pre_Avg_Volume'])
+    price_threshold = -0.003
+    kospi['Distribution_Day'] = (kospi['Change'] <= price_threshold) & (kospi['Volume_Change'] > 0)
     kospi['Cum_Dist_Days'] = kospi['Distribution_Day'].rolling(window=21, min_periods=1).sum()
 
     kosdaq = fdr.DataReader('KQ11')
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['Volume_Change'] = kosdaq['Volume'] / kosdaq['Volume'].shift(1) - 1
     kosdaq['Pre_Avg_Volume'] = kosdaq['Volume'].shift(1).rolling(window=20).mean()
-    kosdaq['Distribution_Day'] = (kosdaq['Change'] <= price_threshold) & (kosdaq['Volume'] > kosdaq['Pre_Avg_Volume'])
+    kosdaq['Distribution_Day'] = (kosdaq['Change'] <= price_threshold) & (kosdaq['Volume_Change'] > 0)
     kosdaq['Cum_Dist_Days'] = kosdaq['Distribution_Day'].rolling(window=21, min_periods=1).sum()
 
     result_file = "woo4_backtest_results.csv"
