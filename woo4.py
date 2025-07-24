@@ -346,13 +346,13 @@ def send_sell_to_slack(sell_data):
 
   try:
     if sell_data.empty:
-      builder.add_line("오늘은 매도 후보가 없습니다.")
+      builder.add_line(f"{today.year}년 {today.month}월 {today.day}일은 매도 후보가 없습니다.")
       send_slack_message(builder.build(), token, channel)
       print("No stocks to sell today.")
       return
 
     builder.add_line(
-        f"{today.year}년 {today.month}월 {today.day}일 신고가 돌파 매도 후보",
+        f"{today.year}년 {today.month}월 {today.day}일 매도 후보",
         bold=True
     )
 
@@ -365,46 +365,30 @@ def send_sell_to_slack(sell_data):
     sell_data = sell_data.sort_values(by='return_val', ascending=False).copy()
 
     for _, row in sell_data.iterrows():
-      sell_type = "full_moon" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "last_quarter_moon"
+      sell_type = "full" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "half"
       return_val = row['return_val']
-      return_emoji = "red_circle" if return_val > 0 else "large_blue_circle"
+      if return_val > 0 and sell_type == "full":
+        return_emoji = "red_full_circle"
+      elif return_val < 0 and sell_type == "half":
+        return_emoji = "red_half_circle"
+      else:
+        return_emoji = "blue_full_circle"
 
       name = truncate_name(row['Name'], 12)
       buy_date = row['Buy_Date'].strftime('%y-%m-%d')
-      holding_days = row['Full_Holding_Days'] if sell_type == "full_moon" else row['Holding_Days']
+      holding_days = row['Full_Holding_Days'] if sell_type == "full" else row['Holding_Days']
 
       with builder.line() as line:
         line \
-          .emoji(sell_type) \
-          .space() \
           .emoji(return_emoji) \
           .space() \
           .text(f"{name}") \
           .space() \
-          .text(f"{return_val:+.1f}%") \
+          .text(f"{return_val:+.1f}%,") \
           .space() \
           .text(f"{buy_date}") \
           .space() \
           .text(f"{holding_days:.0f}일")
-      # sell_type = "🔥 완전 매도" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "💰 1차 매도"
-      # sell_price = row['Full_Sell_Price'] if sell_type == "🔥 완전 매도" else row['Sell_Price']
-      # holding_days = row['Full_Holding_Days'] if sell_type == "🔥 완전 매도" else row['Holding_Days']
-      # return_val = row['return_val']
-      # emoji = "red_triangle_up" if return_val > 0 else "blue_triangle_down"
-      #
-      # name = truncate_name(row['Name'], 12)
-      # buy_price = row['Buy_Price']
-      # buy_date = row['Buy_Date'].strftime('%y-%m-%d')
-      #
-      # with builder.line() as line:
-      #   line \
-      #     .emoji(emoji) \
-      #     .space() \
-      #     .text(f"{name}", code=True) \
-      #     .space() \
-      #     .text(f"{return_val:+.2f}%") \
-      #     .space() \
-      #     .text(f"{buy_date}, {buy_price:,.0f}원에 매수하여 {holding_days}일 보유하고 {sell_price:,.0f}원에 매도") \
 
     send_slack_message(builder.build(), token, channel)
     print(f"Sent {len(sell_data)} sell candidates to Slack.")
@@ -425,7 +409,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
     builder = SlackMessageBuilder()
 
     if today_trades.empty:
-      builder.add_line("오늘은 매수 후보가 없습니다.")
+      builder.add_line(f"{today.year}년 {today.month}월 {today.day}일은 매수 후보가 없습니다.")
       send_slack_message(builder.build(), token, channel)
       print("No stocks match the buying conditions today")
       return
@@ -441,21 +425,22 @@ def send_to_slack(trades_data, kospi, kosdaq):
     kosdaq_di = kosdaq[kosdaq.index.date == today.date()]['DI'].iloc[-1] if not kosdaq[kosdaq.index.date == today.date()].empty else None
 
     builder.add_line(
-        f"{today.year}년 {today.month}월 {today.day}일 신고가 돌파 매수 후보",
+        f"{today.year}년 {today.month}월 {today.day}일 매수 후보",
         bold=True
     )
 
     for market, group in today_trades.groupby('Market'):
-      rsi_emoji = "large_green_circle" if (50 <= (
+      rsi_emoji = "green_sphere" if (50 <= (
         kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80) and (
           (kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
-        kospi_di if market == 'KOSPI' else kosdaq_di) else "red_circle"
+        kospi_di if market == 'KOSPI' else kosdaq_di) else "red_sphere"
       rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
       adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
       builder.add_line(
-          f" {market} (RSI: {rsi_value:.2f}, ADX: {adx_value:.2f})",
+          f" {market} (RSI {rsi_value:.2f}, ADX {adx_value:.2f})",
           emoji=rsi_emoji,
-          bold=True
+          bold=True,
+          italic=True
       )
       for _, row in group.iterrows():
         name = row['Name']
@@ -476,11 +461,12 @@ def send_to_slack(trades_data, kospi, kosdaq):
         with builder.line() as line:
           line \
             .emoji(emoji) \
-            .text(truncate_name(name, 10), code=True) \
+            .text(truncate_name(name, 10)) \
+            .text(f"({format_market_cap(marcap)})") \
             .space() \
-            .text(f"Gap20: {ma20_gap * 100:.1f}%") \
-            .text(f", RS: {rs} ({rs_1m},{rs_3m},{rs_6m})") \
-            .text(f", {format_market_cap(marcap)}")
+            .text(f"20Gap {ma20_gap * 100:.1f}%,") \
+            .space() \
+            .text(f"RS {rs} ({rs_1m}/{rs_3m}/{rs_6m})") \
 
     # Slack 메시지 전송
     send_slack_message(builder.build(), token, channel)
