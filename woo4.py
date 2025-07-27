@@ -31,8 +31,8 @@ def calculate_indicators(df):
   # df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
-
   df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
+  df['AllTimeHigh'] = df['Close'] >= df['Close'].expanding().max()
 
   # 39주 신고가 돌파 여부
   is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
