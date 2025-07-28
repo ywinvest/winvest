@@ -124,28 +124,25 @@ class LightStockBot:
     try:
       # 종목코드 찾기
       stock_code = self.find_stock_code(stock_input.strip())
+      print(f"종목 코드: {stock_code}")
       if not stock_code:
         builder = SlackMessageBuilder()
-        builder.add_line(
-            text="종목을 찾을 수 없습니다. 6자리 종목코드(예: ",
-            emoji="x"
-        ).add_line(
-            text="005930",
-            code=True
-        ).add_line(
-            text=") 또는 정확한 종목명(예: "
-        ).add_line(
-            text="삼성전자",
-            code=True
-        ).add_line(
-            text=")을 입력하세요."
-        )
+        with builder.line() as line:
+          line \
+            .emoji("x") \
+            .space() \
+            .text("종목을 찾을 수 없습니다. 6자리 종목코드(예: ") \
+            .text("005930", code=True) \
+            .text(") 또는 정확한 종목명(예: ") \
+            .text("삼성전자", code=True) \
+            .text(")")
         return {"blocks": builder.build()}
 
       # 종목명 가져오기
       try:
         # 캐시에서 종목명 조회
         stock_name = next((name for name, code in self.ticker_cache.items() if code == stock_code and name != stock_code), stock_input)
+        print(f"종목명: {stock_name}")
       except:
         stock_name = stock_input
 
@@ -163,7 +160,9 @@ class LightStockBot:
       try:
         # 최근 7일간 데이터 가져와서 최신 데이터 사용
         start_date = trade_date - timedelta(days=7)
+        print(f"데이터 조회: {stock_code} ({start_date} ~ {trade_date})")
         df = fdr.DataReader(stock_code, start=start_date, end=trade_date)
+        print(f"데이터 조회 결과: {df.tail()}")
 
         if df.empty:
           builder = SlackMessageBuilder()
@@ -177,54 +176,44 @@ class LightStockBot:
         latest = df.iloc[-1]
         prev = df.iloc[-2] if len(df) > 1 else latest
 
-        current_price = int(latest['Close'])
-        change = current_price - int(prev['Close'])
-        change_rate = (change / int(prev['Close']) * 100) if int(prev['Close']) > 0 else 0
-
+        close_price = int(latest['Close'])
         open_price = int(latest['Open'])
         high_price = int(latest['High'])
-        low_price = int(latest['Low'])
         volume = int(latest['Volume'])
 
-        # 등락 표시
-        if change > 0:
-          emoji = "red_circle"
-          sign = "▲"
-        elif change < 0:
-          emoji = "blue_circle"
-          sign = "▼"
-        else:
-          emoji = "white_circle"
-          sign = "→"
+        # 등락률 계산
+        close_change_rate = ((close_price - int(prev['Close'])) / int(prev['Close']) * 100) if int(prev['Close']) > 0 else 0
+        open_change_rate = ((open_price - int(prev['Open'])) / int(prev['Open']) * 100) if int(prev['Open']) > 0 else 0
+        high_change_rate = ((high_price - int(prev['High'])) / int(prev['High']) * 100) if int(prev['High']) > 0 else 0
+        volume_change_rate = ((volume - int(prev['Volume'])) / int(prev['Volume']) * 100) if int(prev['Volume']) > 0 else 0
+
+        # 등락 이모지
+        def get_emoji(change_rate):
+          return "red_full_circle" if change_rate >= 0 else "blue_full_circle"
 
         # Block Kit 포맷팅 with SlackMessageBuilder
         builder = SlackMessageBuilder()
         builder.add_line(
-            text=f"{stock_name} ({stock_code})",
-            emoji="chart_with_upwards_trend",
+            text=f"{df.index[-1].strftime('%Y-%m-%d')} {stock_name} ({stock_code}) 주가 정보",
             bold=True
         ).add_line(
-            text=f"현재가: {current_price:,}원",
-            emoji="moneybag"
+            text=f"종가 {close_price:,} {close_change_rate:+.2f}%",
+            emoji=get_emoji(close_change_rate)
         ).add_line(
-            text=f"등락: {sign} {change:+,}원 ({change_rate:+.2f}%)",
-            emoji=emoji
+            text=f"시가 {open_price:,} {open_change_rate:+.2f}%",
+            emoji=get_emoji(open_change_rate)
         ).add_line(
-            text="거래정보:",
-            bold=True,
-            emoji="bar_chart"
+            text=f"고가 {high_price:,} {high_change_rate:+.2f}%",
+            emoji=get_emoji(high_change_rate)
         ).add_line(
-            text=f"• 시가: {open_price:,}원 | 고가: {high_price:,}원"
-        ).add_line(
-            text=f"• 저가: {low_price:,}원 | 거래량: {volume:,}주"
-        ).add_line(
-            text=f"{df.index[-1].strftime('%Y-%m-%d')} 기준",
-            emoji="clock3"
+            text=f"거래량 {volume:,} {volume_change_rate:+.2f}%",
+            emoji=get_emoji(volume_change_rate)
         )
 
         return {"blocks": builder.build()}
 
       except Exception as e:
+        print(f"주가 데이터 조회 오류: {e}")
         builder = SlackMessageBuilder()
         builder.add_line(
             text=f"'{stock_name} ({stock_code})' 주가 데이터 조회 실패: 거래 중단 또는 데이터 없음",
@@ -233,6 +222,7 @@ class LightStockBot:
         return {"blocks": builder.build()}
 
     except Exception as e:
+      print(f"종목 조회 오류: {e}")
       builder = SlackMessageBuilder()
       builder.add_line(
           text=f"오류 발생: {str(e)[:50]}...",
@@ -245,32 +235,28 @@ stock_bot = LightStockBot()
 
 @slack_app.command("/stock")
 def handle_stock_slash_command(ack, respond, command):
-  """슬래시 커맨드 '/stock 종목명' 처리"""
+  """슬래시 커맨드 '/stock 종목명 또는 종목코드' 처리"""
   ack()  # 명령어 수신 확인
 
   # 입력 파싱
   stock_input = command['text'].strip()
 
-  # 유효성 검사
   if not stock_input:
     builder = SlackMessageBuilder()
-    builder.add_line(
-        text="사용법: ",
-        emoji="book"
-    ).add_line(
-        text="/stock [종목명 또는 종목코드]",
-        code=True
-    ).add_line(
-        text="예시: "
-    ).add_line(
-        text="/stock 삼성전자",
-        code=True
-    ).add_line(
-        text=" 또는 "
-    ).add_line(
-        text="/stock 005930",
-        code=True
-    )
+    with builder.line() as line:
+      line \
+        .emoji("book") \
+        .space() \
+        .text("/stock [종목명 또는 종목코드]", code=True) \
+        .space() \
+        .text("예시:") \
+        .space() \
+        .text("/stock 삼성전자") \
+        .space() \
+        .text("또는") \
+        .space() \
+        .text("/stock 005930") \
+
     respond({"response_type": "ephemeral", "blocks": builder.build()})
     return
 
@@ -296,9 +282,8 @@ if __name__ == "__main__":
   # Render의 PORT 환경변수 사용 (기본값: 10000)
   port = int(os.environ.get("PORT", 10000))
 
-  print(f"🌐 웹서버 포트: {port}")
-  print(f"🔧 Bot Token: {bot_token[:12]}..." if bot_token else "❌ Bot Token 없음")
-  print(f"🔧 App Token: {app_token[:12]}..." if app_token else "❌ App Token 없음")
+  # print(f"🔧 Bot Token: {bot_token[:12]}..." if bot_token else "❌ Bot Token 없음")
+  # print(f"🔧 App Token: {app_token[:12]}..." if app_token else "❌ App Token 없음")
 
   # Slack 봇을 별도 스레드에서 실행
   bot_thread = threading.Thread(target=run_slack_bot, daemon=True)
