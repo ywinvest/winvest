@@ -2,11 +2,12 @@ import os
 import threading
 from datetime import datetime, timedelta
 
+import FinanceDataReader as fdr
 from flask import Flask, jsonify
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-from pykrx import stock
+from slack_utils import SlackMessageBuilder
 
 # 토큰 검증
 bot_token = os.environ.get("SLACK_BOT_TOKEN")
@@ -49,7 +50,7 @@ def health():
 def status():
   return jsonify({
     "service": "Korean Stock Slack Bot",
-    "version": "2.0.0 (pykrx)",
+    "version": "0.0.1",
     "bot_status": bot_status,
     "cache_info": {
       "ticker_count": len(stock_bot.ticker_cache) // 2 if hasattr(stock_bot, 'ticker_cache') else 0,
@@ -80,18 +81,20 @@ class LightStockBot:
         print("📋 종목 리스트 업데이트 중...")
 
         # KOSPI + KOSDAQ 종목 정보
-        kospi_tickers = stock.get_market_ticker_list("20250101", market="KOSPI")
-        kosdaq_tickers = stock.get_market_ticker_list("20250101", market="KOSDAQ")
+        kospi_df = fdr.StockListing('KOSPI')
+        kosdaq_df = fdr.StockListing('KOSDAQ')
 
         # 종목명-코드 매핑
-        for ticker in kospi_tickers + kosdaq_tickers:
-          try:
-            name = stock.get_market_ticker_name(ticker)
-            if name:
-              self.ticker_cache[name] = ticker
-              self.ticker_cache[ticker] = ticker  # 코드로도 접근 가능
-          except:
-            continue
+        for df in [kospi_df, kosdaq_df]:
+          for _, row in df.iterrows():
+            try:
+              ticker = row['Symbol']
+              name = row['Name']
+              if name and ticker:
+                self.ticker_cache[name] = ticker
+                self.ticker_cache[ticker] = ticker  # 코드로도 접근 가능
+            except:
+              continue
 
         self.cache_updated = datetime.now()
         print(f"✅ 종목 {len(self.ticker_cache)//2}개 로드 완료")
@@ -120,16 +123,32 @@ class LightStockBot:
     return None
 
   def get_stock_info(self, stock_input):
-    """주식 정보 조회 (pykrx 사용)"""
+    """주식 정보 조회 (FinanceDataReader 사용)"""
     try:
       # 종목코드 찾기
       stock_code = self.find_stock_code(stock_input.strip())
       if not stock_code:
-        return f"❌ 종목을 찾을 수 없습니다. 6자리 종목코드(예: `005930`) 또는 정확한 종목명(예: `삼성전자`)을 입력하세요."
+        builder = SlackMessageBuilder()
+        builder.add_line(
+            text="종목을 찾을 수 없습니다. 6자리 종목코드(예: ",
+            emoji="x"
+        ).add_line(
+            text="005930",
+            code=True
+        ).add_line(
+            text=") 또는 정확한 종목명(예: "
+        ).add_line(
+            text="삼성전자",
+            code=True
+        ).add_line(
+            text=")을 입력하세요."
+        )
+        return {"blocks": builder.build()}
 
       # 종목명 가져오기
       try:
-        stock_name = stock.get_market_ticker_name(stock_code)
+        # 캐시에서 종목명 조회
+        stock_name = next((name for name, code in self.ticker_cache.items() if code == stock_code and name != stock_code), stock_input)
       except:
         stock_name = stock_input
 
@@ -143,60 +162,86 @@ class LightStockBot:
       elif today.weekday() == 6:  # 일요일
         trade_date = today - timedelta(days=2)
 
-      date_str = trade_date.strftime("%Y%m%d")
-
       # 주가 정보 조회
       try:
-        # 최근 5일간 데이터 가져와서 최신 데이터 사용
-        start_date = (trade_date - timedelta(days=7)).strftime("%Y%m%d")
-        df = stock.get_market_ohlcv(start_date, date_str, stock_code)
+        # 최근 7일간 데이터 가져와서 최신 데이터 사용
+        start_date = trade_date - timedelta(days=7)
+        df = fdr.DataReader(stock_code, start=start_date, end=trade_date)
 
         if df.empty:
-          return f"❌ '{stock_name}({stock_code})' 종목의 데이터가 없습니다."
+          builder = SlackMessageBuilder()
+          builder.add_line(
+              text=f"'{stock_name} ({stock_code})' 종목의 데이터가 없습니다.",
+              emoji="x"
+          )
+          return {"blocks": builder.build()}
 
         # 최신 데이터
         latest = df.iloc[-1]
         prev = df.iloc[-2] if len(df) > 1 else latest
 
-        current_price = int(latest['종가'])
-        change = current_price - int(prev['종가'])
-        change_rate = (change / int(prev['종가']) * 100) if int(prev['종가']) > 0 else 0
+        current_price = int(latest['Close'])
+        change = current_price - int(prev['Close'])
+        change_rate = (change / int(prev['Close']) * 100) if int(prev['Close']) > 0 else 0
 
-        open_price = int(latest['시가'])
-        high_price = int(latest['고가'])
-        low_price = int(latest['저가'])
-        volume = int(latest['거래량'])
+        open_price = int(latest['Open'])
+        high_price = int(latest['High'])
+        low_price = int(latest['Low'])
+        volume = int(latest['Volume'])
 
         # 등락 표시
         if change > 0:
-          emoji = "🔴"
+          emoji = "red_circle"
           sign = "▲"
         elif change < 0:
-          emoji = "🔵"
+          emoji = "blue_circle"
           sign = "▼"
         else:
-          emoji = "⚪"
+          emoji = "white_circle"
           sign = "→"
 
-        # 결과 포맷팅
-        result = f"""📈 **{stock_name} ({stock_code})**
+        # Block Kit 포맷팅 with SlackMessageBuilder
+        builder = SlackMessageBuilder()
+        builder.add_line(
+            text=f"{stock_name} ({stock_code})",
+            emoji="chart_with_upwards_trend",
+            bold=True
+        ).add_line(
+            text=f"현재가: {current_price:,}원",
+            emoji="moneybag"
+        ).add_line(
+            text=f"등락: {sign} {change:+,}원 ({change_rate:+.2f}%)",
+            emoji=emoji
+        ).add_line(
+            text="거래정보:",
+            bold=True,
+            emoji="bar_chart"
+        ).add_line(
+            text=f"• 시가: {open_price:,}원 | 고가: {high_price:,}원"
+        ).add_line(
+            text=f"• 저가: {low_price:,}원 | 거래량: {volume:,}주"
+        ).add_line(
+            text=f"{df.index[-1].strftime('%Y-%m-%d')} 기준",
+            emoji="clock3"
+        )
 
-💰 현재가: {current_price:,}원
-{emoji} 등락: {sign} {change:+,}원 ({change_rate:+.2f}%)
-
-📊 거래정보:
-• 시가: {open_price:,}원 | 고가: {high_price:,}원
-• 저가: {low_price:,}원 | 거래량: {volume:,}주
-
-🕐 {df.index[-1].strftime('%Y-%m-%d')} 기준"""
-
-        return result
+        return {"blocks": builder.build()}
 
       except Exception as e:
-        return f"❌ '{stock_name}({stock_code})' 주가 데이터 조회 실패: 거래 중단 또는 데이터 없음"
+        builder = SlackMessageBuilder()
+        builder.add_line(
+            text=f"'{stock_name} ({stock_code})' 주가 데이터 조회 실패: 거래 중단 또는 데이터 없음",
+            emoji="x"
+        )
+        return {"blocks": builder.build()}
 
     except Exception as e:
-      return f"❌ 오류 발생: {str(e)[:50]}..."
+      builder = SlackMessageBuilder()
+      builder.add_line(
+          text=f"오류 발생: {str(e)[:50]}...",
+          emoji="x"
+      )
+      return {"blocks": builder.build()}
 
 # 봇 인스턴스 생성
 stock_bot = LightStockBot()
@@ -211,10 +256,25 @@ def handle_stock_slash_command(ack, respond, command):
 
   # 유효성 검사
   if not stock_input:
-    respond(
-        "📖 사용법: `/stock [종목명 또는 종목코드]`\n예시: `/stock 삼성전자` 또는 `/stock 005930`",
-        response_type="ephemeral"
+    builder = SlackMessageBuilder()
+    builder.add_line(
+        text="사용법: ",
+        emoji="book"
+    ).add_line(
+        text="/stock [종목명 또는 종목코드]",
+        code=True
+    ).add_line(
+        text="예시: "
+    ).add_line(
+        text="/stock 삼성전자",
+        code=True
+    ).add_line(
+        text=" 또는 "
+    ).add_line(
+        text="/stock 005930",
+        code=True
     )
+    respond({"response_type": "ephemeral", "blocks": builder.build()})
     return
 
   # 주식 정보 조회
