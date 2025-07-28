@@ -177,10 +177,23 @@ class LightStockBot:
 # 봇 인스턴스 생성
 stock_bot = LightStockBot()
 
-@slack_app.message(re.compile(r'^/stock\s+(.+)', re.IGNORECASE))
-def handle_stock_command(message, say):
-  """'/stock 종목명' 명령어 처리"""
-  match = re.search(r'/stock\s+(.+)', message['text'], re.IGNORECASE)
+@slack_app.command("/stock")
+def handle_stock_slash_command(ack, respond, command):
+  """슬래시 커맨드 '/stock 종목명' 처리"""
+  ack()  # 명령어 수신 확인
+
+  stock_input = command['text'].strip()
+  if not stock_input:
+    respond("📖 사용법: `/stock [종목명 또는 종목코드]`\n예시: `/stock 삼성전자` 또는 `/stock 005930`")
+    return
+
+  result = stock_bot.get_stock_info(stock_input)
+  respond(result)
+
+@slack_app.message(re.compile(r'^stock\s+(.+)', re.IGNORECASE))
+def handle_stock_message(message, say):
+  """'stock 종목명' 일반 메시지 처리 (슬래시 없음)"""
+  match = re.search(r'stock\s+(.+)', message['text'], re.IGNORECASE)
   if match:
     stock_input = match.group(1).strip()
     result = stock_bot.get_stock_info(stock_input)
@@ -199,12 +212,13 @@ def handle_help(message, say):
   help_text = """🤖 **경량 한국 주식 봇**
 
 📋 **사용법**:
-• `/stock 삼성전자` - 종목명으로 조회
-• `/stock 005930` - 종목코드로 조회  
+• `/stock 삼성전자` - 슬래시 커맨드 (추천)
+• `stock 005930` - 일반 메시지 (슬래시 없이)
 • `005930` - 6자리 코드 직접 입력
+• `@봇이름 stock 네이버` - 멘션으로 조회
 • `도움말` - 이 메시지 표시
 
-💡 **예시**: `/stock 네이버`, `/stock TSLA`
+💡 **추천**: `/stock 종목명` 형태 사용!
 ⚡ 경량화로 빠른 응답!"""
   say(help_text)
 
@@ -215,8 +229,8 @@ def handle_app_mention(event, say):
   mention_removed = re.sub(r'<@[A-Z0-9]+>', '', text).strip()
 
   if mention_removed:
-    # /stock 명령어 확인
-    stock_match = re.search(r'/stock\s+(.+)', mention_removed, re.IGNORECASE)
+    # stock 명령어 확인 (슬래시 없음)
+    stock_match = re.search(r'stock\s+(.+)', mention_removed, re.IGNORECASE)
     if stock_match:
       stock_input = stock_match.group(1).strip()
       result = stock_bot.get_stock_info(stock_input)
@@ -226,7 +240,7 @@ def handle_app_mention(event, say):
       result = stock_bot.get_stock_info(mention_removed)
       say(result)
   else:
-    say("💡 사용법: `@봇이름 /stock 삼성전자` 또는 `도움말`")
+    say("💡 사용법: `@봇이름 stock 삼성전자`, `/stock 삼성전자` 또는 `도움말`")
 
 def run_slack_bot():
   """Slack 봇을 별도 스레드에서 실행"""
