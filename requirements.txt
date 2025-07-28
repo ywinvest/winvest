@@ -8,3 +8,4 @@ python-dotenv
 numpy~=1.24
 slack_sdk
 slack_bolt
+flask

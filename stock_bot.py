@@ -1,7 +1,10 @@
 import os
 import re
-import requests
+import threading
 from datetime import datetime
+
+import requests
+from flask import Flask
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -17,24 +20,32 @@ if not bot_token.startswith("xoxb-") or not app_token.startswith("xapp-"):
   print("❌ 토큰 형식이 잘못되었습니다!")
   exit(1)
 
-app = App(token=bot_token)
+# Flask 웹서버 (더미)
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def home():
+  return "한국 주식 Slack Bot이 실행 중입니다!"
+
+@flask_app.route('/health')
+def health():
+  return {"status": "ok", "message": "Bot is running"}
+
+# Slack App
+slack_app = App(token=bot_token)
 
 class LightStockBot:
   def __init__(self):
-    # 네이버 금융 API 기본 URL
     self.base_url = "https://polling.finance.naver.com/api/realtime"
     self.headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
 
   def search_stock_code(self, query):
-    """네이버 검색으로 종목코드 찾기"""
     try:
-      # 6자리 숫자면 종목코드로 간주
       if query.isdigit() and len(query) == 6:
         return query
 
-      # 네이버 검색 API로 종목 검색
       search_url = f"https://ac.finance.naver.com/ac"
       params = {
         'q': query,
@@ -54,7 +65,6 @@ class LightStockBot:
         if 'items' in data and len(data['items']) > 0:
           for item in data['items']:
             if len(item) >= 2:
-              # 종목코드 추출 (6자리 숫자)
               code_match = re.search(r'(\d{6})', item[0])
               if code_match:
                 return code_match.group(1)
@@ -65,14 +75,11 @@ class LightStockBot:
       return None
 
   def get_stock_info(self, stock_input):
-    """주식 정보 조회 (경량화)"""
     try:
-      # 종목코드 찾기
       stock_code = self.search_stock_code(stock_input.strip())
       if not stock_code:
         return f"❌ '{stock_input}' 종목을 찾을 수 없습니다."
 
-      # 네이버 금융에서 주가 정보 가져오기
       url = f"{self.base_url}.nhn"
       params = {'query': f'SERVICE_ITEM:{stock_code}'}
 
@@ -92,19 +99,16 @@ class LightStockBot:
 
       stock_data = areas[0]['datas'][0]
 
-      # 데이터 파싱
       name = stock_data.get('nm', stock_input)
       current_price = int(stock_data.get('nv', 0))
       change = int(stock_data.get('cv', 0))
       change_rate = float(stock_data.get('cr', 0))
 
-      # 추가 정보
       open_price = int(stock_data.get('ov', 0))
       high_price = int(stock_data.get('hv', 0))
       low_price = int(stock_data.get('lv', 0))
       volume = int(stock_data.get('aq', 0))
 
-      # 등락 표시
       if change > 0:
         emoji = "🔴"
         sign = "▲"
@@ -115,7 +119,6 @@ class LightStockBot:
         emoji = "⚪"
         sign = "→"
 
-      # 결과 포맷팅 (간소화)
       result = f"""📈 **{name} ({stock_code})**
 
 💰 현재가: {current_price:,}원
@@ -137,25 +140,22 @@ class LightStockBot:
 # 봇 인스턴스 생성
 stock_bot = LightStockBot()
 
-@app.message(re.compile(r'^/stock\s+(.+)', re.IGNORECASE))
+@slack_app.message(re.compile(r'^/stock\s+(.+)', re.IGNORECASE))
 def handle_stock_command(message, say):
-  """'/stock 종목명' 명령어 처리"""
   match = re.search(r'/stock\s+(.+)', message['text'], re.IGNORECASE)
   if match:
     stock_input = match.group(1).strip()
     result = stock_bot.get_stock_info(stock_input)
     say(result)
 
-@app.message(re.compile(r'^[0-9]{6}$'))
+@slack_app.message(re.compile(r'^[0-9]{6}$'))
 def handle_stock_code_direct(message, say):
-  """6자리 종목코드 직접 입력"""
   stock_code = message['text']
   result = stock_bot.get_stock_info(stock_code)
   say(result)
 
-@app.message("도움말")
+@slack_app.message("도움말")
 def handle_help(message, say):
-  """도움말"""
   help_text = """🤖 **경량 한국 주식 봇**
 
 📋 **사용법**:
@@ -168,32 +168,39 @@ def handle_help(message, say):
 ⚡ 경량화로 빠른 응답!"""
   say(help_text)
 
-@app.event("app_mention")
+@slack_app.event("app_mention")
 def handle_app_mention(event, say):
-  """봇 멘션 처리"""
   text = event['text']
   mention_removed = re.sub(r'<@[A-Z0-9]+>', '', text).strip()
 
   if mention_removed:
-    # /stock 명령어 확인
     stock_match = re.search(r'/stock\s+(.+)', mention_removed, re.IGNORECASE)
     if stock_match:
       stock_input = stock_match.group(1).strip()
       result = stock_bot.get_stock_info(stock_input)
       say(result)
     else:
-      # 직접 종목명 입력
       result = stock_bot.get_stock_info(mention_removed)
       say(result)
   else:
     say("💡 사용법: `@봇이름 /stock 삼성전자` 또는 `도움말`")
 
-# 앱 시작
-if __name__ == "__main__":
+def run_slack_bot():
+  """Slack 봇을 별도 스레드에서 실행"""
   try:
-    handler = SocketModeHandler(app, app_token)
-    print("⚡️ 경량 한국 주식 봇 시작!")
-    print(f"🔧 메모리 사용량 최적화 완료")
+    handler = SocketModeHandler(slack_app, app_token)
+    print("⚡️ Slack 봇 시작!")
     handler.start()
   except Exception as e:
-    print(f"❌ 봇 시작 실패: {e}")
+    print(f"❌ Slack 봇 시작 실패: {e}")
+
+# 메인 실행
+if __name__ == "__main__":
+  # Slack 봇을 별도 스레드에서 실행
+  bot_thread = threading.Thread(target=run_slack_bot, daemon=True)
+  bot_thread.start()
+
+  # Flask 웹서버 실행 (Render 포트 요구사항 충족)
+  port = int(os.environ.get("PORT", 5000))
+  print(f"🌐 웹서버 시작 (포트: {port})")
+  flask_app.run(host="0.0.0.0", port=port)
