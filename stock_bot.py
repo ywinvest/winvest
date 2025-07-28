@@ -30,7 +30,7 @@ bot_status = {"running": False, "error": None}
 @flask_app.route('/')
 def home():
   return {
-    "message": "한국 주식 Slack Bot이 실행 중입니다!",
+    "message": "주식 Slack Bot이 실행 중입니다!",
     "bot_status": bot_status,
     "endpoints": {
       "health": "/health",
@@ -49,7 +49,7 @@ def health():
 @flask_app.route('/status')
 def status():
   return jsonify({
-    "service": "Korean Stock Slack Bot",
+    "service": "Stock Slack Bot",
     "version": "0.0.1",
     "bot_status": bot_status,
     "cache_info": {
@@ -129,7 +129,7 @@ class LightStockBot:
         builder = SlackMessageBuilder()
         with builder.line() as line:
           line \
-            .emoji("x") \
+            .emoji("red_x") \
             .space() \
             .text("종목을 찾을 수 없습니다. 6자리 종목코드(예: ") \
             .text("005930", code=True) \
@@ -168,7 +168,7 @@ class LightStockBot:
           builder = SlackMessageBuilder()
           builder.add_line(
               text=f"'{stock_name} ({stock_code})' 종목의 데이터가 없습니다.",
-              emoji="x"
+              emoji="red_x"
           )
           return {"blocks": builder.build()}
 
@@ -218,11 +218,11 @@ class LightStockBot:
         return {"blocks": builder.build()}
 
       except Exception as e:
-        print(f"주가 데이터 조회 오류: {e}")
+        print(f"주가 정보 조회 오류: {e}")
         builder = SlackMessageBuilder()
         builder.add_line(
-            text=f"'{stock_name} ({stock_code})' 주가 데이터 조회 실패: 거래 중단 또는 데이터 없음",
-            emoji="x"
+            text=f" {stock_name} ({stock_code}) 주가 정보 조회 실패: 거래 중단 또는 데이터 없음",
+            emoji="red_x"
         )
         return {"blocks": builder.build()}
 
@@ -231,7 +231,7 @@ class LightStockBot:
       builder = SlackMessageBuilder()
       builder.add_line(
           text=f"오류 발생: {str(e)[:50]}...",
-          emoji="x"
+          emoji="red_x"
       )
       return {"blocks": builder.build()}
 
@@ -254,13 +254,14 @@ def handle_stock_slash_command(ack, respond, command):
         .space() \
         .text("/stock [종목명 또는 종목코드]", code=True) \
         .space() \
-        .text("예시:") \
+        .text("(예:") \
         .space() \
-        .text("/stock 삼성전자") \
+        .text("/stock 삼성전자", code=True) \
         .space() \
         .text("또는") \
         .space() \
-        .text("/stock 005930") \
+        .text("/stock 005930", code=True) \
+        .text(")") \
 
     respond({"response_type": "ephemeral", "blocks": builder.build()})
     return
