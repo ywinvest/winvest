@@ -368,11 +368,11 @@ def send_sell_to_slack(sell_data):
       sell_type = "full" if pd.notna(row['Full_Sell_Date']) and pd.to_datetime(row['Full_Sell_Date']).date() == today.date() else "half"
       return_val = row['return_val']
       if return_val > 0 and sell_type == "full":
-        return_emoji = "red_full_circle"
+        emoji = "red_full_circle"
       elif return_val < 0 and sell_type == "half":
-        return_emoji = "red_half_circle"
+        emoji = "red_half_circle"
       else:
-        return_emoji = "blue_full_circle"
+        emoji = "blue_full_circle"
 
       name = truncate_name(row['Name'], 12)
       buy_date = row['Buy_Date'].strftime('%y-%m-%d')
@@ -380,7 +380,7 @@ def send_sell_to_slack(sell_data):
 
       with builder.line() as line:
         line \
-          .emoji(return_emoji) \
+          .emoji(emoji) \
           .space() \
           .text(f"{name}") \
           .space() \
@@ -461,6 +461,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
         with builder.line() as line:
           line \
             .emoji(emoji) \
+            .space() \
             .text(truncate_name(name, 10)) \
             .text(f"({format_market_cap(marcap)})") \
             .space() \

@@ -93,7 +93,7 @@ def send_to_slack(result_data):
         diff_high_close = high_change / 100 - change
         diff_close_open = (close - open) / open
 
-        message = f"{name} : {format_market_cap(marcap)}, 고가: {high_change:.2f}%, 고가-종가: {diff_high_close * 100:.2f}%, 종가-시가: {diff_close_open * 100:.2f}%, 거래량: {volume_change * 100:.2f}%"
+        message = f"{name}({format_market_cap(marcap)}) 고 {high_change:.2f}%, 고-종 {diff_high_close * 100:.2f}%, 종-시 {diff_close_open * 100:.2f}%, 거래량 {volume_change * 100:.2f}%"
 
         if high_change >= 10 and volume_change > 5 and diff_high_close >= 0 and diff_high_close <= 0.025:
           builder.add_line(f" {message}", emoji="first_place_medal")
