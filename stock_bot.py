@@ -1,11 +1,13 @@
 import os
 import re
-import requests
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
+
 from flask import Flask, jsonify
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+
+from pykrx import stock
 
 # 토큰 검증
 bot_token = os.environ.get("SLACK_BOT_TOKEN")
@@ -48,8 +50,12 @@ def health():
 def status():
   return jsonify({
     "service": "Korean Stock Slack Bot",
-    "version": "1.0.0",
+    "version": "2.0.0 (pykrx)",
     "bot_status": bot_status,
+    "cache_info": {
+      "ticker_count": len(stock_bot.ticker_cache) // 2 if hasattr(stock_bot, 'ticker_cache') else 0,
+      "last_updated": stock_bot.cache_updated.isoformat() if hasattr(stock_bot, 'cache_updated') and stock_bot.cache_updated else None
+    },
     "environment": {
       "port": os.environ.get("PORT", "10000"),
       "has_bot_token": bool(bot_token),
@@ -62,101 +68,119 @@ slack_app = App(token=bot_token)
 
 class LightStockBot:
   def __init__(self):
-    self.base_url = "https://polling.finance.naver.com/api/realtime"
-    self.headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
+    self.ticker_cache = {}  # 종목명-코드 캐시
+    self.cache_updated = None
 
-  def search_stock_code(self, query):
-    """네이버 검색으로 종목코드 찾기"""
+  def update_ticker_cache(self):
+    """종목 리스트 캐시 업데이트 (1일 1회)"""
     try:
-      # 6자리 숫자면 종목코드로 간주
-      if query.isdigit() and len(query) == 6:
-        return query
+      # 캐시가 없거나 하루 지났으면 업데이트
+      if (self.cache_updated is None or
+          datetime.now() - self.cache_updated > timedelta(days=1)):
 
-      # 네이버 검색 API로 종목 검색
-      search_url = f"https://ac.finance.naver.com/ac"
-      params = {
-        'q': query,
-        'q_enc': 'UTF-8',
-        'st': '111',
-        'frm': 'stock',
-        'r_format': 'json',
-        'r_enc': 'UTF-8',
-        'r_unicode': '0',
-        't_koreng': '1',
-        'r_lt': '111'
-      }
+        print("📋 종목 리스트 업데이트 중...")
 
-      response = requests.get(search_url, params=params, headers=self.headers, timeout=5)
-      if response.status_code == 200:
-        data = response.json()
-        if 'items' in data and len(data['items']) > 0:
-          for item in data['items']:
-            if len(item) >= 2:
-              # 종목코드 추출 (6자리 숫자)
-              code_match = re.search(r'(\d{6})', item[0])
-              if code_match:
-                return code_match.group(1)
+        # KOSPI + KOSDAQ 종목 정보
+        kospi_tickers = stock.get_market_ticker_list("20250101", market="KOSPI")
+        kosdaq_tickers = stock.get_market_ticker_list("20250101", market="KOSDAQ")
 
-      return None
+        # 종목명-코드 매핑
+        for ticker in kospi_tickers + kosdaq_tickers:
+          try:
+            name = stock.get_market_ticker_name(ticker)
+            if name:
+              self.ticker_cache[name] = ticker
+              self.ticker_cache[ticker] = ticker  # 코드로도 접근 가능
+          except:
+            continue
+
+        self.cache_updated = datetime.now()
+        print(f"✅ 종목 {len(self.ticker_cache)//2}개 로드 완료")
+
     except Exception as e:
-      print(f"종목 검색 오류: {e}")
-      return None
+      print(f"⚠️ 종목 리스트 업데이트 실패: {e}")
+
+  def find_stock_code(self, query):
+    """종목명 또는 코드로 종목 찾기"""
+    # 6자리 숫자면 종목코드로 간주
+    if query.isdigit() and len(query) == 6:
+      return query
+
+    # 캐시 업데이트
+    self.update_ticker_cache()
+
+    # 정확한 매치
+    if query in self.ticker_cache:
+      return self.ticker_cache[query]
+
+    # 부분 매치
+    for name, code in self.ticker_cache.items():
+      if query in name and len(code) == 6:  # 종목코드만
+        return code
+
+    return None
 
   def get_stock_info(self, stock_input):
-    """주식 정보 조회 (경량화)"""
+    """주식 정보 조회 (pykrx 사용)"""
     try:
       # 종목코드 찾기
-      stock_code = self.search_stock_code(stock_input.strip())
+      stock_code = self.find_stock_code(stock_input.strip())
       if not stock_code:
-        return f"❌ '{stock_input}' 종목을 찾을 수 없습니다."
+          return f"❌ pykrx 모듈이 없어 6자리 종목코드만 사용 가능합니다.\n예: `005930`"
 
-      # 네이버 금융에서 주가 정보 가져오기
-      url = f"{self.base_url}.nhn"
-      params = {'query': f'SERVICE_ITEM:{stock_code}'}
+      # 종목명 가져오기
+      try:
+        stock_name = stock.get_market_ticker_name(stock_code)
+      except:
+        stock_name = stock_input
 
-      response = requests.get(url, params=params, headers=self.headers, timeout=10)
+      # 최근 거래일 계산 (주말 제외)
+      today = datetime.now()
+      trade_date = today
 
-      if response.status_code != 200:
-        return f"❌ 주가 정보를 가져올 수 없습니다."
+      # 주말이면 금요일로
+      if today.weekday() == 5:  # 토요일
+        trade_date = today - timedelta(days=1)
+      elif today.weekday() == 6:  # 일요일
+        trade_date = today - timedelta(days=2)
 
-      data = response.json()
+      date_str = trade_date.strftime("%Y%m%d")
 
-      if 'result' not in data or 'areas' not in data['result']:
-        return f"❌ '{stock_input}' 종목의 데이터가 없습니다."
+      # 주가 정보 조회
+      try:
+        # 최근 5일간 데이터 가져와서 최신 데이터 사용
+        start_date = (trade_date - timedelta(days=7)).strftime("%Y%m%d")
+        df = stock.get_market_ohlcv(start_date, date_str, stock_code)
 
-      areas = data['result']['areas']
-      if not areas or len(areas[0]['datas']) == 0:
-        return f"❌ '{stock_input}' 종목의 데이터가 없습니다."
+        if df.empty:
+          return f"❌ '{stock_name}({stock_code})' 종목의 데이터가 없습니다."
 
-      stock_data = areas[0]['datas'][0]
+        # 최신 데이터
+        latest = df.iloc[-1]
+        prev = df.iloc[-2] if len(df) > 1 else latest
 
-      # 데이터 파싱
-      name = stock_data.get('nm', stock_input)
-      current_price = int(stock_data.get('nv', 0))
-      change = int(stock_data.get('cv', 0))
-      change_rate = float(stock_data.get('cr', 0))
+        current_price = int(latest['종가'])
+        change = current_price - int(prev['종가'])
+        change_rate = (change / int(prev['종가']) * 100) if int(prev['종가']) > 0 else 0
 
-      # 추가 정보
-      open_price = int(stock_data.get('ov', 0))
-      high_price = int(stock_data.get('hv', 0))
-      low_price = int(stock_data.get('lv', 0))
-      volume = int(stock_data.get('aq', 0))
+        open_price = int(latest['시가'])
+        high_price = int(latest['고가'])
+        low_price = int(latest['저가'])
+        volume = int(latest['거래량'])
 
-      # 등락 표시
-      if change > 0:
-        emoji = "🔴"
-        sign = "▲"
-      elif change < 0:
-        emoji = "🔵"
-        sign = "▼"
-      else:
-        emoji = "⚪"
-        sign = "→"
+        # 등락 표시
+        if change > 0:
+          emoji = "🔴"
+          sign = "▲"
+        elif change < 0:
+          emoji = "🔵"
+          sign = "▼"
+        else:
+          emoji = "⚪"
+          sign = "→"
 
-      # 결과 포맷팅 (간소화)
-      result = f"""📈 **{name} ({stock_code})**
+        # 결과 포맷팅
+        result = f"""📈 **{stock_name} ({stock_code})**
 
 💰 현재가: {current_price:,}원
 {emoji} 등락: {sign} {change:+,}원 ({change_rate:+.2f}%)
@@ -165,14 +189,15 @@ class LightStockBot:
 • 시가: {open_price:,}원 | 고가: {high_price:,}원
 • 저가: {low_price:,}원 | 거래량: {volume:,}주
 
-🕐 {datetime.now().strftime('%H:%M:%S')}"""
+🕐 {df.index[-1].strftime('%Y-%m-%d')} 기준"""
 
-      return result
+        return result
 
-    except requests.exceptions.Timeout:
-      return "❌ 요청 시간이 초과되었습니다. 다시 시도해주세요."
+      except Exception as e:
+        return f"❌ '{stock_name}({stock_code})' 주가 데이터 조회 실패: 거래 중단 또는 데이터 없음"
+
     except Exception as e:
-      return f"❌ 오류 발생: 네트워크를 확인해주세요."
+      return f"❌ 오류 발생: {str(e)[:50]}..."
 
 # 봇 인스턴스 생성
 stock_bot = LightStockBot()
@@ -209,17 +234,28 @@ def handle_stock_code_direct(message, say):
 @slack_app.message("도움말")
 def handle_help(message, say):
   """도움말"""
-  help_text = """🤖 **경량 한국 주식 봇**
+  if PYKRX_AVAILABLE:
+    help_text = """🤖 **한국 주식 봇 (pykrx 버전)**
 
 📋 **사용법**:
 • `/stock 삼성전자` - 슬래시 커맨드 (추천)
-• `stock 005930` - 일반 메시지 (슬래시 없이)
+• `stock 네이버` - 일반 메시지 (슬래시 없이)
 • `005930` - 6자리 코드 직접 입력
-• `@봇이름 stock 네이버` - 멘션으로 조회
+• `@봇이름 stock LG화학` - 멘션으로 조회
 • `도움말` - 이 메시지 표시
 
-💡 **추천**: `/stock 종목명` 형태 사용!
-⚡ 경량화로 빠른 응답!"""
+💡 **지원**: KOSPI, KOSDAQ 전 종목
+⚡ pykrx로 안정적인 데이터 제공!"""
+  else:
+    help_text = """🤖 **한국 주식 봇 (종목코드 전용)**
+
+📋 **사용법**:
+• `/stock 005930` - 슬래시 커맨드
+• `005930` - 6자리 코드 직접 입력
+
+⚠️ **제한**: pykrx 모듈 없음 - 종목코드만 사용 가능
+💡 **예시**: 삼성전자(005930), 네이버(035420)"""
+
   say(help_text)
 
 @slack_app.event("app_mention")
