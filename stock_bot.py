@@ -179,12 +179,14 @@ class LightStockBot:
         close_price = int(latest['Close'])
         open_price = int(latest['Open'])
         high_price = int(latest['High'])
+        low_price = int(latest['Low'])
         volume = int(latest['Volume'])
 
         # 등락률 계산
         close_change_rate = ((close_price - int(prev['Close'])) / int(prev['Close']) * 100) if int(prev['Close']) > 0 else 0
         open_change_rate = ((open_price - int(prev['Open'])) / int(prev['Open']) * 100) if int(prev['Open']) > 0 else 0
         high_change_rate = ((high_price - int(prev['High'])) / int(prev['High']) * 100) if int(prev['High']) > 0 else 0
+        low_change_rate = ((low_price - int(prev['Low'])) / int(prev['Low>']) * 100) if int(prev['Low']) > 0 else 0
         volume_change_rate = ((volume - int(prev['Volume'])) / int(prev['Volume']) * 100) if int(prev['Volume']) > 0 else 0
 
         # 등락 이모지
@@ -205,6 +207,9 @@ class LightStockBot:
         ).add_line(
             text=f"고가 {high_price:,} {high_change_rate:+.2f}%",
             emoji=get_emoji(high_change_rate)
+        ).add_line(
+            text=f"저가 {low_price:,} {low_change_rate:+.2f}%",
+            emoji=get_emoji(low_change_rate)
         ).add_line(
             text=f"거래량 {volume:,} {volume_change_rate:+.2f}%",
             emoji=get_emoji(volume_change_rate)
