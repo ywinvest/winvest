@@ -234,8 +234,7 @@ def handle_stock_code_direct(message, say):
 @slack_app.message("도움말")
 def handle_help(message, say):
   """도움말"""
-  if PYKRX_AVAILABLE:
-    help_text = """🤖 **한국 주식 봇 (pykrx 버전)**
+  help_text = """🤖 **한국 주식 봇 (pykrx 버전)**
 
 📋 **사용법**:
 • `/stock 삼성전자` - 슬래시 커맨드 (추천)
@@ -246,15 +245,6 @@ def handle_help(message, say):
 
 💡 **지원**: KOSPI, KOSDAQ 전 종목
 ⚡ pykrx로 안정적인 데이터 제공!"""
-  else:
-    help_text = """🤖 **한국 주식 봇 (종목코드 전용)**
-
-📋 **사용법**:
-• `/stock 005930` - 슬래시 커맨드
-• `005930` - 6자리 코드 직접 입력
-
-⚠️ **제한**: pykrx 모듈 없음 - 종목코드만 사용 가능
-💡 **예시**: 삼성전자(005930), 네이버(035420)"""
 
   say(help_text)
 
