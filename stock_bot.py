@@ -80,21 +80,18 @@ class LightStockBot:
 
         print("📋 종목 리스트 업데이트 중...")
 
-        # KOSPI + KOSDAQ 종목 정보
-        kospi_df = fdr.StockListing('KOSPI')
-        kosdaq_df = fdr.StockListing('KOSDAQ')
+        krx_df = fdr.StockListing('KRX')
 
         # 종목명-코드 매핑
-        for df in [kospi_df, kosdaq_df]:
-          for _, row in df.iterrows():
-            try:
-              ticker = row['Symbol']
-              name = row['Name']
-              if name and ticker:
-                self.ticker_cache[name] = ticker
-                self.ticker_cache[ticker] = ticker  # 코드로도 접근 가능
-            except:
-              continue
+        for _, row in krx_df.iterrows():
+          try:
+            ticker = row['Code']
+            name = row['Name']
+            if name and ticker:
+              self.ticker_cache[name] = ticker
+              self.ticker_cache[ticker] = ticker
+          except:
+            continue
 
         self.cache_updated = datetime.now()
         print(f"✅ 종목 {len(self.ticker_cache)//2}개 로드 완료")
