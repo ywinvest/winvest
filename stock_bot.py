@@ -1,5 +1,4 @@
 import os
-import re
 import threading
 from datetime import datetime, timedelta
 
@@ -126,7 +125,7 @@ class LightStockBot:
       # 종목코드 찾기
       stock_code = self.find_stock_code(stock_input.strip())
       if not stock_code:
-          return f"❌ pykrx 모듈이 없어 6자리 종목코드만 사용 가능합니다.\n예: `005930`"
+        return f"❌ 종목을 찾을 수 없습니다. 6자리 종목코드(예: `005930`) 또는 정확한 종목명(예: `삼성전자`)을 입력하세요."
 
       # 종목명 가져오기
       try:
@@ -207,66 +206,20 @@ def handle_stock_slash_command(ack, respond, command):
   """슬래시 커맨드 '/stock 종목명' 처리"""
   ack()  # 명령어 수신 확인
 
+  # 입력 파싱
   stock_input = command['text'].strip()
+
+  # 유효성 검사
   if not stock_input:
-    respond("📖 사용법: `/stock [종목명 또는 종목코드]`\n예시: `/stock 삼성전자` 또는 `/stock 005930`")
+    respond(
+        "📖 사용법: `/stock [종목명 또는 종목코드]`\n예시: `/stock 삼성전자` 또는 `/stock 005930`",
+        response_type="ephemeral"
+    )
     return
 
+  # 주식 정보 조회
   result = stock_bot.get_stock_info(stock_input)
-  respond(result)
-
-@slack_app.message(re.compile(r'^stock\s+(.+)', re.IGNORECASE))
-def handle_stock_message(message, say):
-  """'stock 종목명' 일반 메시지 처리 (슬래시 없음)"""
-  match = re.search(r'stock\s+(.+)', message['text'], re.IGNORECASE)
-  if match:
-    stock_input = match.group(1).strip()
-    result = stock_bot.get_stock_info(stock_input)
-    say(result)
-
-@slack_app.message(re.compile(r'^[0-9]{6}$'))
-def handle_stock_code_direct(message, say):
-  """6자리 종목코드 직접 입력"""
-  stock_code = message['text']
-  result = stock_bot.get_stock_info(stock_code)
-  say(result)
-
-@slack_app.message("도움말")
-def handle_help(message, say):
-  """도움말"""
-  help_text = """🤖 **한국 주식 봇 (pykrx 버전)**
-
-📋 **사용법**:
-• `/stock 삼성전자` - 슬래시 커맨드 (추천)
-• `stock 네이버` - 일반 메시지 (슬래시 없이)
-• `005930` - 6자리 코드 직접 입력
-• `@봇이름 stock LG화학` - 멘션으로 조회
-• `도움말` - 이 메시지 표시
-
-💡 **지원**: KOSPI, KOSDAQ 전 종목
-⚡ pykrx로 안정적인 데이터 제공!"""
-
-  say(help_text)
-
-@slack_app.event("app_mention")
-def handle_app_mention(event, say):
-  """봇 멘션 처리"""
-  text = event['text']
-  mention_removed = re.sub(r'<@[A-Z0-9]+>', '', text).strip()
-
-  if mention_removed:
-    # stock 명령어 확인 (슬래시 없음)
-    stock_match = re.search(r'stock\s+(.+)', mention_removed, re.IGNORECASE)
-    if stock_match:
-      stock_input = stock_match.group(1).strip()
-      result = stock_bot.get_stock_info(stock_input)
-      say(result)
-    else:
-      # 직접 종목명 입력
-      result = stock_bot.get_stock_info(mention_removed)
-      say(result)
-  else:
-    say("💡 사용법: `@봇이름 stock 삼성전자`, `/stock 삼성전자` 또는 `도움말`")
+  respond(result, response_type="in_channel")
 
 def run_slack_bot():
   """Slack 봇을 별도 스레드에서 실행"""
