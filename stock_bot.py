@@ -251,25 +251,15 @@ def process_and_send_stock_info(client: WebClient, channel_id: str, stock_input:
           channel=channel_id,
           file=chart_image_buffer,
           filename=f"{stock_code}_chart.png",
-          title=f"{stock_name} ({stock_code}) Chart",
-          initial_comment=f"📈 *{stock_name}*의 최근 1개월 차트입니다."
+          title=f"{stock_name} ({stock_code})",
+          # initial_comment=f"📈 *{stock_name}*의 최근 1개월 차트입니다."
       )
 
-      # 5-2. 상세 정보를 별도 메시지로 전송 (thread 없이)
-      client.chat_postMessage(
-          channel=channel_id,
-          blocks=info_blocks,
-          text=f"📊 {stock_name} ({stock_code}) 상세 정보"
-      )
-      print(f"✅ {stock_name} 차트 및 정보 전송 완료")
-    else:
-      # 차트 생성 실패시 텍스트 정보만 전송
-      client.chat_postMessage(
-          channel=channel_id,
-          blocks=info_blocks,
-          text=f"📊 {stock_name} ({stock_code}) 주식 정보"
-      )
-      print(f"✅ {stock_name} 텍스트 정보 전송 완료")
+    client.chat_postMessage(
+        channel=channel_id,
+        blocks=info_blocks,
+        text=f"{stock_name} ({stock_code}) 주가 정보"
+    )
 
   except Exception as e:
     print(f"❌ Slack 전송 실패: {e}")
