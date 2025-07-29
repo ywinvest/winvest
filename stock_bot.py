@@ -136,7 +136,7 @@ class LightStockBot:
             .text(") 또는 정확한 종목명(예: ") \
             .text("삼성전자", code=True) \
             .text(")")
-        return {"blocks": builder.build()}
+        return {"response_type": "ephemeral", "blocks": builder.build()}
 
       # 종목명 가져오기
       try:
@@ -218,7 +218,7 @@ class LightStockBot:
             emoji=get_emoji(volume_change_rate)
         )
 
-        return {"blocks": builder.build()}
+        return {"response_type": "in_channel", "blocks": builder.build()}
 
       except Exception as e:
         print(f"주가 정보 조회 오류: {e}")
@@ -227,7 +227,7 @@ class LightStockBot:
             text=f" {stock_name} ({stock_code}) 주가 정보 조회 실패: 거래 중단 또는 데이터 없음",
             emoji="red_x"
         )
-        return {"blocks": builder.build()}
+        return {"response_type": "ephemeral", "blocks": builder.build()}
 
     except Exception as e:
       print(f"종목 조회 오류: {e}")
@@ -236,7 +236,7 @@ class LightStockBot:
           text=f"오류 발생: {str(e)[:50]}...",
           emoji="red_x"
       )
-      return {"response_type": "in_channel", "blocks": builder.build()}
+      return {"response_type": "ephemeral", "blocks": builder.build()}
 
 # 봇 인스턴스 생성
 stock_bot = LightStockBot()
