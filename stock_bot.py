@@ -244,11 +244,10 @@ def process_and_send_stock_info(client: WebClient, channel_id: str, stock_input:
   # 4. 상세 정보 블록 생성
   info_blocks = stock_bot.build_stock_info_blocks(df, stock_name, stock_code)
 
-  # 5. 슬랙에 전송 (응답 구조 디버깅 포함)
   try:
     if chart_image_buffer:
-      # 5-1. 차트 이미지 먼저 업로드
-      upload_response = client.files_upload_v2(
+      # 5-1. 차트 이미지 업로드
+      client.files_upload_v2(
           channel=channel_id,
           file=chart_image_buffer,
           filename=f"{stock_code}_chart.png",
@@ -256,51 +255,13 @@ def process_and_send_stock_info(client: WebClient, channel_id: str, stock_input:
           initial_comment=f"📈 *{stock_name}*의 최근 1개월 차트입니다."
       )
 
-      # 응답 구조 디버깅
-      print(f"🔍 Upload response keys: {upload_response.keys()}")
-      if 'file' in upload_response:
-        print(f"🔍 File keys: {upload_response['file'].keys()}")
-
-      # thread_ts 찾기 - 여러 경로 시도
-      thread_ts = None
-      try:
-        # 경로 1: upload_response['file']['ts']
-        thread_ts = upload_response['file']['ts']
-        print(f"✅ thread_ts found at ['file']['ts']: {thread_ts}")
-      except KeyError:
-        try:
-          # 경로 2: upload_response['ts']
-          thread_ts = upload_response['ts']
-          print(f"✅ thread_ts found at ['ts']: {thread_ts}")
-        except KeyError:
-          try:
-            # 경로 3: upload_response['file']['permalink_public'] 등에서 추출
-            if 'file' in upload_response and 'id' in upload_response['file']:
-              file_id = upload_response['file']['id']
-              print(f"📁 File ID: {file_id}")
-              # thread_ts 없이 진행
-              thread_ts = None
-          except KeyError:
-            print("⚠️ thread_ts를 찾을 수 없습니다. 일반 메시지로 전송합니다.")
-            thread_ts = None
-
-      # 5-2. 상세 정보 전송 (thread_ts가 있으면 스레드로, 없으면 일반 메시지로)
-      if thread_ts:
-        client.chat_postMessage(
-            channel=channel_id,
-            blocks=info_blocks,
-            thread_ts=thread_ts,
-            text=f"📊 {stock_name} ({stock_code}) 상세 정보"
-        )
-        print(f"✅ {stock_name} 스레드 메시지 전송 완료")
-      else:
-        client.chat_postMessage(
-            channel=channel_id,
-            blocks=info_blocks,
-            text=f"📊 {stock_name} ({stock_code}) 상세 정보"
-        )
-        print(f"✅ {stock_name} 일반 메시지 전송 완료")
-
+      # 5-2. 상세 정보를 별도 메시지로 전송 (thread 없이)
+      client.chat_postMessage(
+          channel=channel_id,
+          blocks=info_blocks,
+          text=f"📊 {stock_name} ({stock_code}) 상세 정보"
+      )
+      print(f"✅ {stock_name} 차트 및 정보 전송 완료")
     else:
       # 차트 생성 실패시 텍스트 정보만 전송
       client.chat_postMessage(
@@ -311,33 +272,7 @@ def process_and_send_stock_info(client: WebClient, channel_id: str, stock_input:
       print(f"✅ {stock_name} 텍스트 정보 전송 완료")
 
   except Exception as e:
-    print(f"❌ Slack 메시지 전송 실패: {e}")
-    print(f"❌ 에러 타입: {type(e)}")
-
-    # 간단한 텍스트 메시지로 재시도
-    try:
-      latest = df.iloc[-1]
-      prev = df.iloc[-2] if len(df) > 1 else latest
-      close_price = int(latest['Close'])
-      prev_close_price = int(prev['Close'])
-      change_rate = ((close_price - prev_close_price) / prev_close_price * 100) if prev_close_price > 0 else 0
-
-      emoji = "🔴" if change_rate >= 0 else "🔵"
-      simple_message = f"📊 *{stock_name}* ({stock_code})\n{emoji} 종가: {close_price:,}원 ({change_rate:+.2f}%)\n날짜: {df.index[-1].strftime('%Y-%m-%d')}"
-
-      client.chat_postMessage(channel=channel_id, text=simple_message)
-      print(f"✅ {stock_name} 간단 정보 전송 완료")
-    except Exception as e2:
-      print(f"❌ 간단 메시지도 전송 실패: {e2}")
-
-      # 최후의 수단: 아주 간단한 메시지
-      try:
-        client.chat_postMessage(
-            channel=channel_id,
-            text=f"😅 {stock_name} 정보 조회는 완료했지만 메시지 전송 중 오류가 발생했습니다."
-        )
-      except Exception as e3:
-        print(f"❌ 최종 메시지도 전송 실패: {e3}")
+    print(f"❌ Slack 전송 실패: {e}")
 
 @slack_app.command("/stock")
 def handle_stock_slash_command(ack, respond, command, client):
