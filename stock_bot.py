@@ -8,6 +8,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
+import mplfinance as mpf
 
 import FinanceDataReader as fdr
 from flask import Flask, jsonify
@@ -103,6 +104,57 @@ def create_stock_chart(df: pd.DataFrame, stock_name: str, stock_code: str):
   except Exception as e:
     print(f"⚠️ Chart creation failed: {e}")
     return None
+
+def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code: str):
+  """mplfinance를 사용한 전문적인 캔들스틱 차트 (pip install mplfinance 필요)"""
+  try:
+
+    # DataFrame 복사본 생성
+    df = df.copy()
+
+    # 이동평균선 계산
+    df['MA5'] = df['Close'].rolling(window=5).mean()
+    df['MA20'] = df['Close'].rolling(window=20).mean()
+
+    # 추가 플롯 설정 (이동평균선)
+    apds = [
+      mpf.make_addplot(df['MA5'], color='orange', width=1.5),
+      mpf.make_addplot(df['MA20'], color='purple', width=1.5)
+    ]
+
+    # 스타일 설정
+    mc = mpf.make_marketcolors(
+        up='red', down='blue',
+        edge='inherit',
+        wick={'up':'darkred', 'down':'darkblue'},
+        volume='in'
+    )
+
+    s = mpf.make_mpf_style(marketcolors=mc, gridstyle='-', gridcolor='lightgray')
+
+    # 메모리 버퍼에 저장
+    buf = io.BytesIO()
+
+    mpf.plot(df,
+             type='candle',
+             style=s,
+             addplot=apds,
+             title=f"{stock_name} ({stock_code}) - Last 30 Days",
+             ylabel='Price (KRW)',
+             volume=True,  # 거래량 포함
+             figsize=(12, 8),
+             savefig=dict(fname=buf, format='png', dpi=150, bbox_inches='tight')
+             )
+
+    buf.seek(0)
+    return buf
+
+  except ImportError:
+    print("⚠️ mplfinance 라이브러리가 없습니다. 기본 캔들스틱 차트를 사용합니다.")
+    return create_stock_chart(df, stock_name, stock_code)
+  except Exception as e:
+    print(f"⚠️ mplfinance chart creation failed: {e}")
+    return create_stock_chart(df, stock_name, stock_code)
 
 class LightStockBot:
   def __init__(self):
@@ -239,7 +291,7 @@ def process_and_send_stock_info(client: WebClient, channel_id: str, stock_input:
     return
 
   # 3. 차트 생성
-  chart_image_buffer = create_stock_chart(df.tail(30), stock_name, stock_code)
+  chart_image_buffer = create_stock_chart_mplfinance(df.tail(30), stock_name, stock_code)
 
   # 4. 상세 정보 블록 생성
   info_blocks = stock_bot.build_stock_info_blocks(df, stock_name, stock_code)
