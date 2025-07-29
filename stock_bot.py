@@ -202,19 +202,19 @@ class LightStockBot:
             text=f"{df.index[-1].strftime('%Y-%m-%d')} {stock_name} ({stock_code}) 주가 정보",
             bold=True
         ).add_line(
-            text=f"종가 {close_price:,} {close_change_rate:+.2f}%",
+            text=f" 종가 {close_price:,} {close_change_rate:+.2f}%",
             emoji=get_emoji(close_change_rate)
         ).add_line(
-            text=f"시가 {open_price:,} {open_change_rate:+.2f}%",
+            text=f" 시가 {open_price:,} {open_change_rate:+.2f}%",
             emoji=get_emoji(open_change_rate)
         ).add_line(
-            text=f"고가 {high_price:,} {high_change_rate:+.2f}%",
+            text=f" 고가 {high_price:,} {high_change_rate:+.2f}%",
             emoji=get_emoji(high_change_rate)
         ).add_line(
-            text=f"저가 {low_price:,} {low_change_rate:+.2f}%",
+            text=f" 저가 {low_price:,} {low_change_rate:+.2f}%",
             emoji=get_emoji(low_change_rate)
         ).add_line(
-            text=f"거래량 {volume:,} {volume_change_rate:+.2f}%",
+            text=f" 거래량 {volume:,} {volume_change_rate:+.2f}%",
             emoji=get_emoji(volume_change_rate)
         )
 
