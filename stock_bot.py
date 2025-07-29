@@ -176,6 +176,9 @@ class LightStockBot:
         latest = df.iloc[-1]
         prev = df.iloc[-2] if len(df) > 1 else latest
 
+        prev_close_price = int(prev['Close'])
+        prev_volume = int(prev['Volume'])
+
         close_price = int(latest['Close'])
         open_price = int(latest['Open'])
         high_price = int(latest['High'])
@@ -183,11 +186,11 @@ class LightStockBot:
         volume = int(latest['Volume'])
 
         # 등락률 계산
-        close_change_rate = ((close_price - int(prev['Close'])) / int(prev['Close']) * 100) if int(prev['Close']) > 0 else 0
-        open_change_rate = ((open_price - int(prev['Open'])) / int(prev['Open']) * 100) if int(prev['Open']) > 0 else 0
-        high_change_rate = ((high_price - int(prev['High'])) / int(prev['High']) * 100) if int(prev['High']) > 0 else 0
-        low_change_rate = ((low_price - int(prev['Low'])) / int(prev['Low']) * 100) if int(prev['Low']) > 0 else 0
-        volume_change_rate = ((volume - int(prev['Volume'])) / int(prev['Volume']) * 100) if int(prev['Volume']) > 0 else 0
+        close_change_rate = ((close_price - prev_close_price) / prev_close_price * 100) if prev_close_price > 0 else 0
+        open_change_rate = ((open_price - prev_close_price) / prev_close_price * 100) if prev_close_price > 0 else 0
+        high_change_rate = ((high_price - prev_close_price) / prev_close_price * 100) if prev_close_price > 0 else 0
+        low_change_rate = ((low_price - prev_close_price) / prev_close_price * 100) if prev_close_price > 0 else 0
+        volume_change_rate = ((volume - prev_volume) / prev_volume * 100) if prev_volume > 0 else 0
 
         # 등락 이모지
         def get_emoji(change_rate):
