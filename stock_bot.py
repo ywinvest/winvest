@@ -236,7 +236,7 @@ class LightStockBot:
           text=f"오류 발생: {str(e)[:50]}...",
           emoji="red_x"
       )
-      return {"blocks": builder.build()}
+      return {"response_type": "in_channel", "blocks": builder.build()}
 
 # 봇 인스턴스 생성
 stock_bot = LightStockBot()
@@ -271,7 +271,7 @@ def handle_stock_slash_command(ack, respond, command):
 
   # 주식 정보 조회
   result = stock_bot.get_stock_info(stock_input)
-  respond(result, response_type="in_channel")
+  respond(result)
 
 def run_slack_bot():
   """Slack 봇을 별도 스레드에서 실행"""
