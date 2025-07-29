@@ -186,7 +186,7 @@ class LightStockBot:
         close_change_rate = ((close_price - int(prev['Close'])) / int(prev['Close']) * 100) if int(prev['Close']) > 0 else 0
         open_change_rate = ((open_price - int(prev['Open'])) / int(prev['Open']) * 100) if int(prev['Open']) > 0 else 0
         high_change_rate = ((high_price - int(prev['High'])) / int(prev['High']) * 100) if int(prev['High']) > 0 else 0
-        low_change_rate = ((low_price - int(prev['Low'])) / int(prev['Low>']) * 100) if int(prev['Low']) > 0 else 0
+        low_change_rate = ((low_price - int(prev['Low'])) / int(prev['Low']) * 100) if int(prev['Low']) > 0 else 0
         volume_change_rate = ((volume - int(prev['Volume'])) / int(prev['Volume']) * 100) if int(prev['Volume']) > 0 else 0
 
         # 등락 이모지
