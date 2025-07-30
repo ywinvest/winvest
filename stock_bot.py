@@ -124,10 +124,10 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
     # ❗ [수정] 캔들 스타일 변경: 상승(up)은 속이 빈 빨간색, 하락(down)은 꽉 찬 파란색
     mc = mpf.make_marketcolors(
         up='none',         # 상승 캔들 내부 채우기 없음
-        down='none',       # 하락 캔들은 파란색으로 채우기
+        down='none',       # 하락 캔들 내부 채우기 없음
         edge={'up':'red', 'down':'blue'},  # 상승은 빨간 테두리, 하락은 파란 테두리
-        wick='inherit',    # 캔들 심지(wick)는 테두리 색상 상속
-        volume='in'
+        wick={'up': 'red', 'down': 'blue'},
+        volume={'up': 'red', 'down': 'blue'},
     )
 
     s = mpf.make_mpf_style(marketcolors=mc, gridstyle='-', gridcolor='lightgray')
@@ -155,33 +155,35 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
       row = df.iloc[i]
       date_index = df.index.get_loc(row.name)
 
-      # 1. 가장 최근 거래일 (오늘): O, H, L, C 모두 표시
+      # 1. 가장 최근 거래일 (오늘): O, H, L, C 모두 오른쪽에 표시
       if i == len(df) - 1:
         open_price = int(row['Open'])
         high_price = int(row['High'])
         low_price = int(row['Low'])
         close_price = int(row['Close'])
 
+        # ❗ [수정] OHLC 주석 위치를 모두 캔들 오른쪽으로 조정
         # 고가 (H)
         price_ax.annotate(f'H: {high_price:,}', xy=(date_index, high_price),
-                          xytext=(5, 5), textcoords='offset points', fontsize=9,
+                          xytext=(8, -4), textcoords='offset points', fontsize=9,
                           color='darkred', ha='left',
                           bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
         # 저가 (L)
         price_ax.annotate(f'L: {low_price:,}', xy=(date_index, low_price),
-                          xytext=(5, -18), textcoords='offset points', fontsize=9,
+                          xytext=(8, -4), textcoords='offset points', fontsize=9,
                           color='darkblue', ha='left',
                           bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
         # 종가 (C)
         price_ax.annotate(f'C: {close_price:,}', xy=(date_index, close_price),
-                          xytext=(12, 0), textcoords='offset points', fontsize=9,
+                          xytext=(8, -4), textcoords='offset points', fontsize=9,
                           fontweight='bold', color='black', ha='left',
                           bbox=dict(boxstyle='round,pad=0.2', facecolor='yellow', alpha=0.8))
         # 시가 (O)
         price_ax.annotate(f'O: {open_price:,}', xy=(date_index, open_price),
-                          xytext=(-50, 0), textcoords='offset points', fontsize=9,
-                          color='dimgray', ha='right',
+                          xytext=(8, -4), textcoords='offset points', fontsize=9,
+                          color='dimgray', ha='left',
                           bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+
       # 2. 그 외 최근 4거래일: 종가(C)만 표시
       else:
         close_price = int(row['Close'])
