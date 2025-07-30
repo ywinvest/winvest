@@ -117,81 +117,86 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
 
     # 추가 플롯 설정 (이동평균선)
     apds = [
-      mpf.make_addplot(df['MA5'], color='orange', width=1.5),
+      mpf.make_addplot(df['MA5'], color='green', width=1.5),
       mpf.make_addplot(df['MA20'], color='purple', width=1.5)
     ]
 
-    # 스타일 설정
+    # ❗ [수정] 캔들 스타일 변경: 상승(up)은 속이 빈 빨간색, 하락(down)은 꽉 찬 파란색
     mc = mpf.make_marketcolors(
-        up='red', down='blue',
-        edge='inherit',
-        wick={'up':'darkred', 'down':'darkblue'},
+        up='none',         # 상승 캔들 내부 채우기 없음
+        down='none',       # 하락 캔들은 파란색으로 채우기
+        edge={'up':'red', 'down':'blue'},  # 상승은 빨간 테두리, 하락은 파란 테두리
+        wick='inherit',    # 캔들 심지(wick)는 테두리 색상 상속
         volume='in'
     )
 
     s = mpf.make_mpf_style(marketcolors=mc, gridstyle='-', gridcolor='lightgray')
 
-    # 메모리 버퍼에 저장
+    # 메모리 버퍼 준비
     buf = io.BytesIO()
 
-    # ❗ [수정] savefig 인자를 제거하고 차트 객체만 반환받습니다.
+    # 차트 객체 생성 (저장은 나중에)
     fig, axes = mpf.plot(df,
                          type='candle',
                          style=s,
                          addplot=apds,
-                         title=f" ", # 임시 제목 또는 빈 제목으로 설정
+                         title=" ",  # 제목은 나중에 동적으로 설정
                          ylabel='Price (KRW)',
                          volume=True,
                          figsize=(14, 10),
                          returnfig=True
                          )
 
-    # 가격 정보 표시 (최신 5일치만 표시)
     price_ax = axes[0]
-    volume_ax = axes[2] # 거래량 축은 axes[2]에 위치합니다.
+    volume_ax = axes[2] # 거래량 축
 
-    # 최근 5일의 데이터만 텍스트로 표시 (차트가 복잡해지지 않도록)
     recent_days = min(5, len(df))
     for i in range(len(df) - recent_days, len(df)):
       row = df.iloc[i]
-      date_index = df.index.get_loc(row.name) # x축 좌표를 날짜 인덱스로 가져옵니다.
+      date_index = df.index.get_loc(row.name)
 
-      # 가격 정보 텍스트 (캔들 위에 표시)
-      high_price = int(row['High'])
-      low_price = int(row['Low'])
+      # 1. 가장 최근 거래일 (오늘): O, H, L, C 모두 표시
+      if i == len(df) - 1:
+        open_price = int(row['Open'])
+        high_price = int(row['High'])
+        low_price = int(row['Low'])
+        close_price = int(row['Close'])
 
-      # 최고가는 캔들 위쪽에, 최저가는 아래쪽에 표시
-      price_ax.annotate(f'{high_price:,}',
-                        xy=(date_index, high_price),
-                        xytext=(5, 5),
-                        textcoords='offset points',
-                        fontsize=8,
-                        color='darkgreen',
-                        ha='left',
-                        bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7))
+        # 고가 (H)
+        price_ax.annotate(f'H: {high_price:,}', xy=(date_index, high_price),
+                          xytext=(5, 5), textcoords='offset points', fontsize=9,
+                          color='darkred', ha='left',
+                          bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+        # 저가 (L)
+        price_ax.annotate(f'L: {low_price:,}', xy=(date_index, low_price),
+                          xytext=(5, -18), textcoords='offset points', fontsize=9,
+                          color='darkblue', ha='left',
+                          bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+        # 종가 (C)
+        price_ax.annotate(f'C: {close_price:,}', xy=(date_index, close_price),
+                          xytext=(12, 0), textcoords='offset points', fontsize=9,
+                          fontweight='bold', color='black', ha='left',
+                          bbox=dict(boxstyle='round,pad=0.2', facecolor='yellow', alpha=0.8))
+        # 시가 (O)
+        price_ax.annotate(f'O: {open_price:,}', xy=(date_index, open_price),
+                          xytext=(-50, 0), textcoords='offset points', fontsize=9,
+                          color='dimgray', ha='right',
+                          bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+      # 2. 그 외 최근 4거래일: 종가(C)만 표시
+      else:
+        close_price = int(row['Close'])
+        price_ax.annotate(f'{close_price:,}', xy=(date_index, close_price),
+                          xytext=(5, -5), textcoords='offset points', fontsize=8,
+                          color='gray', ha='left')
 
-      price_ax.annotate(f'{low_price:,}',
-                        xy=(date_index, low_price),
-                        xytext=(5, -15),
-                        textcoords='offset points',
-                        fontsize=8,
-                        color='darkred',
-                        ha='left',
-                        bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7))
+      # 모든 5일에 대해 거래량 정보는 계속 표시
+      volume = int(row['Volume'])
+      volume_text = f'{volume/1000:,.0f}K' if volume >= 1000 else str(volume)
+      volume_ax.annotate(volume_text, xy=(date_index, volume),
+                         xytext=(0, 5), textcoords='offset points',
+                         fontsize=7, color='black', ha='center',
+                         bbox=dict(boxstyle='round,pad=0.1', facecolor='lightyellow', alpha=0.7))
 
-      # 거래량 정보 표시
-      if volume_ax is not None:
-        volume = int(row['Volume'])
-        volume_text = f'{volume/1000:,.0f}K' if volume >= 1000 else str(volume)
-
-        volume_ax.annotate(volume_text,
-                           xy=(date_index, volume),
-                           xytext=(0, 5),
-                           textcoords='offset points',
-                           fontsize=7,
-                           color='black',
-                           ha='center',
-                           bbox=dict(boxstyle='round,pad=0.2', facecolor='lightyellow', alpha=0.8))
 
     # 최신일 정보를 제목에 추가
     latest = df.iloc[-1]
@@ -200,13 +205,13 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
     change_rate = ((latest_close - prev_close) / prev_close * 100) if prev_close > 0 else 0
     change_symbol = "▲" if change_rate >= 0 else "▼"
 
-    # ❗ [수정] fig.suptitle()을 사용하여 제목을 동적으로 설정합니다.
+    # suptitle을 사용해 최종 제목 설정
     fig.suptitle(f"{stock_name} ({stock_code}) - Last 30 Days\n"
                  f"Latest: {latest_close:,}원 ({change_symbol}{change_rate:+.2f}%) "
                  f"({latest.name.strftime('%Y-%m-%d')})",
                  fontsize=14, fontweight='bold')
 
-    # ❗ 모든 수정이 끝난 후, 버퍼에 최종 이미지를 저장합니다.
+    # 모든 작업 완료 후 버퍼에 저장
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
     plt.close(fig)
@@ -218,7 +223,6 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
     return create_stock_chart(df, stock_name, stock_code)
   except Exception as e:
     print(f"⚠️ mplfinance chart creation failed: {e}")
-    # 오류 발생 시 기본 차트로 대체
     return create_stock_chart(df, stock_name, stock_code)
 
 class LightStockBot:
