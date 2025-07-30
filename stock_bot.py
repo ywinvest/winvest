@@ -106,9 +106,8 @@ def create_stock_chart(df: pd.DataFrame, stock_name: str, stock_code: str):
     return None
 
 def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code: str):
-  """mplfinance를 사용한 전문적인 캔들스틱 차트 (pip install mplfinance 필요)"""
+  """mplfinance를 사용한 전문적인 캔들스틱 차트 (가격 및 거래량 정보 표시 포함)"""
   try:
-
     # DataFrame 복사본 생성
     df = df.copy()
 
@@ -135,22 +134,90 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
     # 메모리 버퍼에 저장
     buf = io.BytesIO()
 
-    mpf.plot(df,
-             type='candle',
-             style=s,
-             addplot=apds,
-             title=f"{stock_name} ({stock_code}) - Last 30 Days",
-             ylabel='Price (KRW)',
-             volume=True,  # 거래량 포함
-             figsize=(12, 8),
-             savefig=dict(fname=buf, format='png', dpi=150, bbox_inches='tight')
-             )
+    # 차트 생성 시 returnfig=True로 figure 객체 받기
+    fig, axes = mpf.plot(df,
+                         type='candle',
+                         style=s,
+                         addplot=apds,
+                         title=f"{stock_name} ({stock_code}) - Last 30 Days",
+                         ylabel='Price (KRW)',
+                         volume=True,  # 거래량 포함
+                         figsize=(14, 10),
+                         returnfig=True,  # figure 객체 반환
+                         savefig=dict(fname=buf, format='png', dpi=150, bbox_inches='tight')
+                         )
 
+    # 가격 정보 표시 (최신 5일치만 표시)
+    price_ax = axes[0]  # 가격 차트 축
+    volume_ax = axes[1] if len(axes) > 1 else None  # 거래량 차트 축
+
+    # 최근 5일의 데이터만 텍스트로 표시 (차트가 복잡해지지 않도록)
+    recent_days = min(5, len(df))
+    for i in range(len(df) - recent_days, len(df)):
+      row = df.iloc[i]
+      date_str = row.name.strftime('%m/%d')
+
+      # 가격 정보 텍스트 (캔들 위에 표시)
+      high_price = int(row['High'])
+      low_price = int(row['Low'])
+      open_price = int(row['Open'])
+      close_price = int(row['Close'])
+
+      # 최고가는 캔들 위쪽에, 최저가는 아래쪽에 표시
+      price_ax.annotate(f'{high_price:,}',
+                        xy=(i, high_price),
+                        xytext=(5, 5),
+                        textcoords='offset points',
+                        fontsize=8,
+                        color='darkgreen',
+                        ha='left',
+                        bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7))
+
+      price_ax.annotate(f'{low_price:,}',
+                        xy=(i, low_price),
+                        xytext=(5, -15),
+                        textcoords='offset points',
+                        fontsize=8,
+                        color='darkred',
+                        ha='left',
+                        bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7))
+
+      # 거래량 정보 표시
+      if volume_ax is not None:
+        volume = int(row['Volume'])
+        volume_text = f'{volume:,}' if volume < 1000000 else f'{volume//1000:,}K'
+
+        volume_ax.annotate(volume_text,
+                           xy=(i, volume),
+                           xytext=(0, 5),
+                           textcoords='offset points',
+                           fontsize=7,
+                           color='black',
+                           ha='center',
+                           bbox=dict(boxstyle='round,pad=0.2', facecolor='lightyellow', alpha=0.8))
+
+    # 최신일 정보를 제목에 추가
+    latest = df.iloc[-1]
+    latest_close = int(latest['Close'])
+    prev_close = int(df.iloc[-2]['Close']) if len(df) > 1 else latest_close
+    change_rate = ((latest_close - prev_close) / prev_close * 100) if prev_close > 0 else 0
+    change_symbol = "↑" if change_rate >= 0 else "↓"
+
+    # 제목 업데이트
+    fig.suptitle(f"{stock_name} ({stock_code}) - Last 30 Days\n"
+                 f"Latest: {latest_close:,}원 {change_symbol}{change_rate:+.2f}% "
+                 f"({latest.name.strftime('%Y-%m-%d')})",
+                 fontsize=14, fontweight='bold')
+
+    # 버퍼에 저장
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
+    plt.close(fig)  # 메모리 정리
+
     return buf
 
   except ImportError:
-    print("⚠️ mplfinance 라이브러리가 없습니다. 기본 캔들스틱 차트를 사용합니다.")
+    print("⚠️ mplfinance 라이브러리가 없습니다. 기본 차트를 사용합니다.")
     return create_stock_chart(df, stock_name, stock_code)
   except Exception as e:
     print(f"⚠️ mplfinance chart creation failed: {e}")
