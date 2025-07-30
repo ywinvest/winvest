@@ -134,38 +134,35 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
     # 메모리 버퍼에 저장
     buf = io.BytesIO()
 
-    # 차트 생성 시 returnfig=True로 figure 객체 받기
+    # ❗ [수정] savefig 인자를 제거하고 차트 객체만 반환받습니다.
     fig, axes = mpf.plot(df,
                          type='candle',
                          style=s,
                          addplot=apds,
-                         title=f"{stock_name} ({stock_code}) - Last 30 Days",
+                         title=f" ", # 임시 제목 또는 빈 제목으로 설정
                          ylabel='Price (KRW)',
-                         volume=True,  # 거래량 포함
+                         volume=True,
                          figsize=(14, 10),
-                         returnfig=True,  # figure 객체 반환
-                         savefig=dict(fname=buf, format='png', dpi=150, bbox_inches='tight')
+                         returnfig=True
                          )
 
     # 가격 정보 표시 (최신 5일치만 표시)
-    price_ax = axes[0]  # 가격 차트 축
-    volume_ax = axes[1] if len(axes) > 1 else None  # 거래량 차트 축
+    price_ax = axes[0]
+    volume_ax = axes[2] # 거래량 축은 axes[2]에 위치합니다.
 
     # 최근 5일의 데이터만 텍스트로 표시 (차트가 복잡해지지 않도록)
     recent_days = min(5, len(df))
     for i in range(len(df) - recent_days, len(df)):
       row = df.iloc[i]
-      date_str = row.name.strftime('%m/%d')
+      date_index = df.index.get_loc(row.name) # x축 좌표를 날짜 인덱스로 가져옵니다.
 
       # 가격 정보 텍스트 (캔들 위에 표시)
       high_price = int(row['High'])
       low_price = int(row['Low'])
-      open_price = int(row['Open'])
-      close_price = int(row['Close'])
 
       # 최고가는 캔들 위쪽에, 최저가는 아래쪽에 표시
       price_ax.annotate(f'{high_price:,}',
-                        xy=(i, high_price),
+                        xy=(date_index, high_price),
                         xytext=(5, 5),
                         textcoords='offset points',
                         fontsize=8,
@@ -174,7 +171,7 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
                         bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7))
 
       price_ax.annotate(f'{low_price:,}',
-                        xy=(i, low_price),
+                        xy=(date_index, low_price),
                         xytext=(5, -15),
                         textcoords='offset points',
                         fontsize=8,
@@ -185,10 +182,10 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
       # 거래량 정보 표시
       if volume_ax is not None:
         volume = int(row['Volume'])
-        volume_text = f'{volume:,}' if volume < 1000000 else f'{volume//1000:,}K'
+        volume_text = f'{volume/1000:,.0f}K' if volume >= 1000 else str(volume)
 
         volume_ax.annotate(volume_text,
-                           xy=(i, volume),
+                           xy=(date_index, volume),
                            xytext=(0, 5),
                            textcoords='offset points',
                            fontsize=7,
@@ -201,18 +198,18 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
     latest_close = int(latest['Close'])
     prev_close = int(df.iloc[-2]['Close']) if len(df) > 1 else latest_close
     change_rate = ((latest_close - prev_close) / prev_close * 100) if prev_close > 0 else 0
-    change_symbol = "↑" if change_rate >= 0 else "↓"
+    change_symbol = "▲" if change_rate >= 0 else "▼"
 
-    # 제목 업데이트
+    # ❗ [수정] fig.suptitle()을 사용하여 제목을 동적으로 설정합니다.
     fig.suptitle(f"{stock_name} ({stock_code}) - Last 30 Days\n"
-                 f"Latest: {latest_close:,}원 {change_symbol}{change_rate:+.2f}% "
+                 f"Latest: {latest_close:,}원 ({change_symbol}{change_rate:+.2f}%) "
                  f"({latest.name.strftime('%Y-%m-%d')})",
                  fontsize=14, fontweight='bold')
 
-    # 버퍼에 저장
+    # ❗ 모든 수정이 끝난 후, 버퍼에 최종 이미지를 저장합니다.
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
-    plt.close(fig)  # 메모리 정리
+    plt.close(fig)
 
     return buf
 
@@ -221,6 +218,7 @@ def create_stock_chart_mplfinance(df: pd.DataFrame, stock_name: str, stock_code:
     return create_stock_chart(df, stock_name, stock_code)
   except Exception as e:
     print(f"⚠️ mplfinance chart creation failed: {e}")
+    # 오류 발생 시 기본 차트로 대체
     return create_stock_chart(df, stock_name, stock_code)
 
 class LightStockBot:
