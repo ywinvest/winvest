@@ -43,7 +43,12 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     df.loc[buy_date, 'Action'] = 'Buy'
     df.loc[buy_date:, 'Weight'] += 1.0
 
-    position_size = 1  # 그 외의 경우 1배
+    # Check RSI and adjust position size
+    rsi = df.loc[buy_date, 'RSI']
+    if rsi <= 20:
+      position_size = 2  # RSI 20 이하일 때 2배
+    else:
+      position_size = 1  # 그 외의 경우 1배
 
     # Subset the data to look forward from the buy date
     subsequent_data = df.loc[buy_date:]
