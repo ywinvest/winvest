@@ -369,7 +369,7 @@ def send_sell_to_slack(sell_data):
       return_val = row['return_val']
       if return_val > 0 and sell_type == "full":
         emoji = "red_full_circle"
-      elif return_val < 0 and sell_type == "half":
+      elif return_val > 0 and sell_type == "half":
         emoji = "red_half_circle"
       else:
         emoji = "blue_full_circle"
