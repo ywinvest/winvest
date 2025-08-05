@@ -1,7 +1,6 @@
 import concurrent.futures
 import io
 import time
-from datetime import datetime
 from functools import partial
 
 import FinanceDataReader as fdr
@@ -11,7 +10,7 @@ import requests
 from dotenv import load_dotenv
 
 import woo1
-import woo4
+import woo2
 
 
 def parallel_process_stocks(all_stocks):
@@ -47,7 +46,7 @@ def process_stock(row):
       print(f"No data after listing date for {code}")
       return None
 
-    df = woo4.calculate_indicators(df)
+    df = woo2.calculate_indicators(df)
 
     if not df.empty:
       df['Code'] = code
@@ -105,13 +104,13 @@ if __name__ == "__main__":
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
 
-    result_file = "woo4_backtest_results.csv"
+    result_file = "woo2_backtest_results.csv"
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks)
-    result_data = woo4.calculate_relative_strength(result_data)
+    result_data = woo2.calculate_relative_strength(result_data)
     filtered_data = woo1.filter_common_stocks(result_data)
-    result_data = woo4.buy_and_sell(filtered_data, kospi, kosdaq)
+    result_data = woo2.buy_and_sell(filtered_data, kospi, kosdaq)
     # final_data = result_data[buy_condition(result_data)]
     result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
   except Exception as e:
