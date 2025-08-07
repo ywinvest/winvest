@@ -242,24 +242,39 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         stop_loss_price = buy_price * 0.92
         trailing_stop_loss_price = buy_price * 1.1
 
-        # 1차 매도 (분할 익절 또는 전체 손절)
-        take_profit_dates = trade_data.index[trade_data['High'] >= take_profit_price]
-        stop_loss_dates = trade_data.index[trade_data['Close'] < stop_loss_price]
+        # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
+        take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
+        take_profit_high_dates = trade_data[(trade_data['Open'] < take_profit_price) & (trade_data['High'] >= take_profit_price)]
+        stop_loss_dates = trade_data[trade_data['Close'] < stop_loss_price]
 
-        first_take_profit_date = take_profit_dates[0] if not take_profit_dates.empty else None
-        first_stop_loss_date = stop_loss_dates[0] if not stop_loss_dates.empty else None
+        # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
+        take_profit_open_date = take_profit_open_dates.index[0] if not take_profit_open_dates.empty else None
+        take_profit_high_date = take_profit_high_dates.index[0] if not take_profit_high_dates.empty else None
+        stop_loss_date = stop_loss_dates.index[0] if not stop_loss_dates.empty else None
 
-        # 어떤 매도 조건이 먼저 충족되었는지 확인
-        if first_stop_loss_date and (first_take_profit_date is None or first_stop_loss_date < first_take_profit_date):
-          # 손절 조건이 먼저 발생하면 즉시 전체 매도
-          sell_date = first_stop_loss_date
-          sell_price = trade_data.loc[sell_date, 'Close']
-          full_sell_date, full_sell_price = sell_date, sell_price
-        elif first_take_profit_date:
-          # 익절 조건이 먼저 발생하면 1차 분할 매도
-          sell_date = first_take_profit_date
-          sell_price = take_profit_price
+        # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
+        valid_dates = [(d, 'open') for d in [take_profit_open_date] if d is not None] + \
+                      [(d, 'high') for d in [take_profit_high_date] if d is not None] + \
+                      [(d, 'stop') for d in [stop_loss_date] if d is not None]
 
+        if valid_dates:
+          earliest_date, condition = min(valid_dates, key=lambda x: x[0])
+
+          if condition == 'open':
+            sell_date = earliest_date
+            sell_price = trade_data.loc[earliest_date, 'Open']
+          elif condition == 'high':
+            sell_date = earliest_date
+            sell_price = take_profit_price
+          else:  # condition == 'stop'
+            sell_date = earliest_date
+            sell_price = trade_data.loc[earliest_date, 'Close']
+            full_sell_date = earliest_date
+            full_sell_price = trade_data.loc[earliest_date, 'Close']
+        # else:
+        #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
+
+        if sell_date and not full_sell_date:
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           if not after_partial_sell_data.empty:
