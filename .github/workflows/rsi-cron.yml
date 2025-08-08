@@ -5,7 +5,7 @@ on:
   schedule:
   # 매주 월~금 오전 8:20, 11:40, 오후 3:00 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 가정함
   - cron: "20 23 * * 0-4" # 오전 8:20 (UTC+9)
-  - cron: "40 2 * * 1-5"   # 정오 11:40 (UTC+9)
+#  - cron: "40 2 * * 1-5"   # 정오 11:40 (UTC+9)
   - cron: "0 6 * * 1-5"  # 오후 3:00 (UTC+9)
 
 jobs:
@@ -49,13 +49,13 @@ jobs:
       run: |
         python rsi.py --market global
 
-    - name: Run RSI script (Korea Market - 11:40)
-      if: ${{ github.event.schedule == '40 2 * * 1-5' }}
-      env:
-        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-        SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
-      run: |
-        python rsi.py --market korea
+#    - name: Run RSI script (Korea Market - 11:40)
+#      if: ${{ github.event.schedule == '40 2 * * 1-5' }}
+#      env:
+#        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+#        SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
+#      run: |
+#        python rsi.py --market korea
 
     - name: Run RSI script (Korea Market - 15:00)
       if: ${{ github.event.schedule == '0 6 * * 1-5' }}
