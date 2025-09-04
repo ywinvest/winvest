@@ -27,7 +27,7 @@ def calculate_indicators(df):
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
 
-  df['MA20_Slope'] = df['MA20'].pct_change(fill_method=None)
+  df['Pre_MA20_Slope'] = df['MA20'].shift(1).pct_change(fill_method=None)
   return df
 
 def filter_common_stocks(df):
