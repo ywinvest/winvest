@@ -43,7 +43,7 @@ def buy_condition(df):
   # 벡터화된 연산 사용
   conditions = pd.Series(True, index=df.index)
   conditions &= (df['Close'] <= df['52WeekLow'] * 1.3)
-  conditions &= (df['Change'] >= 0)
+  conditions &= (df['Change'] > 0)
   conditions &= (df['High_Change'] >= 8)
   conditions &= (df['Bullish'])
   conditions &= (df['Volume_Change'] > 3) # 300% 초과
