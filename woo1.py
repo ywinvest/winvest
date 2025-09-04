@@ -26,6 +26,22 @@ def calculate_indicators(df):
   df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
+
+  # Store the closing price on the day a crossover occurs
+  crossover_close_prices = df['Close'].where(df['Crossover'])
+
+  # The most recent crossover's closing price
+  df['Last_Crossover_Close'] = crossover_close_prices.ffill()
+
+  # Identify when the 'Last_Crossover_Close' value changes, indicating a new crossover event
+  new_crossover_event = (df['Last_Crossover_Close'].notna()) & \
+                        (df['Last_Crossover_Close'] != df['Last_Crossover_Close'].shift(1))
+
+  # The previous crossover price is the value of 'Last_Crossover_Close' from the day before the new event
+  previous_crossover_prices = df['Last_Crossover_Close'].shift(1).where(new_crossover_event)
+
+  # Forward-fill to carry the previous crossover price forward until the next event
+  df['Previous_Crossover_Close'] = previous_crossover_prices.ffill()
   return df
 
 def filter_common_stocks(df):
