@@ -5,8 +5,10 @@ from datetime import datetime
 from functools import partial
 
 import FinanceDataReader as fdr
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
+from scipy.signal import find_peaks
 
 from slack_utils import SlackMessageBuilder, send_slack_message
 
@@ -27,7 +29,23 @@ def calculate_indicators(df):
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
 
-  df['Pre_MA20_Slope'] = df['MA20'].shift(1).pct_change(fill_method=None)
+  # SciPy를 사용한 쌍바닥 감지: 벡터화된 저점 찾기
+  low_array = df['Low'].values
+  # 저점을 피크로 변환하기 위해 음수 적용 (거리 5일 이상, prominence 0.01 이상으로 필터링)
+  valleys, _ = find_peaks(-low_array, distance=5, prominence=0.01 * np.mean(low_array))
+
+  df['Recent_Low_1'] = np.nan  # 두 번째로 최근 저점
+  df['Recent_Low_2'] = np.nan  # 가장 최근 저점
+
+  if len(valleys) >= 2:
+    # 최근 2개 저점 추출 (벡터화)
+    recent_valleys = valleys[-2:]
+    low1, low2 = low_array[recent_valleys]
+
+    # 최근 두 저점 값을 모든 행에 적용 (성능 위해 단순화)
+    df['Recent_Low_1'] = low1
+    df['Recent_Low_2'] = low2
+
   return df
 
 def filter_common_stocks(df):
