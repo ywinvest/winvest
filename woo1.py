@@ -26,6 +26,24 @@ def calculate_indicators(df):
   df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
+
+  # 최근 두 번의 Crossover 날짜 찾기
+  crossover_indices = df[df['Crossover']].index
+  if len(crossover_indices) >= 2:
+    # 최근 두 개의 Crossover 날짜
+    latest_crossover = crossover_indices[-1]
+    second_latest_crossover = crossover_indices[-2]
+
+    # period1: 현재 날짜와 최근 Crossover 사이의 인덱스 차이
+    period1 = len(df.loc[latest_crossover:]) - 1  # 현재 날짜 포함하지 않음
+    # period2: 최근 Crossover와 그 이전 Crossover 사이의 인덱스 차이
+    period2 = len(df.loc[second_latest_crossover:latest_crossover]) - 1
+
+    # 두 Crossover 사이의 최저가 계산
+    df['Crossover_Low'] = df['Low'].shift(period1).rolling(window=period2, min_periods=1).min()
+  else:
+    # Crossover가 2번 미만인 경우 NaN으로 설정
+    df['Crossover_Low'] = pd.NA
   return df
 
 def filter_common_stocks(df):
