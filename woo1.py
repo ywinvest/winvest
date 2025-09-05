@@ -41,9 +41,18 @@ def calculate_indicators(df):
 
     # 두 Crossover 사이의 최저가 계산
     df['Crossover_Low'] = df['Low'].shift(period1).rolling(window=period2, min_periods=1).min()
+    # 최근 Crossover 날짜와 두 번째 Crossover 날짜 추가
+    df['Period1'] = period1
+    df['Period2'] = period2
+    df['Latest_Crossover_Date'] = latest_crossover
+    df['Second_Latest_Crossover_Date'] = second_latest_crossover
   else:
     # Crossover가 2번 미만인 경우 NaN으로 설정
     df['Crossover_Low'] = pd.NA
+    df['Period1'] = pd.NA
+    df['Period2'] = pd.NA
+    df['Latest_Crossover_Date'] = pd.NA
+    df['Second_Latest_Crossover_Date'] = pd.NA
   return df
 
 def filter_common_stocks(df):
