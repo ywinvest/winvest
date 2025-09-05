@@ -42,9 +42,9 @@ def calculate_indicators(df):
       second_latest_crossover = past_crossovers[-2]
 
       # period1: 현재 날짜와 최근 Crossover 사이의 기간 (거래일 기준)
-      period1 = len(df.loc[latest_crossover:current_date])
+      period1 = len(df.loc[latest_crossover:current_date]) - 1
       # period2: 최근 Crossover와 그 이전 Crossover 사이의 기간
-      period2 = len(df.loc[second_latest_crossover:latest_crossover]) -1
+      period2 = len(df.loc[second_latest_crossover:latest_crossover]) - 1
 
       # 두 Crossover 사이의 최저가 계산
       crossover_low = df.loc[second_latest_crossover:latest_crossover]['Low'].min()
