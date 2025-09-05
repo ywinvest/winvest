@@ -27,32 +27,41 @@ def calculate_indicators(df):
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
 
-  # 최근 두 번의 Crossover 날짜 찾기
-  crossover_indices = df[df['Crossover']].index
-  if len(crossover_indices) >= 2:
-    # 최근 두 개의 Crossover 날짜
-    latest_crossover = crossover_indices[0]
-    second_latest_crossover = crossover_indices[-1]
+  # 먼저 Crossover가 발생한 모든 날짜를 찾아둠
+  all_crossover_dates = df[df['Crossover']].index
 
-    # period1: 현재 날짜와 최근 Crossover 사이의 인덱스 차이
-    period1 = len(df.loc[latest_crossover:])
-    # period2: 최근 Crossover와 그 이전 Crossover 사이의 인덱스 차이
-    period2 = len(df.loc[second_latest_crossover:latest_crossover]) - 1
+  # 각 행(날짜)별로 Crossover 관련 지표를 계산할 함수 정의
+  def find_crossovers_for_row(row):
+    current_date = row.name # 현재 행의 인덱스(날짜)
 
-    # 두 Crossover 사이의 최저가 계산
-    df['Crossover_Low'] = df['Low'].shift(period1).rolling(window=period2, min_periods=1).min()
-    # 최근 Crossover 날짜와 두 번째 Crossover 날짜 추가
-    df['Period1'] = period1
-    df['Period2'] = period2
-    df['Latest_Crossover_Date'] = latest_crossover
-    df['Second_Latest_Crossover_Date'] = second_latest_crossover
-  else:
-    # Crossover가 2번 미만인 경우 NaN으로 설정
-    df['Crossover_Low'] = pd.NA
-    df['Period1'] = pd.NA
-    df['Period2'] = pd.NA
-    df['Latest_Crossover_Date'] = pd.NA
-    df['Second_Latest_Crossover_Date'] = pd.NA
+    # 현재 날짜 이전에 발생한 Crossover들만 필터링
+    past_crossovers = all_crossover_dates[all_crossover_dates <= current_date]
+
+    if len(past_crossovers) >= 2:
+      latest_crossover = past_crossovers[-1]
+      second_latest_crossover = past_crossovers[-2]
+
+      # period1: 현재 날짜와 최근 Crossover 사이의 기간 (거래일 기준)
+      period1 = len(df.loc[latest_crossover:current_date])
+      # period2: 최근 Crossover와 그 이전 Crossover 사이의 기간
+      period2 = len(df.loc[second_latest_crossover:latest_crossover]) -1
+
+      # 두 Crossover 사이의 최저가 계산
+      crossover_low = df.loc[second_latest_crossover:latest_crossover]['Low'].min()
+
+      return pd.Series([
+        crossover_low, period1, period2,
+        latest_crossover, second_latest_crossover
+      ])
+    else:
+      # Crossover가 2번 미만이면 NaN 값들로 구성된 Series 반환
+      return pd.Series([pd.NA, pd.NA, pd.NA, pd.NaT, pd.NaT])
+
+  # .apply()를 사용하여 모든 행에 대해 함수 적용
+  # axis=1은 행 단위로 함수를 적용하라는 의미
+  crossover_cols = ['Crossover_Low', 'Period1', 'Period2', 'Latest_Crossover_Date', 'Second_Latest_Crossover_Date']
+  df[crossover_cols] = df.apply(find_crossovers_for_row, axis=1)
+
   return df
 
 def filter_common_stocks(df):
