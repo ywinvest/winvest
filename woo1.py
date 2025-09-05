@@ -28,7 +28,7 @@ def calculate_indicators(df):
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
 
   # Crossover가 발생한 날의 날짜만 남기고 나머지는 NaT(Not a Time)으로 채움
-  crossover_event_dates = df.index.where(df['Crossover'])
+  crossover_event_dates = pd.Series(df.index, index=df.index).where(df['Crossover'])
 
   # Step 1: 각 행별 '가장 최근 Crossover 날짜' 계산
   # ffill()을 통해 NaT를 직전의 유효한 날짜로 채워 넣음
