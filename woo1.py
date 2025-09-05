@@ -31,8 +31,8 @@ def calculate_indicators(df):
   crossover_indices = df[df['Crossover']].index
   if len(crossover_indices) >= 2:
     # 최근 두 개의 Crossover 날짜
-    latest_crossover = crossover_indices[-1]
-    second_latest_crossover = crossover_indices[-2]
+    latest_crossover = crossover_indices[0]
+    second_latest_crossover = crossover_indices[-1]
 
     # period1: 현재 날짜와 최근 Crossover 사이의 인덱스 차이
     period1 = len(df.loc[latest_crossover:])
