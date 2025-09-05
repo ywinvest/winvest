@@ -26,6 +26,7 @@ def calculate_indicators(df):
   df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
+  df['52WeekLowOfClose'] = df['Close'].rolling(window='365D', min_periods=1).min()
 
   # Crossover가 발생한 날의 날짜만 남기고 나머지는 NaT(Not a Time)으로 채움
   crossover_event_dates = pd.Series(df.index, index=df.index).where(df['Crossover'])
@@ -55,11 +56,11 @@ def calculate_indicators(df):
 
   # Step 5: Crossover_Low (두 Crossover 사이의 최저가) 계산
   # 각 Crossover 기간(Period2) 동안의 최저가를 미리 계산
-  min_low_per_period = df.groupby('Latest_Crossover_Date')['Low'].min()
+  min_low_per_period = df.groupby('Latest_Crossover_Date')['Close'].min()
   # {최근 Crossover: '직전' 기간의 최저가}를 매핑
   crossover_low_map = df['Latest_Crossover_Date'].map(min_low_per_period.shift(1))
   # 위 매핑 결과를 Second_Latest_Crossover_Date가 있는 행에만 적용
-  df['Crossover_Low'] = crossover_low_map.where(df['Second_Latest_Crossover_Date'].notna())
+  df['Crossover_LowOfClose'] = crossover_low_map.where(df['Second_Latest_Crossover_Date'].notna())
 
   return df
 
