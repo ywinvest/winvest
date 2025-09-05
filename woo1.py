@@ -27,40 +27,39 @@ def calculate_indicators(df):
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
 
-  # 먼저 Crossover가 발생한 모든 날짜를 찾아둠
-  all_crossover_dates = df[df['Crossover']].index
+  # Crossover가 발생한 날의 날짜만 남기고 나머지는 NaT(Not a Time)으로 채움
+  crossover_event_dates = df.index.where(df['Crossover'])
 
-  # 각 행(날짜)별로 Crossover 관련 지표를 계산할 함수 정의
-  def find_crossovers_for_row(row):
-    current_date = row.name # 현재 행의 인덱스(날짜)
+  # Step 1: 각 행별 '가장 최근 Crossover 날짜' 계산
+  # ffill()을 통해 NaT를 직전의 유효한 날짜로 채워 넣음
+  df['Latest_Crossover_Date'] = crossover_event_dates.ffill()
 
-    # 현재 날짜 이전에 발생한 Crossover들만 필터링
-    past_crossovers = all_crossover_dates[all_crossover_dates <= current_date]
+  # Step 2: 각 행별 '두 번째 최근 Crossover 날짜' 계산
+  # 유니크한 Crossover 날짜 리스트를 만듦
+  unique_crossovers = df['Latest_Crossover_Date'].dropna().unique()
+  # {최근 Crossover: 직전 Crossover} 형태의 딕셔너리 생성
+  second_latest_map = dict(zip(unique_crossovers[1:], unique_crossovers[:-1]))
+  # map을 이용해 두 번째 최근 날짜를 한 번에 매핑
+  df['Second_Latest_Crossover_Date'] = df['Latest_Crossover_Date'].map(second_latest_map)
 
-    if len(past_crossovers) >= 2:
-      latest_crossover = past_crossovers[-1]
-      second_latest_crossover = past_crossovers[-2]
+  # Step 3: Period1 (최근 Crossover 이후 경과된 거래일) 계산
+  # 최근 Crossover 날짜로 그룹화하고, 그룹 내에서 누적 개수를 세면 경과일이 됨
+  df['Period1'] = df.groupby('Latest_Crossover_Date').cumcount() + 1
 
-      # period1: 현재 날짜와 최근 Crossover 사이의 기간 (거래일 기준)
-      period1 = len(df.loc[latest_crossover:current_date]) - 1
-      # period2: 최근 Crossover와 그 이전 Crossover 사이의 기간
-      period2 = len(df.loc[second_latest_crossover:latest_crossover]) - 1
+  # Step 4: Period2 (Crossover 발생 간격 거래일) 계산
+  # 날짜를 직접 다루는 대신, 전체 데이터에서의 위치(index)를 이용해 거래일 간격 계산
+  date_to_pos = pd.Series(range(len(df)), index=df.index)
+  pos_latest = df['Latest_Crossover_Date'].map(date_to_pos)
+  pos_second_latest = df['Second_Latest_Crossover_Date'].map(date_to_pos)
+  df['Period2'] = pos_latest - pos_second_latest
 
-      # 두 Crossover 사이의 최저가 계산
-      crossover_low = df.loc[second_latest_crossover:latest_crossover]['Low'].min()
-
-      return pd.Series([
-        crossover_low, period1, period2,
-        latest_crossover, second_latest_crossover
-      ])
-    else:
-      # Crossover가 2번 미만이면 NaN 값들로 구성된 Series 반환
-      return pd.Series([pd.NA, pd.NA, pd.NA, pd.NaT, pd.NaT])
-
-  # .apply()를 사용하여 모든 행에 대해 함수 적용
-  # axis=1은 행 단위로 함수를 적용하라는 의미
-  crossover_cols = ['Crossover_Low', 'Period1', 'Period2', 'Latest_Crossover_Date', 'Second_Latest_Crossover_Date']
-  df[crossover_cols] = df.apply(find_crossovers_for_row, axis=1)
+  # Step 5: Crossover_Low (두 Crossover 사이의 최저가) 계산
+  # 각 Crossover 기간(Period2) 동안의 최저가를 미리 계산
+  min_low_per_period = df.groupby('Latest_Crossover_Date')['Low'].min()
+  # {최근 Crossover: '직전' 기간의 최저가}를 매핑
+  crossover_low_map = df['Latest_Crossover_Date'].map(min_low_per_period.shift(1))
+  # 위 매핑 결과를 Second_Latest_Crossover_Date가 있는 행에만 적용
+  df['Crossover_Low'] = crossover_low_map.where(df['Second_Latest_Crossover_Date'].notna())
 
   return df
 
