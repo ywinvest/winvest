@@ -1,9 +1,9 @@
 yfinance
 pandas_ta
-setuptools
+setuptools>=65.0.0
 pykrx
 finance-datareader
 plotly
 python-dotenv
-numpy~=1.24
+numpy>=1.26.0
 slack_sdk
