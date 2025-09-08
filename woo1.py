@@ -6,6 +6,7 @@ from functools import partial
 
 import FinanceDataReader as fdr
 import pandas as pd
+import pandas_ta as ta
 from dotenv import load_dotenv
 
 from slack_utils import SlackMessageBuilder, send_slack_message
@@ -26,6 +27,8 @@ def calculate_indicators(df):
   df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   df['52WeekLow'] = df['Low'].rolling(window='365D', min_periods=1).min()
+
+  df['RSI14'] = ta.rsi(df['Close'], length=14)
   return df
 
 def filter_common_stocks(df):
