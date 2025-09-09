@@ -44,15 +44,16 @@ def buy_condition(df):
   conditions = pd.Series(True, index=df.index)
   conditions &= (df['Close'] <= df['52WeekLow'] * 1.3)
   conditions &= (df['Change'].shift(1) > 0)
-  conditions &= (df['High_Change'].shift(1) >= 8)
+  conditions &= (df['High_Change'].shift(1) >= 10)
   conditions &= (df['Bullish'].shift(1))
-  conditions &= (df['Volume_Change'].shift(1) > 3) # 300% 초과
+  conditions &= (df['Volume_Change'].shift(1) > 4) # 300% 초과
   # conditions &= (df['Volume_Change'] < 1000) # 100,000% 미만
   conditions &= (df['Crossover_Count'] >= 2)
   # conditions &= ~((df['Pre_Volume_Change'] > 3) & (df['Pre_Change'] > 0)) # 전봉 거래량 300% 초과 + 등락률 0% 초과 제외
   conditions &= (df['Pre_Volume_Change'].shift(1) <= 4) # 전봉 거래량 400% 이하
   conditions &= (df['Close'] >= df['MA20'])
   conditions &= (df['Low'].shift(1) != df['52WeekLow'].shift(1)) # 52주 신저가 경신 제외
+  conditions &= ((df['High_Change'].shift(1) - df['Change'].shift(1)) > 0.1 | (df['High_Change'].shift(1) - df['Change'].shift(1)) <= 0.025) # 52주 신저가 경신 제외
   return conditions
 
 def format_market_cap(marcap):
