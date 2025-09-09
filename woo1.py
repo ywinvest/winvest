@@ -53,7 +53,7 @@ def buy_condition(df):
   conditions &= (df['Pre_Volume_Change'].shift(1) <= 4) # 전봉 거래량 400% 이하
   conditions &= (df['Close'] >= df['MA20'])
   conditions &= (df['Low'].shift(1) != df['52WeekLow'].shift(1)) # 52주 신저가 경신 제외
-  conditions &= (((df['High_Change'].shift(1) - df['Change'].shift(1)) > 0.1) | ((df['High_Change'].shift(1) - df['Change'].shift(1)) <= 0.025)) # 52주 신저가 경신 제외
+  conditions &= (((df['High_Change'].shift(1)/100 - df['Change'].shift(1)) > 0.1) | ((df['High_Change'].shift(1)/100 - df['Change'].shift(1)) <= 0.025)) # 52주 신저가 경신 제외
   return conditions
 
 def format_market_cap(marcap):
