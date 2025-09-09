@@ -110,8 +110,8 @@ def process_stock(row):
             # 각 조건이 처음 발생하는 날짜 찾기
             target_open_sell = data_2_22[data_2_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
             target_high_sell = data_2_22[(data_2_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_2_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
-            stop_loss1 = data_2_22[(data_2_22['Close'] < df.loc[buy_date, 'Open']) & (data_2_22['Close'] < data_2_22['MA20']) & ~data_2_22['Bullish']]
-            stop_loss2 = data_2_22[(data_2_22['Close'] <= buy_price * 0.92) & ((data_2_22['Close'] < df.loc[buy_date, 'Open']) | (data_2_22['Close'] < data_2_22['MA20'])) & ~data_2_22['Bullish']]
+            stop_loss1 = data_2_22[(data_2_22['Close'] < df.iloc[df.index.get_loc(buy_date) - 1]['Open']) & (data_2_22['Close'] < data_2_22['MA20']) & ~data_2_22['Bullish']]
+            stop_loss2 = data_2_22[(data_2_22['Close'] <= buy_price * 0.92) & ((data_2_22['Close'] < df.iloc[df.index.get_loc(buy_date) - 1]['Open']) | (data_2_22['Close'] < data_2_22['MA20'])) & ~data_2_22['Bullish']]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
             open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
