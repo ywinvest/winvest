@@ -64,12 +64,13 @@ def process_stock(row):
   market = row['Market']
   try:
     # 종목 데이터 가져오기
-    df = fdr.DataReader(ticker, "2004")
+    df = fdr.DataReader(ticker, "2014")
     df = woo1.calculate_indicators(df)
 
     # 매수 조건에 해당하는 데이터 필터링
     buys = df[woo1.buy_condition(df)]
-    buys = buys[~buys.index.year.isin([2004])]  # 2004년 데이터 제외
+    buys = buys[buys.index >= '2015-06-15']
+    # buys = buys[~buys.index.year.isin([2014])]  # 2004년 데이터 제외
 
     if not buys.empty:
       for buy_date in buys.index:
