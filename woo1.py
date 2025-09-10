@@ -49,8 +49,8 @@ def buy_condition(df):
   conditions &= (df['Change'] > 0)
   conditions &= (df['High_Change'] >= 8)
   conditions &= (df['Bullish'])
-  # conditions &= (df['Volume_Change'] > 3) # 300% 초과
-  conditions &= (df['MA_Volume20_Change'] > 3) # 300% 초과
+  conditions &= (df['Volume_Change'] > 3) # 300% 초과
+  # conditions &= (df['MA_Volume20_Change'] > 3) # 300% 초과
   # conditions &= (df['Volume_Change'] < 1000) # 100,000% 미만
   conditions &= (df['Crossover_Count'] >= 2)
   # conditions &= ~((df['Pre_Volume_Change'] > 3) & (df['Pre_Change'] > 0)) # 전봉 거래량 300% 초과 + 등락률 0% 초과 제외
