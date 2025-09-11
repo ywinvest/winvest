@@ -169,7 +169,7 @@ def buy_condition(df):
   conditions &= (df['Volume'].shift(1) > 0)
   # conditions &= (df['MA120_Uptrend_Days'] < 400) # 120일 상승 추세 장기 연속 제외
   # conditions &= ((df['Close'] - df['Open'])/df['Close'] > -0.05) # 긴 음봉 제외
-  # conditions &= (df['MA20_Gap'] < 0.3)
+  conditions &= (df['MA20_Gap'] < 0.3)
   return conditions
 
 
@@ -485,7 +485,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
         rs_6m = row['RS_6M']
 
         emoji = "question"
-        if ma20_gap < 0.3 and rs_1m >= rs_3m and rs_1m >= rs_6m:
+        if rs_1m >= rs_3m and rs_1m >= rs_6m:
           if 80 <= rs <= 95:
             emoji = "first_place_medal"
           elif (75 <= rs <= 89) or (96 <= rs <= 99):
