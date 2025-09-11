@@ -84,7 +84,7 @@ def calculate_indicators(df):
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
   first_day_close = df['Close'].iloc[0]
-  for period_days in [21, 63, 126, 252]:
+  for period_days in [21, 63, 126, 189, 252]:
     period_str = f"{period_days // 21}M"
     return_col = f'Return_{period_str}'
     base_price = df['Close'].shift(period_days)
