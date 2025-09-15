@@ -26,7 +26,7 @@ def calculate_indicators(df):
   df['DMP'] = adx_data['DMP_14']
   df['DMN'] = adx_data['DMN_14']
   df['DI'] = df['DMP'] > df['DMN']
-  df['MA20_Gap'] = df['Close'] / df['MA_20'] - 1
+  df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).round(2)
 
   df.dropna(inplace=True)
   return df

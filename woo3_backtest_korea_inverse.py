@@ -12,8 +12,8 @@ def buy_condition(df):
   """Buy condition for korea indicies."""
   return (df['RSI'] > 70) & \
     (df['Bullish']) & \
-    (df['Change_Rate'] > 0) & \
-    (df['DMP'] > 50)
+    (df['Change_Rate'] > 0)
+    # (df['DMP'] > 50)
     # (df['ADX'] > 50) & \
     # (((df['High'] - df['Close']) / df['Close']) > 0.0005) & \
     # (df['High'] == df['High_5D']) & \
