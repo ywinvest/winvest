@@ -26,6 +26,7 @@ def calculate_indicators(df):
   df['DMP'] = adx_data['DMP_14']
   df['DMN'] = adx_data['DMN_14']
   df['DI'] = df['DMP'] > df['DMN']
+  df['MA20_Gap'] = df['Close'] / df['MA_20'] - 1
 
   df.dropna(inplace=True)
   return df
