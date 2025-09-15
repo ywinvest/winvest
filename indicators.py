@@ -21,5 +21,11 @@ def calculate_indicators(df):
 
   df['High_5D'] = df['High'].rolling(window=5, min_periods=1).max()
 
+  adx_data = ta.adx(high=df['High'], low=df['Low'], close=df['Close'], length=14, mamode='EMA')
+  df['ADX'] = adx_data['ADX_14']
+  df['DMP'] = adx_data['DMP_14']
+  df['DMN'] = adx_data['DMN_14']
+  df['DI'] = df['DMP'] > df['DMN']
+
   df.dropna(inplace=True)
   return df
