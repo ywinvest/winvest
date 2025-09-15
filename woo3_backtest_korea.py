@@ -123,7 +123,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
 
 if __name__ == "__main__":
-  with open('config-woo2.json', 'r') as config_file:
+  with open('config-woo3.json', 'r') as config_file:
     config = json.load(config_file)
 
   tickers = config["korea"]["tickers"]
