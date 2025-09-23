@@ -3,8 +3,8 @@ name: woo2 - Send signal
 on:
   workflow_dispatch:
   schedule:
-  # 매주 월~금 오후 3:05 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
-  - cron: "0 6 * * 1-5"  # 오후 3:00 (UTC+9)
+  # 매주 월~금, 대기열로 인해 발생하는 지연시간을 고려함
+  - cron: "55 5 * * 1-5"  # 오후 2:55 (UTC+9)
 
 jobs:
   run-python:
