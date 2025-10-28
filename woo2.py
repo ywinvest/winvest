@@ -42,6 +42,8 @@ def calculate_indicators(df):
 
   df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).apply(get_max_excluding_last_5, raw=False)
   df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).apply(get_max_excluding_last_5, raw=False)
+  df['Pre39WeekHigh'] = df['Pre39WeekHigh'].fillna(method='ffill').fillna(0)
+  df['Pre52WeekHigh'] = df['Pre52WeekHigh'].fillna(method='ffill').fillna(0)
 
   # 39주 신고가 돌파 여부
   is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
