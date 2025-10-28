@@ -5,6 +5,7 @@ from datetime import datetime
 from functools import partial
 
 import FinanceDataReader as fdr
+import numpy as np
 import pandas as pd
 import pandas_ta as ta
 from dotenv import load_dotenv
@@ -30,6 +31,7 @@ def calculate_indicators(df):
   # df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
   # df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
+
   # 롤링 윈도우(Series)를 받아, 마지막 5개 요소를 제외한 최댓값을 계산
   # raw=False로 설정해야 Series 객체로 받아 .iloc 등을 사용할 수 있음
   def get_max_excluding_last_5(window_series):
@@ -38,7 +40,7 @@ def calculate_indicators(df):
       return window_series.iloc[:-5].max()
     else:
       # 윈도우가 5개 이하일 경우 (데이터 초기), 제외할 데이터가 없으므로 NA 반환
-      return pd.NA
+      return np.nan
 
   df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).apply(get_max_excluding_last_5, raw=False)
   df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).apply(get_max_excluding_last_5, raw=False)
