@@ -79,6 +79,8 @@ def process_stock(row):
         data_1 = df.iloc[buy_date_idx + 1:]
 
         buy_price = df.loc[buy_date, 'Buy']
+        current_price = df['Close'].iloc[-1]
+        estimated_marcap = marcap * (buy_price / current_price)
 
         partial_sell_date = None
         partial_sell_price = None
@@ -157,6 +159,7 @@ def process_stock(row):
         buys.loc[buy_date, 'Ticker'] = ticker
         buys.loc[buy_date, 'Name'] = name
         buys.loc[buy_date, 'Marcap'] = marcap
+        buys.loc[buy_date, 'Estimated_Marcap'] = estimated_marcap
         buys.loc[buy_date, 'Buy_Date'] = buy_date
         buys.loc[buy_date, 'Buy_Price'] = buy_price
         buys.loc[buy_date, 'Partial_Sell_Date'] = partial_sell_date
