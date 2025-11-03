@@ -207,7 +207,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       if market == 'KOSPI':
         rsi_source_df = kospi_df
       elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
-        rsi_source_df = kosdaq_df
+        rsi_source_df = kospi_df
 
       if rsi_source_df is not None and buy_date in rsi_source_df.index:
         rsi_val = rsi_source_df.loc[buy_date, 'RSI']
