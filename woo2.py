@@ -442,9 +442,8 @@ def send_to_slack(trades_data, kospi, kosdaq):
 
     today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
 
-    # 시장별 RSI 값 가져오기 (오늘 날짜 기준)
-    kospi_rsi = today_kospi['RSI'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_rsi = today_kosdaq['RSI'].iloc[-1] if not today_kosdaq.empty else None
+    # kospi_rsi = today_kospi['RSI'].iloc[-1] if not today_kospi.empty else None
+    # kosdaq_rsi = today_kosdaq['RSI'].iloc[-1] if not today_kosdaq.empty else None
     kospi_adx = today_kospi['ADX'].iloc[-1] if not today_kospi.empty else None
     kosdaq_adx = today_kosdaq['ADX'].iloc[-1] if not today_kosdaq.empty else None
     kospi_di = today_kospi['DI'].iloc[-1] if not today_kospi.empty else None
@@ -458,8 +457,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
     )
 
     for market, group in today_trades.groupby('Market'):
-      if (50 <= (kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80) and (
-          (kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
+      if ((kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
           kospi_di if market == 'KOSPI' else kosdaq_di):
         if kospi_ma20_up if market == 'KOSPI' else kosdaq_ma20_up:
           rsi_emoji = "green_sphere"
@@ -467,10 +465,11 @@ def send_to_slack(trades_data, kospi, kosdaq):
           rsi_emoji = "yellow_sphere"
       else:
         rsi_emoji = "red_sphere"
-      rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
+      # rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
       adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
+      di_value = kospi_di if market == 'KOSPI' else kosdaq_di
       builder.add_line(
-          f" {market} (RSI {rsi_value:.2f}, ADX {adx_value:.2f})",
+          f" {market} (ADX {adx_value:.2f}, DI {di_value})",
           emoji=rsi_emoji,
           bold=True,
           italic=True
@@ -488,7 +487,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
         if rs_1m >= rs_3m and rs_1m >= rs_6m:
           if 80 <= rs <= 95:
             emoji = "first_place_medal"
-          elif (75 <= rs <= 89) or (96 <= rs <= 99):
+          elif (75 <= rs <= 79) or (96 <= rs <= 99):
             emoji = "second_place_medal"
 
         with builder.line() as line:
