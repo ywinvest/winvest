@@ -202,22 +202,26 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       index_ma20_up = None
       index_adx = None
       index_di = None
+      index_change = None
 
-      rsi_source_df = None
+      source_df = None
       if market == 'KOSPI':
-        rsi_source_df = kospi_df
+        source_df = kospi_df
       elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
-        rsi_source_df = kosdaq_df
+        source_df = kosdaq_df
 
-      if rsi_source_df is not None and buy_date in rsi_source_df.index:
-        rsi_val = rsi_source_df.loc[buy_date, 'RSI']
+      if source_df is not None and buy_date in source_df.index:
+        rsi_val = source_df.loc[buy_date, 'RSI']
         index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-        ma20_up_val = rsi_source_df.loc[buy_date, 'MA20_Up']
+        ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
         index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-        adx_val = rsi_source_df.loc[buy_date, 'ADX']
+        adx_val = source_df.loc[buy_date, 'ADX']
         index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-        di_val = rsi_source_df.loc[buy_date, 'DI']
+        di_val = source_df.loc[buy_date, 'DI']
         index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+        change_val = source_df.loc[buy_date, 'Change']
+        index_change = change_val.iloc[0] if isinstance(change_val, pd.Series) else change_val
+
 
       # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
       #   continue
@@ -312,6 +316,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Index_ADX': index_adx,
         'Index_DI': index_di,
         'Index_MA20_Up': index_ma20_up,
+        'Index_Change': index_change,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Full_Sell_Date': full_sell_date,
