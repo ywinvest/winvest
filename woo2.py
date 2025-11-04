@@ -155,7 +155,7 @@ def buy_condition(df):
 
   conditions &= (
       ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
-      ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
+      ((kosdaq) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break'])
   )
   # conditions &= (df['MA20_Uptrend'] == True)
   # conditions &= (df['MA60_Uptrend'] == True)
