@@ -200,23 +200,26 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       market = buy_row['Market']
       index_rsi = None
       index_ma20_up = None
+      index_ma20w_up = None
       index_adx = None
       index_di = None
 
-      rsi_source_df = None
+      source_df = None
       if market == 'KOSPI':
-        rsi_source_df = kospi_df
+        source_df = kospi_df
       elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
-        rsi_source_df = kosdaq_df
+        source_df = kosdaq_df
 
-      if rsi_source_df is not None and buy_date in rsi_source_df.index:
-        rsi_val = rsi_source_df.loc[buy_date, 'RSI']
+      if source_df is not None and buy_date in source_df.index:
+        rsi_val = source_df.loc[buy_date, 'RSI']
         index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-        ma20_up_val = rsi_source_df.loc[buy_date, 'MA20_Up']
+        ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
         index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-        adx_val = rsi_source_df.loc[buy_date, 'ADX']
+        ma20w_up_val = source_df.loc[buy_date, 'MA20W_Up']
+        index_ma20w_up = ma20w_up_val.iloc[0] if isinstance(ma20w_up_val, pd.Series) else ma20w_up_val
+        adx_val = source_df.loc[buy_date, 'ADX']
         index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-        di_val = rsi_source_df.loc[buy_date, 'DI']
+        di_val = source_df.loc[buy_date, 'DI']
         index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
       # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
@@ -312,6 +315,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Index_ADX': index_adx,
         'Index_DI': index_di,
         'Index_MA20_Up': index_ma20_up,
+        'Index_MA20W_Up': index_ma20w_up,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Full_Sell_Date': full_sell_date,
@@ -566,6 +570,7 @@ if __name__ == "__main__":
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
+    kospi['MA20W_Up'] = kospi['Close'] > kospi['Close'].rolling(window=100).mean()
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -573,8 +578,9 @@ if __name__ == "__main__":
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
+    kosdaq['MA20W_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=100).mean()
 
-    # 병렬 처리로 데이터 분석
+  # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
     result_data = calculate_relative_strength(result_data)
     filtered_data = filter_common_stocks(result_data)
