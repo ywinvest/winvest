@@ -221,7 +221,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         index_ma20_uptrend = ma20_uptrend_val.iloc[0] if isinstance(ma20_uptrend_val, pd.Series) else ma20_uptrend_val
         ma20w_uptrend_val = source_df.loc[buy_date, 'MA20W_Uptrend']
         index_ma20w_uptrend = ma20w_uptrend_val.iloc[0] if isinstance(ma20w_uptrend_val, pd.Series) else ma20w_uptrend_val
-        ma20w_slope_val = source_df.loc[buy_date, 'MA20W_Uptrend']
+        ma20w_slope_val = source_df.loc[buy_date, 'MA20W_Slope']
         index_ma20w_slope = ma20w_slope_val.iloc[0] if isinstance(ma20w_slope_val, pd.Series) else ma20w_slope_val
         adx_val = source_df.loc[buy_date, 'ADX']
         index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
