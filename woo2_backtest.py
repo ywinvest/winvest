@@ -95,16 +95,22 @@ if __name__ == "__main__":
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kospi['MA20'] = kospi['Close'].rolling(window=20).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
-    kospi['MA20W_Up'] = kospi['Close'] > kospi['Close'].rolling(window=100).mean()
+    kospi['MA20_Uptrend'] = kospi['MA20'] > kospi['MA20'].shift(1)
+    kospi['MA20W'] = kospi['Close'].rolling(window=100).mean()
+    kospi['MA20W_Uptrend'] = kospi['MA20W'] > kospi['MA20W'].shift(1)
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kosdaq['MA20'] = kospi['Close'].rolling(window=20).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
-    kosdaq['MA20W_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=100).mean()
+    kosdaq['MA20_Uptrend'] = kosdaq['MA20'] > kosdaq['MA20'].shift(1)
+    kosdaq['MA20W'] = kosdaq['Close'].rolling(window=100).mean()
+    kosdaq['MA20W_Uptrend'] = kosdaq['MA20W'] > kosdaq['MA20W'].shift(1)
 
     result_file = "woo2_backtest_results.csv"
 
