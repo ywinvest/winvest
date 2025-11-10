@@ -113,8 +113,9 @@ if __name__ == "__main__":
     kospi_weekly['ADX_W'] = adx_weekly_data['ADX_14']
     kospi_weekly['DI_W'] = adx_weekly_data['DMP_14'] > adx_weekly_data['DMN_14']
 
-    kospi = kospi.join(kospi_weekly[['ADX_W', 'DI_W']])
-    kospi[['ADX_W', 'DI_W']] = kospi[['ADX_W', 'DI_W']].ffill()
+    weekly_indicators = kospi_weekly[['ADX_W', 'DI_W']].reindex(kospi.index, method='ffill')
+
+    kospi = kospi.join(weekly_indicators)
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -141,9 +142,8 @@ if __name__ == "__main__":
     kosdaq_weekly['ADX_W'] = adx_weekly_data_kq['ADX_14']
     kosdaq_weekly['DI_W'] = adx_weekly_data_kq['DMP_14'] > adx_weekly_data_kq['DMN_14']
 
-    # 일봉 데이터에 주봉 지표 매핑 (forward fill로 주간 값 채우기)
-    kosdaq = kosdaq.join(kosdaq_weekly[['ADX_W', 'DI_W']])
-    kosdaq[['ADX_W', 'DI_W']] = kosdaq[['ADX_W', 'DI_W']].ffill()
+    weekly_indicators_kq = kosdaq_weekly[['ADX_W', 'DI_W']].reindex(kosdaq.index, method='ffill')
+    kosdaq = kosdaq.join(weekly_indicators_kq)
 
     result_file = "woo2_backtest_results.csv"
 
