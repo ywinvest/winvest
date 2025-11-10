@@ -201,8 +201,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       index_rsi = None
       index_ma20_up = None
       index_ma20_uptrend = None
+      index_ma20w_up = None
       index_ma20w_uptrend = None
-      index_ma20w_slope = None
       index_adx = None
       index_di = None
       index_adx_w = None
@@ -221,10 +221,10 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
         ma20_uptrend_val = source_df.loc[buy_date, 'MA20_Uptrend']
         index_ma20_uptrend = ma20_uptrend_val.iloc[0] if isinstance(ma20_uptrend_val, pd.Series) else ma20_uptrend_val
+        ma20w_up_val = source_df.loc[buy_date, 'MA20W_Up']
+        index_ma20w_up = ma20w_up_val.iloc[0] if isinstance(ma20w_up_val, pd.Series) else ma20w_up_val
         ma20w_uptrend_val = source_df.loc[buy_date, 'MA20W_Uptrend']
         index_ma20w_uptrend = ma20w_uptrend_val.iloc[0] if isinstance(ma20w_uptrend_val, pd.Series) else ma20w_uptrend_val
-        ma20w_slope_val = source_df.loc[buy_date, 'MA20W_Slope']
-        index_ma20w_slope = ma20w_slope_val.iloc[0] if isinstance(ma20w_slope_val, pd.Series) else ma20w_slope_val
         adx_val = source_df.loc[buy_date, 'ADX']
         index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
         di_val = source_df.loc[buy_date, 'DI']
@@ -330,8 +330,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Index_DI_W': index_di_w,
         'Index_MA20_Up': index_ma20_up,
         'Index_MA20_Uptrend': index_ma20_uptrend,
+        'Index_MA20W_Up': index_ma20w_up,
         'Index_MA20W_Uptrend': index_ma20w_uptrend,
-        'Index_MA20W_Slope': index_ma20w_slope,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Full_Sell_Date': full_sell_date,

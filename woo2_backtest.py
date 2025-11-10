@@ -99,8 +99,8 @@ if __name__ == "__main__":
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
     kospi['MA20_Uptrend'] = kospi['MA20'] > kospi['MA20'].shift(1)
     kospi['MA20W'] = kospi['Close'].rolling(window=100).mean()
+    kospi['MA20W_Up'] = kospi['Close'] > kospi['MA20W']
     kospi['MA20W_Uptrend'] = kospi['MA20W'] > kospi['MA20W'].shift(5)
-    kospi['MA20W_Slope'] = kospi['MA20W'].pct_change(periods=5, fill_method=None)
 
     kospi_weekly = kospi.resample('W').agg({
       'Open': 'first',
@@ -126,8 +126,8 @@ if __name__ == "__main__":
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
     kosdaq['MA20_Uptrend'] = kosdaq['MA20'] > kosdaq['MA20'].shift(1)
     kosdaq['MA20W'] = kosdaq['Close'].rolling(window=100).mean()
+    kosdaq['MA20W_Up'] = kosdaq['Close'] > kosdaq['MA20W']
     kosdaq['MA20W_Uptrend'] = kosdaq['MA20W'] > kosdaq['MA20W'].shift(5)
-    kosdaq['MA20W_Slope'] = kosdaq['MA20W'].pct_change(periods=5, fill_method=None)
 
     # --- KOSDAQ 주봉 지표 추가 ---
     kosdaq_weekly = kosdaq.resample('W').agg({
