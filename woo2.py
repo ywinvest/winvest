@@ -230,9 +230,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         di_val = source_df.loc[buy_date, 'DI']
         index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
         adx_w_val = source_df.loc[buy_date, 'ADX_W']
-        index_adx = adx_w_val.iloc[0] if isinstance(adx_w_val, pd.Series) else adx_w_val
+        index_adx_w = adx_w_val.iloc[0] if isinstance(adx_w_val, pd.Series) else adx_w_val
         di_w_val = source_df.loc[buy_date, 'DI_W']
-        index_di = di_w_val.iloc[0] if isinstance(di_w_val, pd.Series) else di_val
+        index_di_w = di_w_val.iloc[0] if isinstance(di_w_val, pd.Series) else di_w_val
 
       # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
       #   continue
@@ -634,7 +634,6 @@ if __name__ == "__main__":
     # 일봉 데이터에 주봉 지표 매핑 (forward fill로 주간 값 채우기)
     kosdaq = kosdaq.join(kosdaq_weekly[['ADX_W', 'DI_W']])
     kosdaq[['ADX_W', 'DI_W']] = kosdaq[['ADX_W', 'DI_W']].ffill()
-
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
