@@ -102,6 +102,20 @@ if __name__ == "__main__":
     kospi['MA20W_Uptrend'] = kospi['MA20W'] > kospi['MA20W'].shift(5)
     kospi['MA20W_Slope'] = kospi['MA20W'].pct_change(periods=5, fill_method=None)
 
+    kospi_weekly = kospi.resample('W').agg({
+      'Open': 'first',
+      'High': 'max',
+      'Low': 'min',
+      'Close': 'last'
+    }).dropna()
+
+    adx_weekly_data = ta.adx(high=kospi_weekly['High'], low=kospi_weekly['Low'], close=kospi_weekly['Close'], length=14, mamode='EMA')
+    kospi_weekly['ADX_W'] = adx_weekly_data['ADX_14']
+    kospi_weekly['DI_W'] = adx_weekly_data['DMP_14'] > adx_weekly_data['DMN_14']
+
+    kospi = kospi.join(kospi_weekly[['ADX_W', 'DI_W']])
+    kospi[['ADX_W', 'DI_W']] = kospi[['ADX_W', 'DI_W']].ffill()
+
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
@@ -113,6 +127,23 @@ if __name__ == "__main__":
     kosdaq['MA20W'] = kosdaq['Close'].rolling(window=100).mean()
     kosdaq['MA20W_Uptrend'] = kosdaq['MA20W'] > kosdaq['MA20W'].shift(5)
     kosdaq['MA20W_Slope'] = kosdaq['MA20W'].pct_change(periods=5, fill_method=None)
+
+    # --- KOSDAQ 주봉 지표 추가 ---
+    kosdaq_weekly = kosdaq.resample('W').agg({
+      'Open': 'first',
+      'High': 'max',
+      'Low': 'min',
+      'Close': 'last'
+    }).dropna()
+
+    # 주봉 기준으로 ADX 계산
+    adx_weekly_data_kq = ta.adx(high=kosdaq_weekly['High'], low=kosdaq_weekly['Low'], close=kosdaq_weekly['Close'], length=14, mamode='EMA')
+    kosdaq_weekly['ADX_W'] = adx_weekly_data_kq['ADX_14']
+    kosdaq_weekly['DI_W'] = adx_weekly_data_kq['DMP_14'] > adx_weekly_data_kq['DMN_14']
+
+    # 일봉 데이터에 주봉 지표 매핑 (forward fill로 주간 값 채우기)
+    kosdaq = kosdaq.join(kosdaq_weekly[['ADX_W', 'DI_W']])
+    kosdaq[['ADX_W', 'DI_W']] = kosdaq[['ADX_W', 'DI_W']].ffill()
 
     result_file = "woo2_backtest_results.csv"
 
