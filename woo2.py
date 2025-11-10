@@ -586,7 +586,7 @@ if __name__ == "__main__":
 
     kospi = fdr.DataReader('KS11', two_years_ago)
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
-    adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
+    adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='RMA')
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['MA20'] = kospi['Close'].rolling(window=20).mean()
@@ -603,7 +603,7 @@ if __name__ == "__main__":
       'Close': 'last'
     }).dropna()
 
-    adx_weekly_data = ta.adx(high=kospi_weekly['High'], low=kospi_weekly['Low'], close=kospi_weekly['Close'], length=14, mamode='EMA')
+    adx_weekly_data = ta.adx(high=kospi_weekly['High'], low=kospi_weekly['Low'], close=kospi_weekly['Close'], length=14, mamode='RMA')
     kospi_weekly['ADX_W'] = adx_weekly_data['ADX_14']
     kospi_weekly['DI_W'] = adx_weekly_data['DMP_14'] > adx_weekly_data['DMN_14']
 
@@ -612,7 +612,7 @@ if __name__ == "__main__":
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
-    adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
+    adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='RMA')
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['MA20'] = kosdaq['Close'].rolling(window=20).mean()
@@ -631,7 +631,7 @@ if __name__ == "__main__":
     }).dropna()
 
     # 주봉 기준으로 ADX 계산
-    adx_weekly_data_kq = ta.adx(high=kosdaq_weekly['High'], low=kosdaq_weekly['Low'], close=kosdaq_weekly['Close'], length=14, mamode='EMA')
+    adx_weekly_data_kq = ta.adx(high=kosdaq_weekly['High'], low=kosdaq_weekly['Low'], close=kosdaq_weekly['Close'], length=14, mamode='RMA')
     kosdaq_weekly['ADX_W'] = adx_weekly_data_kq['ADX_14']
     kosdaq_weekly['DI_W'] = adx_weekly_data_kq['DMP_14'] > adx_weekly_data_kq['DMN_14']
 
