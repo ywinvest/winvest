@@ -114,7 +114,6 @@ if __name__ == "__main__":
     kospi_weekly['DI_W'] = adx_weekly_data['DMP_14'] > adx_weekly_data['DMN_14']
 
     weekly_indicators = kospi_weekly[['ADX_W', 'DI_W']].reindex(kospi.index, method='ffill')
-
     kospi = kospi.join(weekly_indicators)
 
     kosdaq = fdr.DataReader('KQ11')

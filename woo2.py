@@ -471,6 +471,9 @@ def send_to_slack(trades_data, kospi, kosdaq):
     kospi_ma20_up = today_kospi['MA20_Up'].iloc[-1] if not today_kospi.empty else None
     kosdaq_ma20_up = today_kosdaq['MA20_Up'].iloc[-1] if not today_kosdaq.empty else None
 
+    kospi_adx_w = today_kospi['ADX_W'].iloc[-1] if not today_kospi.empty else None
+    kosdaq_adx_w = today_kosdaq['ADX_W'].iloc[-1] if not today_kosdaq.empty else None
+
     builder.add_line(
         f"{today.year}년 {today.month}월 {today.day}일 매수 후보",
         bold=True
@@ -488,8 +491,9 @@ def send_to_slack(trades_data, kospi, kosdaq):
       # rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
       adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
       di_value = kospi_di if market == 'KOSPI' else kosdaq_di
+      adx_w_value = kospi_adx_w if market == 'KOSPI' else kosdaq_adx_w
       builder.add_line(
-          f" {market} (ADX {adx_value:.2f}, DI {di_value})",
+          f" {market} (ADX {adx_value:.2f}, DI {di_value}, ADX_W {adx_w_value:.2f})",
           emoji=rsi_emoji,
           bold=True,
           italic=True
@@ -589,8 +593,8 @@ if __name__ == "__main__":
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
     kospi['MA20_Uptrend'] = kospi['MA20'] > kospi['MA20'].shift(1)
     kospi['MA20W'] = kospi['Close'].rolling(window=100).mean()
+    kospi['MA20W_Up'] = kospi['Close'] > kospi['MA20W']
     kospi['MA20W_Uptrend'] = kospi['MA20W'] > kospi['MA20W'].shift(5)
-    kospi['MA20W_Slope'] = kospi['MA20W'].pct_change(periods=5, fill_method=None)
 
     kospi_weekly = kospi.resample('W').agg({
       'Open': 'first',
@@ -603,8 +607,8 @@ if __name__ == "__main__":
     kospi_weekly['ADX_W'] = adx_weekly_data['ADX_14']
     kospi_weekly['DI_W'] = adx_weekly_data['DMP_14'] > adx_weekly_data['DMN_14']
 
-    kospi = kospi.join(kospi_weekly[['ADX_W', 'DI_W']])
-    kospi[['ADX_W', 'DI_W']] = kospi[['ADX_W', 'DI_W']].ffill()
+    weekly_indicators = kospi_weekly[['ADX_W', 'DI_W']].reindex(kospi.index, method='ffill')
+    kospi = kospi.join(weekly_indicators)
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -615,8 +619,8 @@ if __name__ == "__main__":
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
     kosdaq['MA20_Uptrend'] = kosdaq['MA20'] > kosdaq['MA20'].shift(1)
     kosdaq['MA20W'] = kosdaq['Close'].rolling(window=100).mean()
+    kosdaq['MA20W_Up'] = kosdaq['Close'] > kosdaq['MA20W']
     kosdaq['MA20W_Uptrend'] = kosdaq['MA20W'] > kosdaq['MA20W'].shift(5)
-    kosdaq['MA20W_Slope'] = kosdaq['MA20W'].pct_change(periods=5, fill_method=None)
 
     # --- KOSDAQ 주봉 지표 추가 ---
     kosdaq_weekly = kosdaq.resample('W').agg({
@@ -631,9 +635,8 @@ if __name__ == "__main__":
     kosdaq_weekly['ADX_W'] = adx_weekly_data_kq['ADX_14']
     kosdaq_weekly['DI_W'] = adx_weekly_data_kq['DMP_14'] > adx_weekly_data_kq['DMN_14']
 
-    # 일봉 데이터에 주봉 지표 매핑 (forward fill로 주간 값 채우기)
-    kosdaq = kosdaq.join(kosdaq_weekly[['ADX_W', 'DI_W']])
-    kosdaq[['ADX_W', 'DI_W']] = kosdaq[['ADX_W', 'DI_W']].ffill()
+    weekly_indicators_kq = kosdaq_weekly[['ADX_W', 'DI_W']].reindex(kosdaq.index, method='ffill')
+    kosdaq = kosdaq.join(weekly_indicators_kq)
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
