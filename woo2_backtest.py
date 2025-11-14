@@ -9,6 +9,7 @@ import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
 
+import rs
 import woo1
 import woo2
 
@@ -108,7 +109,7 @@ if __name__ == "__main__":
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks)
-    result_data = woo2.calculate_relative_strength(result_data)
+    result_data = rs.calculate_relative_strength(result_data)
     filtered_data = woo1.filter_common_stocks(result_data)
     result_data = woo2.buy_and_sell(filtered_data, kospi, kosdaq)
     # final_data = result_data[buy_condition(result_data)]
