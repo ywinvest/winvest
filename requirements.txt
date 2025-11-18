@@ -7,3 +7,4 @@ plotly
 python-dotenv
 numpy>=1.26.0
 slack_sdk
+openpyxl
