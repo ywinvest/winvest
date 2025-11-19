@@ -171,31 +171,35 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       if buy_date <= prev_sell_date:
         continue
 
-      # --- RSI 및 시가총액 조건 검사 (수정된 로직) ---
       market = buy_row['Market']
-      index_rsi = None
-      index_ma5_up = None
-      index_ma20_up = None
-      index_adx = None
-      index_di = None
+      buy_index_rsi = None
+      buy_index_ma5_up = None
+      buy_index_ma20_up = None
+      buy_index_adx = None
+      buy_index_di = None
 
-      rsi_source_df = None
+      sell_index_ma5_up = None
+      sell_index_ma20_up = None
+      sell_index_adx = None
+      sell_index_di = None
+
+      source_df = None
       if market == 'KOSPI':
-        rsi_source_df = kospi_df
+        source_df = kospi_df
       elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
-        rsi_source_df = kosdaq_df
+        source_df = kosdaq_df
 
-      if rsi_source_df is not None and buy_date in rsi_source_df.index:
-        rsi_val = rsi_source_df.loc[buy_date, 'RSI']
-        index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-        ma5_up_val = rsi_source_df.loc[buy_date, 'MA5_Up']
-        index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
-        ma20_up_val = rsi_source_df.loc[buy_date, 'MA20_Up']
-        index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-        adx_val = rsi_source_df.loc[buy_date, 'ADX']
-        index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-        di_val = rsi_source_df.loc[buy_date, 'DI']
-        index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+      if source_df is not None and buy_date in source_df.index:
+        rsi_val = source_df.loc[buy_date, 'RSI']
+        buy_index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
+        ma5_up_val = source_df.loc[buy_date, 'MA5_Up']
+        buy_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
+        ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
+        buy_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
+        adx_val = source_df.loc[buy_date, 'ADX']
+        buy_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+        di_val = source_df.loc[buy_date, 'DI']
+        buy_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
       # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
       #   continue
@@ -280,19 +284,33 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
               full_sell_date = final_sell_date
               full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
 
+      if source_df is not None and sell_date in source_df.index:
+        ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
+        sell_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
+        ma20_up_val = source_df.loc[sell_date, 'MA20_Up']
+        sell_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
+        adx_val = source_df.loc[sell_date, 'ADX']
+        sell_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+        di_val = source_df.loc[sell_date, 'DI']
+        sell_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+
       # 최종 거래 결과 기록
       trade_info = buy_row.to_dict()
       trade_info.update({
         'Buy_Date': buy_date,
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
-        'Index_RSI': index_rsi,
-        'Index_ADX': index_adx,
-        'Index_DI': index_di,
-        'Index_MA5_Up': index_ma5_up,
-        'Index_MA20_Up': index_ma20_up,
+        'Buy_Index_RSI': buy_index_rsi,
+        'Buy_Index_ADX': buy_index_adx,
+        'Buy_Index_DI': buy_index_di,
+        'Buy_Index_MA5_Up': buy_index_ma5_up,
+        'Buy_Index_MA20_Up': buy_index_ma20_up,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
+        'Sell_Index_ADX': sell_index_adx,
+        'Sell_Index_DI': sell_index_di,
+        'Sell_Index_MA5_Up': sell_index_ma5_up,
+        'Sell_Index_MA20_Up': sell_index_ma20_up,
         'Full_Sell_Date': full_sell_date,
         'Full_Sell_Price': full_sell_price,
         'Return': (sell_price / buy_price - 1) if sell_price else (current_price / buy_price - 1),
