@@ -189,21 +189,6 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
         source_df = kosdaq_df
 
-      if source_df is not None and buy_date in source_df.index:
-        rsi_val = source_df.loc[buy_date, 'RSI']
-        buy_index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-        ma5_up_val = source_df.loc[buy_date, 'MA5_Up']
-        buy_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
-        ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
-        buy_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-        adx_val = source_df.loc[buy_date, 'ADX']
-        buy_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-        di_val = source_df.loc[buy_date, 'DI']
-        buy_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
-
-      # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
-      #   continue
-
       buy_price = buy_row['Close']
       current_price = stock_group['Close'].iloc[-1]
       estimated_marcap = buy_row['Marcap'] * (buy_price / current_price)
@@ -222,7 +207,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # 익절/손절 가격 정의
         take_profit_price = buy_price * 1.242
         stop_loss_price = buy_price * 0.92
-        trailing_stop_loss_price = buy_price * 1.082
+        default_trailing_stop_loss_price = buy_price * 1.082
 
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
@@ -255,8 +240,32 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             full_sell_price = trade_data.loc[earliest_date, 'Close']
         # else:
         #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
+        if source_df is not None and buy_date in source_df.index:
+          rsi_val = source_df.loc[buy_date, 'RSI']
+          buy_index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
+          ma5_up_val = source_df.loc[buy_date, 'MA5_Up']
+          buy_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
+          ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
+          buy_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
+          adx_val = source_df.loc[buy_date, 'ADX']
+          buy_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+          di_val = source_df.loc[buy_date, 'DI']
+          buy_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+
+        if source_df is not None and sell_date in source_df.index:
+          ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
+          sell_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
+          ma20_up_val = source_df.loc[sell_date, 'MA20_Up']
+          sell_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
+          adx_val = source_df.loc[sell_date, 'ADX']
+          sell_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+          di_val = source_df.loc[sell_date, 'DI']
+          sell_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
         if sell_date and not full_sell_date:
+          is_market_weak = not sell_index_ma5_up
+          trailing_stop_loss_price = buy_price * 1.162 if is_market_weak else default_trailing_stop_loss_price
+
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           if not after_partial_sell_data.empty:
@@ -283,16 +292,6 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             elif final_sell_date:
               full_sell_date = final_sell_date
               full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
-
-      if source_df is not None and sell_date in source_df.index:
-        ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
-        sell_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
-        ma20_up_val = source_df.loc[sell_date, 'MA20_Up']
-        sell_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-        adx_val = source_df.loc[sell_date, 'ADX']
-        sell_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-        di_val = source_df.loc[sell_date, 'DI']
-        sell_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
       # 최종 거래 결과 기록
       trade_info = buy_row.to_dict()
