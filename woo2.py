@@ -144,7 +144,7 @@ def buy_condition(df):
   conditions &= (df['Volume'].shift(1) > 0)
   # conditions &= (df['MA120_Uptrend_Days'] < 400) # 120일 상승 추세 장기 연속 제외
   # conditions &= ((df['Close'] - df['Open'])/df['Close'] > -0.05) # 긴 음봉 제외
-  conditions &= (df['MA20_Gap'] < 0.3)
+  conditions &= (df['MA20_Gap'] < 0.35)
   return conditions
 
 
