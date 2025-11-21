@@ -70,42 +70,54 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     # Subset the data to look forward from the buy date
     subsequent_data = df.loc[buy_date:]
 
-    sell_date_partial = None
+    # 1. 일단 기본 반매도 조건(MA10 Cross)으로 시점을 계산
+    temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
+    sell_date_partial = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
 
-    # Calculate partial sell dates
-    if not current_buy_group_flag:
-      sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
-      sell_date_partial = sell_partial.index[0] if not sell_partial.empty else None
+    consecutive_buys = 0
 
-    # Determine consecutive buys in the current group
+    # 2. 해당 기간 내 연속 매수 횟수 카운트
     if sell_date_partial:
       group_data = subsequent_data.loc[:sell_date_partial]
       consecutive_buys = len(group_data[buy_condition(group_data, is_first_buy=False)])
-      # if consecutive_buys >= 3:
-      current_buy_group_flag = True
+
+      # 현재 매수 건을 포함하여 카운트 조정 (로직에 따라 필요시)
       if rsi <= 30:
         df.loc[buy_date, 'Consecutive Buys'] = consecutive_buys
       else:
-        df.loc[buy_date, 'Consecutive Buys'] = consecutive_buys + 1
+        df.loc[buy_date, 'Consecutive Buys'] = consecutive_buys + 1 # 첫 매수 포함 등 로직 보정
 
-    # Adjust sell conditions based on the flag
-    # if current_buy_group_flag:
-    #   sell_condition_partial = lambda df: df['MA_20_Cross']
-    #   sell_condition_full = lambda df: df['MA_20_Cross']
-    # else:
-    #   sell_condition_partial = lambda df: df['MA_10_Cross']
-    #   sell_condition_full = lambda df: df['MA_20_Cross'] | df['MA_10_Break']
+    # -------------------------------------------------------
+    # [수정된 부분] 연속 매수가 3회 이상인 경우 매도 조건 변경 로직
+    # -------------------------------------------------------
+    if consecutive_buys >= 3:
+      current_buy_group_flag = True
 
-    # Calculate partial sell dates
-    sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
-    sell_date_partial = sell_partial.index[0] if not sell_partial.empty else None
+      # 반매도, 전체매도 모두 20일선 돌파(MA_20_Cross)로 변경
+      override_condition = lambda d: d['MA_20_Cross']
 
-    # Calculate full sell dates after partial sell
-    sell_full = (
-      subsequent_data.loc[sell_date_partial:] if sell_date_partial else subsequent_data
-    )
-    sell_full = sell_full[sell_condition_full(sell_full)] if sell_condition_full else pd.DataFrame()
-    sell_date_full = sell_full.index[0] if not sell_full.empty else None
+      # 반매도 시점 재계산 (MA20)
+      sell_partial_new = subsequent_data[override_condition(subsequent_data)]
+      sell_date_partial = sell_partial_new.index[0] if not sell_partial_new.empty else None
+
+      # 전체 매도 시점 재계산 (MA20 - 반매도와 동일하거나 그 이후)
+      if sell_date_partial:
+        sell_full_new = subsequent_data.loc[sell_date_partial:]
+        sell_full_new = sell_full_new[override_condition(sell_full_new)]
+        sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
+      else:
+        sell_date_full = None
+
+    else:
+      # 3회 미만인 경우 기존 로직 유지 (기본 반매도 날짜 유지)
+      current_buy_group_flag = True if consecutive_buys > 0 else False # 플래그 관리
+
+      # 전체 매도 시점 계산 (기본 조건: MA20 Cross or MA10 Break)
+      sell_full = (
+        subsequent_data.loc[sell_date_partial:] if sell_date_partial else subsequent_data
+      )
+      sell_full = sell_full[sell_condition_full(sell_full)] if sell_condition_full else pd.DataFrame()
+      sell_date_full = sell_full.index[0] if not sell_full.empty else None
 
     if sell_date_partial:
       df.loc[sell_date_partial, 'Action'] = 'Partial Sell'
