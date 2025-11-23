@@ -75,27 +75,57 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     # 첫 매수인 경우에만 연속매수회수 계산
     if is_first_buy:
+      # 1단계: 기본 매도 조건(10일선 돌파)으로 일단 계산
       temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
-      sell_date_partial = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
+      temp_sell_date = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
 
-      if sell_date_partial:
-        group_data = subsequent_data.loc[:sell_date_partial]
-        # 그룹 내 모든 잠재적 매수 신호 찾기
+      if temp_sell_date:
+        group_data = subsequent_data.loc[:temp_sell_date]
+      else:
+        group_data = subsequent_data
+
+      # 그룹 내 잠재적 매수 신호 찾기
+      potential_buys = group_data[buy_condition(group_data, is_first_buy=False)]
+
+      # 이전 매수보다 낮은 가격인 경우만 카운트
+      consecutive_buys = 1  # 첫 매수 포함
+      temp_last_price = position
+
+      for idx in potential_buys.index:
+        if idx > buy_date:
+          current_close = group_data.loc[idx, 'Close']
+          if current_close < temp_last_price:
+            consecutive_buys += 1
+            temp_last_price = current_close
+          else:
+            break
+
+      # 2단계: 연속매수가 3회 이상이면 20일선 돌파 기준으로 재계산
+      if consecutive_buys >= 3:
+        temp_sell_ma20 = subsequent_data[subsequent_data['MA_20_Cross']]
+        temp_sell_date_ma20 = temp_sell_ma20.index[0] if not temp_sell_ma20.empty else None
+
+        if temp_sell_date_ma20:
+          group_data = subsequent_data.loc[:temp_sell_date_ma20]
+        else:
+          group_data = subsequent_data
+
+        # 20일선 기준으로 다시 계산
         potential_buys = group_data[buy_condition(group_data, is_first_buy=False)]
 
-        # 이전 매수보다 낮은 가격인 경우만 카운트
-        consecutive_buys = 1  # 첫 매수 포함
+        consecutive_buys = 1
         temp_last_price = position
+
         for idx in potential_buys.index:
           if idx > buy_date:
             current_close = group_data.loc[idx, 'Close']
             if current_close < temp_last_price:
               consecutive_buys += 1
               temp_last_price = current_close
+            else:
+              break
 
-        group_consecutive_buys = consecutive_buys
-      else:
-        group_consecutive_buys = 1
+      group_consecutive_buys = consecutive_buys
 
     # 모든 매수에 첫 매수에서 계산한 연속매수회수 할당
     df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
