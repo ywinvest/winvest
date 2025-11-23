@@ -13,7 +13,7 @@ def buy_condition(df, is_first_buy=True):
   if is_first_buy:
     return (df['RSI'] <= 35) & (~df['Bullish']) & (df['Change_Rate'] < 0)
   else:
-    return (df['RSI'] <= 30) & (~df['Bullish']) & (df['Change_Rate'] < 0)
+    return (df['RSI'] <= 35) & (~df['Bullish']) & (df['Change_Rate'] < 0)
 
 def sell_condition_partial(df):
   """Partial sell condition for global indices."""
@@ -22,7 +22,6 @@ def sell_condition_partial(df):
 def sell_condition_full(df):
   """Full sell condition for global indices."""
   return df['MA_20_Cross'] | df['MA_10_Break']
-  # return df['MA_10_Cross']
 
 def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition_full):
   """Perform backtest with the specified buy and sell conditions."""
@@ -38,81 +37,87 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
   current_buy_group_flag = False
   sell_date_full = buys.index[0]
+  last_buy_price = None  # 이전 매수 가격 추적
+  group_consecutive_buys = 0  # 그룹의 연속매수회수 (첫 매수에서 계산)
 
   for buy_date in buys.index:
     if sell_date_full is not None and buy_date > sell_date_full:
       current_buy_group_flag = False
+      last_buy_price = None  # 새 그룹 시작시 초기화
+      group_consecutive_buys = 0  # 새 그룹 시작시 초기화
 
     # 현재 매수가 그룹 내 첫 매수인지 확인
     is_first_buy = not current_buy_group_flag
 
-    # 첫 매수가 아닌 경우, RSI 30 이하 조건 확인
+    # 첫 매수가 아닌 경우, 이전 매수보다 종가가 낮은지 확인
     if not is_first_buy:
-      # 단일 행에 대한 조건 체크를 수정
-      row_data = df.loc[[buy_date]]
-      if not buy_condition(row_data, is_first_buy=False).any():
-        continue
+      current_price = df.loc[buy_date, 'Close']
+      if last_buy_price is None or current_price >= last_buy_price:
+        continue  # 이전 매수보다 가격이 높거나 같으면 매수하지 않음
 
     position = df.loc[buy_date, 'Close']
     df.loc[buy_date, 'Action'] = 'Buy'
+    last_buy_price = position  # 현재 매수 가격 저장
 
     # Check RSI and adjust position size
     rsi = df.loc[buy_date, 'RSI']
     if rsi <= 25:
-      position_size = 3  # RSI 25 이하일 때 3배
+      position_size = 3
     elif rsi <= 30:
-      position_size = 2  # RSI 30 이하일 때 2배
+      position_size = 2
     else:
-      position_size = 1  # 그 외의 경우 1배
+      position_size = 1
 
     df.loc[buy_date:, 'Weight'] += position_size
 
     # Subset the data to look forward from the buy date
     subsequent_data = df.loc[buy_date:]
 
-    # 1. 일단 기본 반매도 조건(MA10 Cross)으로 시점을 계산
-    temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
-    sell_date_partial = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
+    # 첫 매수인 경우에만 연속매수회수 계산
+    if is_first_buy:
+      temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
+      sell_date_partial = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
 
-    consecutive_buys = 0
+      if sell_date_partial:
+        group_data = subsequent_data.loc[:sell_date_partial]
+        # 그룹 내 모든 잠재적 매수 신호 찾기
+        potential_buys = group_data[buy_condition(group_data, is_first_buy=False)]
 
-    # 2. 해당 기간 내 연속 매수 횟수 카운트
-    if sell_date_partial:
-      group_data = subsequent_data.loc[:sell_date_partial]
-      consecutive_buys = len(group_data[buy_condition(group_data, is_first_buy=False)])
+        # 이전 매수보다 낮은 가격인 경우만 카운트
+        consecutive_buys = 1  # 첫 매수 포함
+        temp_last_price = position
+        for idx in potential_buys.index:
+          if idx > buy_date:
+            current_close = group_data.loc[idx, 'Close']
+            if current_close < temp_last_price:
+              consecutive_buys += 1
+              temp_last_price = current_close
 
-      # 현재 매수 건을 포함하여 카운트 조정 (로직에 따라 필요시)
-      if rsi <= 30:
-        df.loc[buy_date, 'Consecutive Buys'] = consecutive_buys
+        group_consecutive_buys = consecutive_buys
       else:
-        df.loc[buy_date, 'Consecutive Buys'] = consecutive_buys + 1 # 첫 매수 포함 등 로직 보정
+        group_consecutive_buys = 1
 
-    # -------------------------------------------------------
-    # [수정된 부분] 연속 매수가 3회 이상인 경우 매도 조건 변경 로직
-    # -------------------------------------------------------
-    if consecutive_buys >= 3:
+    # 모든 매수에 첫 매수에서 계산한 연속매수회수 할당
+    df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
+
+    # 연속매수회수가 3회 이상인 경우 매도 조건 변경
+    if group_consecutive_buys >= 3:
       current_buy_group_flag = True
 
-      # 반매도, 전체매도 모두 20일선 돌파(MA_20_Cross)로 변경
+      # 20일선 돌파시 전체 매도 (부분매도 없음)
       override_condition = lambda d: d['MA_20_Cross']
 
-      # 반매도 시점 재계산 (MA20)
-      sell_partial_new = subsequent_data[override_condition(subsequent_data)]
-      sell_date_partial = sell_partial_new.index[0] if not sell_partial_new.empty else None
-
-      # 전체 매도 시점 재계산 (MA20 - 반매도와 동일하거나 그 이후)
-      if sell_date_partial:
-        sell_full_new = subsequent_data.loc[sell_date_partial:]
-        sell_full_new = sell_full_new[override_condition(sell_full_new)]
-        sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
-      else:
-        sell_date_full = None
+      sell_full_new = subsequent_data[override_condition(subsequent_data)]
+      sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
+      sell_date_partial = None  # 부분매도 없음
 
     else:
-      # 3회 미만인 경우 기존 로직 유지 (기본 반매도 날짜 유지)
-      current_buy_group_flag = True if consecutive_buys > 0 else False # 플래그 관리
+      current_buy_group_flag = True
 
-      # 전체 매도 시점 계산 (기본 조건: MA20 Cross or MA10 Break)
+      # 기본 매도 로직
+      temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
+      sell_date_partial = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
+
       sell_full = (
         subsequent_data.loc[sell_date_partial:] if sell_date_partial else subsequent_data
       )
@@ -142,8 +147,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       df.loc[sell_date_full:, 'Weight'] -= current_weight
 
   avg_return = sum(returns) / len(returns) if returns else 0
-  avg_holding_period = sum(holding_periods) / len(
-    holding_periods) if holding_periods else 0
+  avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
 
   output_dir = 'global/buy-and-sell'
   os.makedirs(output_dir, exist_ok=True)
@@ -164,18 +168,15 @@ if __name__ == "__main__":
   today = datetime.today()
   ten_years_ago = today.year - 10
 
-  # 오늘 날짜와 10년 전 날짜를 'YYYY-MM-DD' 형식으로 계산
   end_date = datetime.today()
-  start_date = end_date - timedelta(days=30 * 365)  # 근사치로 10년 계산
+  start_date = end_date - timedelta(days=30 * 365)
 
-  # 날짜를 문자열 형식으로 변환
   end_date_str = end_date.strftime('%Y-%m-%d')
   start_date_str = start_date.strftime('%Y-%m-%d')
 
   for ticker, name in tickers.items():
     print(f"Processing {ticker} ({name})...")
     data = fdr.DataReader(ticker, start=start_date_str, end=end_date_str)
-    # data = fdr.DataReader(ticker)
 
     if data.empty:
       print(f"No data found for {ticker}, skipping.")
@@ -197,4 +198,4 @@ if __name__ == "__main__":
   print("\nBacktest Results:")
   for name, metrics in results.items():
     print(
-      f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
+        f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
