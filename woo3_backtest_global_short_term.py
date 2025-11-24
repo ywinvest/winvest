@@ -98,8 +98,8 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
             consecutive_buys += 1
             temp_last_price = current_close  # 실제 매수한 가격으로 업데이트
 
-      # 2단계: 연속매수가 3회 이상이면 20일선 돌파 기준으로 재계산
-      if consecutive_buys >= 4:
+      # 2단계: 연속매수가 5회 이상이면 20일선 돌파 기준으로 재계산
+      if consecutive_buys >= 5:
         temp_sell_ma20 = subsequent_data[subsequent_data['MA_20_Cross']]
         temp_sell_date_ma20 = temp_sell_ma20.index[0] if not temp_sell_ma20.empty else None
 
@@ -127,7 +127,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
 
     # 연속매수회수가 3회 이상인 경우 매도 조건 변경
-    if group_consecutive_buys >= 4:
+    if group_consecutive_buys >= 5:
       current_buy_group_flag = True
 
       # 20일선 돌파시 전체 매도 (부분매도 없음)
