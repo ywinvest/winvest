@@ -8,10 +8,12 @@ import numpy as np
 
 import indicators
 
+INIT_RSI = 36
+
 # 초기 필터링용 조건
 def buy_condition_broad(df):
   """Broad buy condition for global indices (RSI <= 35)."""
-  return (df['RSI'] <= 35) & (~df['Bullish']) & (df['Change_Rate'] < 0)
+  return (df['RSI'] <= INIT_RSI) & (~df['Bullish']) & (df['Change_Rate'] < 0)
 
 def sell_condition_partial(df):
   """Partial sell condition for global indices (10-MA Cross)."""
@@ -68,7 +70,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
       if current_close >= temp_last_price:
         continue
-      threshold = 30 if next_buy_order == 2 else 35
+      threshold = 30 if next_buy_order == 2 else INIT_RSI
       if current_rsi <= threshold:
         c_buys += 1
         temp_last_price = current_close
@@ -116,15 +118,15 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     # RSI 조건 검증
     current_rsi = df.loc[buy_date, 'RSI']
-    required_rsi = 35
+    required_rsi = INIT_RSI
     if is_first_buy:
-      required_rsi = 35
+      required_rsi = INIT_RSI
     else:
       check_order = current_group_buy_count + 1
       if check_order == 2:
         required_rsi = 30
       else:
-        required_rsi = 35
+        required_rsi = INIT_RSI
 
     if current_rsi > required_rsi:
       continue
