@@ -126,9 +126,9 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     buy_count += 1 # 전체 매수 횟수 증가
 
     # 포지션 사이즈 조절 (기존 로직 유지)
-    if current_rsi <= 25:
+    if current_rsi <= 20:
       position_size = 3
-    elif current_rsi <= 30:
+    elif current_rsi <= 25:
       position_size = 2
     else:
       position_size = 1
