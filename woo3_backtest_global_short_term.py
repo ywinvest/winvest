@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
 import pandas as pd
-import numpy as np
 
 import indicators
+
 
 # 초기 필터링용 조건
 def buy_condition_broad(df):
