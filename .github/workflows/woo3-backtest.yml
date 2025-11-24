@@ -36,7 +36,7 @@ jobs:
       run: |
         python woo3_backtest_global.py
         python woo3_backtest_global_short_term.py
-        python woo3_backtest_korea.py
+        python woo3_backtest_korea_short_term.py
         python woo3_backtest_korea_inverse.py
 
     - name: Upload Artifact
