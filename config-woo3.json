@@ -14,7 +14,8 @@
     "tickers": {
       "IXIC": "NASDAQ",
       "GC=F": "Gold",
-      "BTC-USD": "Bitcoin"
+      "BTC-USD": "Bitcoin",
+      "NQ": "NASDAQ100 Future"
     }
   }
 }
