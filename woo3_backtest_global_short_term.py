@@ -61,7 +61,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     # Check RSI and adjust position size
     rsi = df.loc[buy_date, 'RSI']
-    if rsi <= 25:
+    if rsi <= 20:
       position_size = 3
     elif rsi <= 30:
       position_size = 2
