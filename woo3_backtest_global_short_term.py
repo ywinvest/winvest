@@ -87,7 +87,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       # 그룹 내 잠재적 매수 신호 찾기
       potential_buys = group_data[buy_condition(group_data, is_first_buy=False)]
 
-      # 이전 매수보다 낮은 가격인 경우만 카운트
+      # 이전 매수보다 낮은 가격인 경우만 카운트 (break 없이 계속 체크)
       consecutive_buys = 1  # 첫 매수 포함
       temp_last_price = position
 
@@ -96,9 +96,11 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
           current_close = group_data.loc[idx, 'Close']
           if current_close < temp_last_price:
             consecutive_buys += 1
-            temp_last_price = current_close
-          else:
-            break
+            temp_last_price = current_close  # 실제 매수한 가격으로 업데이트
+
+      # 디버깅: 1단계 결과 출력
+      if buy_date.year == 2020 and buy_date.month in [2, 3]:
+        print(f"[1단계] {buy_date.date()}: 10일선 기준 연속매수 = {consecutive_buys}, 매도일 = {temp_sell_date.date() if temp_sell_date else 'None'}")
 
       # 2단계: 연속매수가 3회 이상이면 20일선 돌파 기준으로 재계산
       if consecutive_buys >= 3:
@@ -122,8 +124,10 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
             if current_close < temp_last_price:
               consecutive_buys += 1
               temp_last_price = current_close
-            else:
-              break
+
+        # 디버깅: 2단계 결과 출력
+        if buy_date.year == 2020 and buy_date.month in [2, 3]:
+          print(f"[2단계] {buy_date.date()}: 20일선 기준 연속매수 = {consecutive_buys}, 매도일 = {temp_sell_date_ma20.date() if temp_sell_date_ma20 else 'None'}")
 
       group_consecutive_buys = consecutive_buys
 
