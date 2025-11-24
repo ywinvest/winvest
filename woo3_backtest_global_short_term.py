@@ -147,7 +147,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       consecutive_buys = count_potential_buys(buy_date, temp_sell_date, position)
 
       # 2단계: 연속매수가 5회 이상이면 20일선 기준으로 재계산
-      if consecutive_buys >= 5:
+      if consecutive_buys >= 3:
         temp_sell_ma20 = subsequent_data[subsequent_data['MA_20_Cross']]
         temp_sell_date_ma20 = temp_sell_ma20.index[0] if not temp_sell_ma20.empty else None
 
@@ -159,7 +159,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
 
     # 매도 로직 결정 (5회 이상이면 전체 매도만, 아니면 부분+전체)
-    if group_consecutive_buys >= 5:
+    if group_consecutive_buys >= 3:
       override_condition = lambda d: d['MA_20_Cross']
       sell_full_new = subsequent_data[override_condition(subsequent_data)]
       sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
