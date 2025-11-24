@@ -15,7 +15,7 @@
       "IXIC": "NASDAQ",
       "GC=F": "Gold",
       "BTC-USD": "Bitcoin",
-      "NQ": "NASDAQ100 Future"
+      "NQ=F": "NASDAQ100 Future"
     }
   }
 }
