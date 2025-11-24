@@ -4,9 +4,11 @@ from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
 import pandas as pd
+import numpy as np
 
 import indicators
 
+# 초기 필터링용 조건
 def buy_condition_broad(df):
   """Broad buy condition for global indices (RSI <= 35)."""
   return (df['RSI'] <= 35) & (~df['Bullish']) & (df['Change_Rate'] < 0)
@@ -20,11 +22,13 @@ def sell_condition_full(df):
   return df['MA_20_Cross'] | df['MA_10_Break']
 
 def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition_full):
-  """Perform backtest with dynamic RSI thresholds and Transaction-based Weight logging."""
+  """Backtest with Group-based Average Return logging."""
   df = indicators.calculate_indicators(data.copy())
 
-  # Weight 컬럼 0.0으로 초기화 (이벤트 발생일에만 값을 기록함)
+  # 결과 기록을 위한 컬럼 초기화
   df['Weight'] = 0.0
+  df['Group Partial Avg Return'] = np.nan
+  df['Group Full Avg Return'] = np.nan
 
   buys = df[buy_condition(df)]
 
@@ -33,11 +37,17 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
   buy_count = 0
 
   current_buy_group_flag = False
-  sell_date_full = buys.index[0]
+  sell_date_full = buys.index[0] if not buys.empty else None
   last_buy_price = None
 
   current_group_buy_count = 0
   group_consecutive_buys = 0
+
+  # [NEW] 그룹별 수익률을 모으기 위한 임시 리스트 및 날짜 저장 변수
+  group_partial_returns = []
+  group_full_returns = []
+  group_sell_date_partial = None
+  group_sell_date_full = None
 
   # --- 내부 함수: 연속 매수 횟수 미리 계산 ---
   def count_potential_buys(start_date, end_date, initial_price):
@@ -55,25 +65,47 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     for idx in potential_candidates.index:
       if idx <= start_date:
         continue
-
       current_close = group_data.loc[idx, 'Close']
       current_rsi = group_data.loc[idx, 'RSI']
 
       if current_close >= temp_last_price:
         continue
-
       threshold = 30 if next_buy_order == 2 else 35
-
       if current_rsi <= threshold:
         c_buys += 1
         temp_last_price = current_close
         next_buy_order += 1
-
     return c_buys
+  # -------------------------------------------------------
+
+  # --- [NEW] 그룹 정산(Flush) 함수 ---
+  def flush_group_metrics():
+    nonlocal group_partial_returns, group_full_returns, group_sell_date_partial, group_sell_date_full
+
+    # 부분 매도 평균 수익률 기록
+    if group_sell_date_partial and group_partial_returns:
+      avg_partial = sum(group_partial_returns) / len(group_partial_returns)
+      df.loc[group_sell_date_partial, 'Group Partial Avg Return'] = avg_partial
+
+    # 전체 매도 평균 수익률 기록
+    if group_sell_date_full and group_full_returns:
+      avg_full = sum(group_full_returns) / len(group_full_returns)
+      df.loc[group_sell_date_full, 'Group Full Avg Return'] = avg_full
+
+    # 리스트 및 변수 초기화
+    group_partial_returns = []
+    group_full_returns = []
+    group_sell_date_partial = None
+    group_sell_date_full = None
+  # -----------------------------------
 
   for buy_date in buys.index:
     # 새 그룹 시작 여부 확인
     if sell_date_full is not None and buy_date > sell_date_full:
+      # [IMPORTANT] 이전 그룹의 데이터 정산(Flush) 수행
+      flush_group_metrics()
+
+      # 상태 초기화
       current_buy_group_flag = False
       last_buy_price = None
       current_group_buy_count = 0
@@ -81,16 +113,15 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     is_first_buy = not current_buy_group_flag
 
-    # 가격 조건 확인 (첫 매수 아닐 때)
+    # 가격 조건 확인
     if not is_first_buy:
       current_price = df.loc[buy_date, 'Close']
       if last_buy_price is None or current_price >= last_buy_price:
         continue
 
-    # 매수 회차별 RSI 조건 검증 (35 -> 30 -> 35)
+    # RSI 조건 검증
     current_rsi = df.loc[buy_date, 'RSI']
     required_rsi = 35
-
     if is_first_buy:
       required_rsi = 35
     else:
@@ -103,15 +134,13 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     if current_rsi > required_rsi:
       continue
 
-    # --- 실제 매수 실행 ---
+    # --- 매수 실행 ---
     position = df.loc[buy_date, 'Close']
     df.loc[buy_date, 'Action'] = 'Buy'
     last_buy_price = position
-
     current_group_buy_count += 1
     buy_count += 1
 
-    # 포지션 사이즈 결정
     if current_rsi <= 20:
       position_size = 3
     elif current_rsi <= 30:
@@ -123,7 +152,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     subsequent_data = df.loc[buy_date:]
 
-    # 첫 매수일 때만 연속매수횟수 예측 계산
+    # 그룹 초기 설정 (연속매수 예측 등)
     if is_first_buy:
       current_buy_group_flag = True
 
@@ -157,34 +186,57 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     remaining_position = position_size
 
+    # --- 부분 매도 처리 ---
     if sell_date_partial:
       df.loc[sell_date_partial, 'Action'] = 'Partial Sell'
       partial_price = df.loc[sell_date_partial, 'Close']
       partial_return = (partial_price / position - 1) * position_size
+
       df.loc[buy_date, 'Partial Return'] = partial_return
       returns.append(partial_return)
       holding_periods.append((sell_date_partial - buy_date).days)
 
+      # Weight 누적
       sell_amount = position_size / 2
       df.loc[sell_date_partial, 'Weight'] += sell_amount
+      remaining_position -= sell_amount
 
-      remaining_position -= sell_amount # 잔량 차감
+      # [NEW] 그룹 통계 수집
+      group_partial_returns.append(partial_return)
+      group_sell_date_partial = sell_date_partial
 
+    # --- 전체 매도 처리 ---
     if sell_date_full:
       df.loc[sell_date_full, 'Action'] = 'Full Sell'
       full_price = df.loc[sell_date_full, 'Close']
       full_return = (full_price / position - 1) * position_size
+
       df.loc[buy_date, 'Full Return'] = full_return
       returns.append(full_return)
       holding_periods.append((sell_date_full - buy_date).days)
 
+      # Weight 누적
       df.loc[sell_date_full, 'Weight'] += remaining_position
+
+      # [NEW] 그룹 통계 수집
+      group_full_returns.append(full_return)
+      group_sell_date_full = sell_date_full
+
+  # [IMPORTANT] 루프 종료 후 마지막 그룹 정산(Flush)
+  flush_group_metrics()
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
 
   output_dir = 'global/buy-and-sell'
   os.makedirs(output_dir, exist_ok=True)
+
+  # 보기 좋게 컬럼 순서 정렬 (선택 사항)
+  cols = ['Close', 'RSI', 'Action', 'Weight', 'Consecutive Buys', 'Partial Return', 'Full Return', 'Group Partial Avg Return', 'Group Full Avg Return']
+  # 존재하는 컬럼만 선택하여 저장
+  final_cols = [c for c in cols if c in df.columns]
+
+  # 전체 데이터를 저장하되, 위 주요 컬럼 위주로 보이게
   df.to_csv(os.path.join(output_dir, f'{ticker}_backtest_results.csv'))
 
   return avg_return, avg_holding_period, buy_count
