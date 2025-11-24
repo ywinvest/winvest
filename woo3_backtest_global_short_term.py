@@ -7,7 +7,6 @@ import pandas as pd
 
 import indicators
 
-# 초기 필터링용 조건 (가장 느슨한 조건인 35를 기준으로 잡고, 상세 로직은 backtest 내부에서 처리)
 def buy_condition_broad(df):
   """Broad buy condition for global indices (RSI <= 35)."""
   return (df['RSI'] <= 35) & (~df['Bullish']) & (df['Change_Rate'] < 0)
@@ -27,7 +26,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
   # Weight 컬럼 0.0으로 초기화 (이벤트 발생일에만 값을 기록함)
   df['Weight'] = 0.0
 
-  # 1차 필터: RSI 35 이하인 모든 잠재적 매수 시점을 가져옴
   buys = df[buy_condition(df)]
 
   returns = []
@@ -38,14 +36,10 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
   sell_date_full = buys.index[0]
   last_buy_price = None
 
-  # 그룹 내 매수 순서 및 연속 매수 횟수 추적
   current_group_buy_count = 0
   group_consecutive_buys = 0
 
-  # [NEW] 현재 그룹의 누적 웨이트를 추적하는 변수 (Dataframe 컬럼 대신 로직으로 관리)
-  current_accumulated_weight = 0.0
-
-  # --- 내부 함수: 연속 매수 횟수 미리 계산 (Look-ahead Logic) ---
+  # --- 내부 함수: 연속 매수 횟수 미리 계산 ---
   def count_potential_buys(start_date, end_date, initial_price):
     if end_date:
       group_data = df.loc[start_date:end_date]
@@ -68,7 +62,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       if current_close >= temp_last_price:
         continue
 
-      # RSI 조건: 2번째는 30 이하, 그 외는 35 이하
       threshold = 30 if next_buy_order == 2 else 35
 
       if current_rsi <= threshold:
@@ -77,7 +70,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
         next_buy_order += 1
 
     return c_buys
-  # -------------------------------------------------------
 
   for buy_date in buys.index:
     # 새 그룹 시작 여부 확인
@@ -86,7 +78,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       last_buy_price = None
       current_group_buy_count = 0
       group_consecutive_buys = 0
-      current_accumulated_weight = 0.0 # 새 그룹 시작시 누적 웨이트 초기화
 
     is_first_buy = not current_buy_group_flag
 
@@ -129,7 +120,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       position_size = 1
 
     df.loc[buy_date, 'Weight'] = position_size
-    current_accumulated_weight += position_size
 
     subsequent_data = df.loc[buy_date:]
 
@@ -165,7 +155,8 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       sell_full = sell_full[sell_condition_full(sell_full)] if sell_condition_full else pd.DataFrame()
       sell_date_full = sell_full.index[0] if not sell_full.empty else None
 
-    # 부분 매도 처리
+    remaining_position = position_size
+
     if sell_date_partial:
       df.loc[sell_date_partial, 'Action'] = 'Partial Sell'
       partial_price = df.loc[sell_date_partial, 'Close']
@@ -174,11 +165,11 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       returns.append(partial_return)
       holding_periods.append((sell_date_partial - buy_date).days)
 
-      sell_weight = current_accumulated_weight / 2
-      df.loc[sell_date_partial, 'Weight'] = sell_weight
-      current_accumulated_weight -= sell_weight # 누적 잔고 갱신
+      sell_amount = position_size / 2
+      df.loc[sell_date_partial, 'Weight'] += sell_amount
 
-    # 전체 매도 처리
+      remaining_position -= sell_amount # 잔량 차감
+
     if sell_date_full:
       df.loc[sell_date_full, 'Action'] = 'Full Sell'
       full_price = df.loc[sell_date_full, 'Close']
@@ -187,9 +178,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       returns.append(full_return)
       holding_periods.append((sell_date_full - buy_date).days)
 
-      sell_weight = current_accumulated_weight
-      df.loc[sell_date_full, 'Weight'] = sell_weight
-      current_accumulated_weight = 0.0 # 전량 매도했으므로 0
+      df.loc[sell_date_full, 'Weight'] += remaining_position
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
@@ -237,5 +226,4 @@ if __name__ == "__main__":
 
   print("\nBacktest Results:")
   for name, metrics in results.items():
-    print(
-      f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
+    print(f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
