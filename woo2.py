@@ -9,6 +9,7 @@ import pandas as pd
 import pandas_ta as ta
 from dotenv import load_dotenv
 
+import rs
 from slack_utils import SlackMessageBuilder, send_slack_message
 
 
@@ -83,33 +84,7 @@ def calculate_indicators(df):
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
-  first_day_close = df['Close'].iloc[0]
-  for period_days in [21, 63, 126, 252]:
-    period_str = f"{period_days // 21}M"
-    return_col = f'Return_{period_str}'
-    base_price = df['Close'].shift(period_days)
-    base_price.fillna(first_day_close, inplace=True)
-    df[return_col] = df['Close'] / base_price - 1
-
-  df['Weighted_Return'] = (df['Return_1M'] * 0.4 +
-                           df['Return_3M'] * 0.3 +
-                           df['Return_6M'] * 0.2 +
-                           df['Return_12M'] * 0.1)
-  return df
-
-
-def calculate_relative_strength(df):
-  grouped = df.groupby([df.index])
-  for period in ["1M", "3M", "6M", "12M"]:
-    return_col = f'Return_{period}'
-    rs_col = f'RS_{period}'
-
-    df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
-    df[rs_col] = df[rs_col].fillna(1).astype(int).clip(1, 99)
-
-  df['RS'] = grouped['Weighted_Return'].rank(pct=True) * 98 + 1
-  df['RS'] = df['RS'].fillna(1).astype(int).clip(1, 99)
-
+  rs.calculate_indicators(df)
   return df
 
 
@@ -169,7 +144,7 @@ def buy_condition(df):
   conditions &= (df['Volume'].shift(1) > 0)
   # conditions &= (df['MA120_Uptrend_Days'] < 400) # 120일 상승 추세 장기 연속 제외
   # conditions &= ((df['Close'] - df['Open'])/df['Close'] > -0.05) # 긴 음봉 제외
-  conditions &= (df['MA20_Gap'] < 0.3)
+  conditions &= (df['MA20_Gap'] < 0.35)
   return conditions
 
 
@@ -196,31 +171,23 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       if buy_date <= prev_sell_date:
         continue
 
-      # --- RSI 및 시가총액 조건 검사 (수정된 로직) ---
       market = buy_row['Market']
-      index_rsi = None
-      index_ma20_up = None
-      index_adx = None
-      index_di = None
+      buy_index_rsi = None
+      buy_index_ma5_up = None
+      buy_index_ma20_up = None
+      buy_index_adx = None
+      buy_index_di = None
 
-      rsi_source_df = None
+      sell_index_ma5_up = None
+      sell_index_ma20_up = None
+      sell_index_adx = None
+      sell_index_di = None
+
+      source_df = None
       if market == 'KOSPI':
-        rsi_source_df = kospi_df
+        source_df = kospi_df
       elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
-        rsi_source_df = kosdaq_df
-
-      if rsi_source_df is not None and buy_date in rsi_source_df.index:
-        rsi_val = rsi_source_df.loc[buy_date, 'RSI']
-        index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-        ma20_up_val = rsi_source_df.loc[buy_date, 'MA20_Up']
-        index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-        adx_val = rsi_source_df.loc[buy_date, 'ADX']
-        index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-        di_val = rsi_source_df.loc[buy_date, 'DI']
-        index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
-
-      # if index_rsi is None or index_rsi > 80 or index_rsi < 30:
-      #   continue
+        source_df = kosdaq_df
 
       buy_price = buy_row['Close']
       current_price = stock_group['Close'].iloc[-1]
@@ -238,9 +205,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
       if not trade_data.empty:
         # 익절/손절 가격 정의
-        take_profit_price = buy_price * 1.24
+        take_profit_price = buy_price * 1.242
         stop_loss_price = buy_price * 0.92
-        trailing_stop_loss_price = buy_price * 1.08
+        default_trailing_stop_loss_price = buy_price * 1.082
 
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
@@ -273,8 +240,32 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             full_sell_price = trade_data.loc[earliest_date, 'Close']
         # else:
         #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
+        if source_df is not None and buy_date in source_df.index:
+          rsi_val = source_df.loc[buy_date, 'RSI']
+          buy_index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
+          ma5_up_val = source_df.loc[buy_date, 'MA5_Up']
+          buy_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
+          ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
+          buy_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
+          adx_val = source_df.loc[buy_date, 'ADX']
+          buy_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+          di_val = source_df.loc[buy_date, 'DI']
+          buy_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+
+        if source_df is not None and sell_date in source_df.index:
+          ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
+          sell_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
+          ma20_up_val = source_df.loc[sell_date, 'MA20_Up']
+          sell_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
+          adx_val = source_df.loc[sell_date, 'ADX']
+          sell_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+          di_val = source_df.loc[sell_date, 'DI']
+          sell_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
         if sell_date and not full_sell_date:
+          is_market_weak = not sell_index_ma5_up
+          trailing_stop_loss_price = buy_price * 1.162 if is_market_weak else default_trailing_stop_loss_price
+
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           if not after_partial_sell_data.empty:
@@ -308,12 +299,17 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Date': buy_date,
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
-        'Index_RSI': index_rsi,
-        'Index_ADX': index_adx,
-        'Index_DI': index_di,
-        'Index_MA20_Up': index_ma20_up,
+        'Buy_Index_RSI': buy_index_rsi,
+        'Buy_Index_ADX': buy_index_adx,
+        'Buy_Index_DI': buy_index_di,
+        'Buy_Index_MA5_Up': buy_index_ma5_up,
+        'Buy_Index_MA20_Up': buy_index_ma20_up,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
+        'Sell_Index_ADX': sell_index_adx,
+        'Sell_Index_DI': sell_index_di,
+        'Sell_Index_MA5_Up': sell_index_ma5_up,
+        'Sell_Index_MA20_Up': sell_index_ma20_up,
         'Full_Sell_Date': full_sell_date,
         'Full_Sell_Price': full_sell_price,
         'Return': (sell_price / buy_price - 1) if sell_price else (current_price / buy_price - 1),
@@ -442,13 +438,14 @@ def send_to_slack(trades_data, kospi, kosdaq):
 
     today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
 
-    # 시장별 RSI 값 가져오기 (오늘 날짜 기준)
-    kospi_rsi = today_kospi['RSI'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_rsi = today_kosdaq['RSI'].iloc[-1] if not today_kosdaq.empty else None
+    # kospi_rsi = today_kospi['RSI'].iloc[-1] if not today_kospi.empty else None
+    # kosdaq_rsi = today_kosdaq['RSI'].iloc[-1] if not today_kosdaq.empty else None
     kospi_adx = today_kospi['ADX'].iloc[-1] if not today_kospi.empty else None
     kosdaq_adx = today_kosdaq['ADX'].iloc[-1] if not today_kosdaq.empty else None
     kospi_di = today_kospi['DI'].iloc[-1] if not today_kospi.empty else None
     kosdaq_di = today_kosdaq['DI'].iloc[-1] if not today_kosdaq.empty else None
+    kospi_ma5_up = today_kospi['MA5_Up'].iloc[-1] if not today_kospi.empty else None
+    kosdaq_ma5_up = today_kosdaq['MA5_Up'].iloc[-1] if not today_kosdaq.empty else None
     kospi_ma20_up = today_kospi['MA20_Up'].iloc[-1] if not today_kospi.empty else None
     kosdaq_ma20_up = today_kosdaq['MA20_Up'].iloc[-1] if not today_kosdaq.empty else None
 
@@ -458,19 +455,21 @@ def send_to_slack(trades_data, kospi, kosdaq):
     )
 
     for market, group in today_trades.groupby('Market'):
-      if (50 <= (kospi_rsi if market == 'KOSPI' else kosdaq_rsi) <= 80) and (
-          (kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
+      if ((kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
           kospi_di if market == 'KOSPI' else kosdaq_di):
-        if kospi_ma20_up if market == 'KOSPI' else kosdaq_ma20_up:
+        ma5_up = kospi_ma5_up if market == 'KOSPI' else kosdaq_ma5_up
+        ma20_up = kospi_ma20_up if market == 'KOSPI' else kosdaq_ma20_up
+        if ma5_up and ma20_up:
           rsi_emoji = "green_sphere"
-        else:
+        elif ma20_up:
           rsi_emoji = "yellow_sphere"
       else:
         rsi_emoji = "red_sphere"
-      rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
+      # rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
       adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
+      di_value = kospi_di if market == 'KOSPI' else kosdaq_di
       builder.add_line(
-          f" {market} (RSI {rsi_value:.2f}, ADX {adx_value:.2f})",
+          f" {market} (ADX {adx_value:.2f}, DI {di_value})",
           emoji=rsi_emoji,
           bold=True,
           italic=True
@@ -488,7 +487,7 @@ def send_to_slack(trades_data, kospi, kosdaq):
         if rs_1m >= rs_3m and rs_1m >= rs_6m:
           if 80 <= rs <= 95:
             emoji = "first_place_medal"
-          elif (75 <= rs <= 89) or (96 <= rs <= 99):
+          elif (75 <= rs <= 79) or (96 <= rs <= 99):
             emoji = "second_place_medal"
 
         with builder.line() as line:
@@ -566,6 +565,7 @@ if __name__ == "__main__":
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
@@ -573,11 +573,12 @@ if __name__ == "__main__":
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
-    result_data = calculate_relative_strength(result_data)
+    result_data = rs.calculate_relative_strength(result_data)
     filtered_data = filter_common_stocks(result_data)
 
     # buy_and_sell 함수를 사용하여 매수 후보 찾기

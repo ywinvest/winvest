@@ -79,6 +79,8 @@ def send_to_slack(result_data):
     result_data = result_data.sort_values(['Market', 'High_Change'], ascending=[True, False])
 
     builder.add_line(f" {today.year}년 {today.month}월 {today.day}일 매수 후보", bold=True)
+    if today.weekday() == 3: # 월=0, 화=1, 수=2, 목=3
+      builder.add_line(f" 목요일이니 매수에 유의하세요!", emoji="warning", bold=True, italic=True)
     # 시장별로 데이터 구성
     for market, group in result_data.groupby('Market'):
       for _, row in group.iterrows():

@@ -9,6 +9,7 @@ import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
 
+import rs
 import woo1
 import woo2
 
@@ -95,6 +96,7 @@ if __name__ == "__main__":
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
 
     kosdaq = fdr.DataReader('KQ11')
@@ -102,14 +104,27 @@ if __name__ == "__main__":
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
 
     result_file = "woo2_backtest_results.csv"
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks)
-    result_data = woo2.calculate_relative_strength(result_data)
+    result_data = rs.calculate_relative_strength(result_data)
     filtered_data = woo1.filter_common_stocks(result_data)
+
+    last_trading_day = result_data.index.max()
+    if last_trading_day:
+      today_rs_data = result_data[result_data.index == last_trading_day].copy()
+      today_rs_data = woo2.filter_common_stocks(today_rs_data)
+      today_rs_data['Marcap(억)'] = (today_rs_data['Marcap'] / 100_000_000).round(0).astype(int)
+      rs_report = today_rs_data.drop(columns=['Marcap'])
+      rs_cols = ['Code', 'Name', 'Market', 'Marcap(억)', 'RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M']
+      rs_report = today_rs_data[rs_cols].sort_values(by='RS', ascending=False)
+      filename = f"rs_{last_trading_day.strftime('%Y%m%d')}.xlsx"
+      rs_report.to_excel(filename, index=False)
+
     result_data = woo2.buy_and_sell(filtered_data, kospi, kosdaq)
     # final_data = result_data[buy_condition(result_data)]
     result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
