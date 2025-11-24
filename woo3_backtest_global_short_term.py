@@ -8,7 +8,7 @@ import numpy as np
 
 import indicators
 
-INIT_RSI = 36
+INIT_RSI = 35
 
 # 초기 필터링용 조건
 def buy_condition_broad(df):
