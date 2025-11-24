@@ -98,12 +98,8 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
             consecutive_buys += 1
             temp_last_price = current_close  # 실제 매수한 가격으로 업데이트
 
-      # 디버깅: 1단계 결과 출력
-      if buy_date.year == 2020 and buy_date.month in [2, 3]:
-        print(f"[1단계] {buy_date.date()}: 10일선 기준 연속매수 = {consecutive_buys}, 매도일 = {temp_sell_date.date() if temp_sell_date else 'None'}")
-
       # 2단계: 연속매수가 3회 이상이면 20일선 돌파 기준으로 재계산
-      if consecutive_buys >= 3:
+      if consecutive_buys >= 4:
         temp_sell_ma20 = subsequent_data[subsequent_data['MA_20_Cross']]
         temp_sell_date_ma20 = temp_sell_ma20.index[0] if not temp_sell_ma20.empty else None
 
@@ -125,17 +121,13 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
               consecutive_buys += 1
               temp_last_price = current_close
 
-        # 디버깅: 2단계 결과 출력
-        if buy_date.year == 2020 and buy_date.month in [2, 3]:
-          print(f"[2단계] {buy_date.date()}: 20일선 기준 연속매수 = {consecutive_buys}, 매도일 = {temp_sell_date_ma20.date() if temp_sell_date_ma20 else 'None'}")
-
       group_consecutive_buys = consecutive_buys
 
     # 모든 매수에 첫 매수에서 계산한 연속매수회수 할당
     df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
 
     # 연속매수회수가 3회 이상인 경우 매도 조건 변경
-    if group_consecutive_buys >= 3:
+    if group_consecutive_buys >= 4:
       current_buy_group_flag = True
 
       # 20일선 돌파시 전체 매도 (부분매도 없음)
