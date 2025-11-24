@@ -76,7 +76,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
         temp_last_price = current_close
         next_buy_order += 1
     return c_buys
-  # -------------------------------------------------------
 
   # --- 그룹 정산(Flush) 함수 ---
   def flush_group_metrics():
@@ -94,7 +93,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     group_full_returns = []
     group_sell_date_partial = None
     group_sell_date_full = None
-  # -----------------------------------
 
   for buy_date in buys.index:
     # 새 그룹 시작 여부 확인
@@ -167,8 +165,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
 
-    #
-
     # 매도 로직 결정
     if group_consecutive_buys >= 5:
       # 5회 이상: Partial Sell 없음, Full Sell = MA_20_Cross
@@ -177,8 +173,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
       sell_date_partial = None
     else:
-      # [MODIFIED LOGIC: 연속매수횟수 < 5]
-
       # 1. Partial Sell은 MA_10_Cross로 유지
       temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
       sell_date_partial = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
