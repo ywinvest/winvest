@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
 import pandas as pd
+import numpy as np
 
 import indicators
-
 
 # 초기 필터링용 조건
 def buy_condition_broad(df):
@@ -14,20 +14,20 @@ def buy_condition_broad(df):
   return (df['RSI'] <= 35) & (~df['Bullish']) & (df['Change_Rate'] < 0)
 
 def sell_condition_partial(df):
-  """Partial sell condition for global indices."""
+  """Partial sell condition for global indices (10-MA Cross)."""
   return df['MA_10_Cross']
 
 def sell_condition_full(df):
-  """Full sell condition for global indices."""
+  """
+  [NOTE]: 이 전역 함수는 더 이상 5회 미만 그룹의 전체 매도 조건으로 직접 사용되지 않습니다.
+  """
   return df['MA_20_Cross'] | df['MA_10_Break']
 
 def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition_full):
-  """Backtest with merged return columns (Individual on Buy rows, Average on Sell rows)."""
+  """Backtest with dynamic Full Sell logic based on consecutive buy count."""
   df = indicators.calculate_indicators(data.copy())
 
-  # 결과 기록을 위한 컬럼 초기화
   df['Weight'] = 0.0
-  # 별도의 Group 컬럼 생성 제거하고 기존 컬럼 사용 예정
 
   buys = df[buy_condition(df)]
 
@@ -42,7 +42,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
   current_group_buy_count = 0
   group_consecutive_buys = 0
 
-  # 그룹별 수익률을 모으기 위한 임시 리스트 및 날짜 저장 변수
   group_partial_returns = []
   group_full_returns = []
   group_sell_date_partial = None
@@ -77,23 +76,18 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     return c_buys
   # -------------------------------------------------------
 
-  # --- [MODIFIED] 그룹 정산(Flush) 함수 ---
+  # --- 그룹 정산(Flush) 함수 ---
   def flush_group_metrics():
     nonlocal group_partial_returns, group_full_returns, group_sell_date_partial, group_sell_date_full
 
-    # 부분 매도 평균 수익률 기록 -> 'Partial Return' 컬럼에 기록
     if group_sell_date_partial and group_partial_returns:
       avg_partial = sum(group_partial_returns) / len(group_partial_returns)
-      # 매도일(Sell Date) 행에 그룹 평균 기록
       df.loc[group_sell_date_partial, 'Partial Return'] = avg_partial
 
-    # 전체 매도 평균 수익률 기록 -> 'Full Return' 컬럼에 기록
     if group_sell_date_full and group_full_returns:
       avg_full = sum(group_full_returns) / len(group_full_returns)
-      # 매도일(Sell Date) 행에 그룹 평균 기록
       df.loc[group_sell_date_full, 'Full Return'] = avg_full
 
-    # 리스트 및 변수 초기화
     group_partial_returns = []
     group_full_returns = []
     group_sell_date_partial = None
@@ -171,19 +165,32 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
 
+    #
+
     # 매도 로직 결정
     if group_consecutive_buys >= 5:
+      # 5회 이상: Partial Sell 없음, Full Sell = MA_20_Cross
       override_condition = lambda d: d['MA_20_Cross']
       sell_full_new = subsequent_data[override_condition(subsequent_data)]
       sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
       sell_date_partial = None
     else:
+      # [MODIFIED LOGIC: 연속매수횟수 < 5]
+
+      # 1. Partial Sell은 MA_10_Cross로 유지
       temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
       sell_date_partial = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
 
+      # 2. Full Sell 조건은 MA_10_Cross로 변경
+      full_sell_condition_lt_5 = lambda d: d['MA_10_Cross']
+
+      # 부분 매도일 이후부터 Full Sell 조건 탐색 시작 (부분 매도일 포함)
       sell_full = subsequent_data.loc[sell_date_partial:] if sell_date_partial else subsequent_data
-      sell_full = sell_full[sell_condition_full(sell_full)] if sell_condition_full else pd.DataFrame()
+
+      # 변경된 조건 적용 (MA_10_Cross)
+      sell_full = sell_full[full_sell_condition_lt_5(sell_full)] if full_sell_condition_lt_5 else pd.DataFrame()
       sell_date_full = sell_full.index[0] if not sell_full.empty else None
+
 
     remaining_position = position_size
 
@@ -193,9 +200,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       partial_price = df.loc[sell_date_partial, 'Close']
       partial_return = (partial_price / position - 1) * position_size
 
-      # 매수일(Buy Date) 행에 개별 수익률 기록
       df.loc[buy_date, 'Partial Return'] = partial_return
-
       returns.append(partial_return)
       holding_periods.append((sell_date_partial - buy_date).days)
 
@@ -214,9 +219,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       full_price = df.loc[sell_date_full, 'Close']
       full_return = (full_price / position - 1) * position_size
 
-      # 매수일(Buy Date) 행에 개별 수익률 기록
       df.loc[buy_date, 'Full Return'] = full_return
-
       returns.append(full_return)
       holding_periods.append((sell_date_full - buy_date).days)
 
@@ -235,13 +238,6 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
   output_dir = 'global/buy-and-sell'
   os.makedirs(output_dir, exist_ok=True)
-
-  # 보기 좋게 컬럼 순서 정렬 (기존 컬럼명 사용)
-  cols = ['Close', 'RSI', 'Action', 'Weight', 'Consecutive Buys', 'Partial Return', 'Full Return']
-  final_cols = [c for c in cols if c in df.columns]
-
-  # 필요한 컬럼만 선택하여 저장하려면 아래 주석 해제, 현재는 전체 저장
-  # df = df[final_cols]
 
   df.to_csv(os.path.join(output_dir, f'{ticker}_backtest_results.csv'))
 
