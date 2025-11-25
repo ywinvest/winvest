@@ -123,6 +123,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     # --- 매수 실행 ---
     position = df.loc[buy_date, 'Close']
+    change_rate = df.loc[buy_date, 'Change_Rate']
     df.loc[buy_date, 'Action'] = 'Buy'
     last_buy_price = position
     current_group_buy_count += 1
@@ -134,6 +135,9 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       position_size = 2
     else:
       position_size = 1
+
+    if change_rate < -5:
+      position_size += 1
 
     df.loc[buy_date, 'Weight'] = position_size
 
