@@ -10,6 +10,7 @@ import pandas as pd
 class DynamicBuyStrategy(bt.Strategy):
   """
   Dynamic buy strategy with adaptive sell logic based on consecutive buy count.
+  Records each individual buy and sell transaction separately.
   """
   params = (
     ('rsi_threshold', 35),
@@ -32,8 +33,6 @@ class DynamicBuyStrategy(bt.Strategy):
 
     # Trade tracking variables
     self.order = None
-    self.buy_price = None
-    self.buy_date = None
 
     # Group tracking
     self.current_buy_group_flag = False
@@ -42,13 +41,16 @@ class DynamicBuyStrategy(bt.Strategy):
     self.last_buy_price = None
     self.group_first_buy_price = None
 
+    # Track all buys in current group
+    self.current_group_buys = []  # List of {date, price, size, rsi}
+
     # Statistics
     self.trade_returns = []
     self.holding_periods = []
     self.buy_count = 0
 
-    # Results storage
-    self.trades_log = []
+    # Results storage - separate logs for buys and sells
+    self.transactions_log = []
 
   def notify_order(self, order):
     if order.status in [order.Submitted, order.Accepted]:
@@ -56,34 +58,75 @@ class DynamicBuyStrategy(bt.Strategy):
 
     if order.status in [order.Completed]:
       if order.isbuy():
-        self.buy_price = order.executed.price
-        self.buy_date = self.data.datetime.date(0)
+        buy_date = self.data.datetime.date(0)
+        buy_price = order.executed.price
+        buy_size = order.executed.size
+        buy_rsi = self.rsi[0]
+
+        # Record individual buy transaction
+        self.transactions_log.append({
+          'Date': buy_date,
+          'Action': 'Buy',
+          'Price': buy_price,
+          'Size': buy_size,
+          'RSI': buy_rsi,
+          'MA_10': self.ma_10[0],
+          'MA_20': self.ma_20[0],
+          'Change_Rate': (self.data.close[0] / self.data.close[-1] - 1) * 100,
+          'Consecutive_Buys': self.group_consecutive_buys,
+          'Return': None,
+          'Holding_Period': None
+        })
+
+        # Add to current group buys
+        self.current_group_buys.append({
+          'date': buy_date,
+          'price': buy_price,
+          'size': buy_size,
+          'rsi': buy_rsi
+        })
 
         if self.params.printlog:
-          print(f'{self.data.datetime.date(0)} BUY EXECUTED, Price: {order.executed.price:.2f}, '
-                f'Size: {order.executed.size:.2f}, RSI: {self.rsi[0]:.2f}')
+          print(f'{buy_date} BUY EXECUTED, Price: {buy_price:.2f}, '
+                f'Size: {buy_size:.2f}, RSI: {buy_rsi:.2f}')
 
       elif order.issell():
-        holding_period = (self.data.datetime.date(0) - self.buy_date).days
-        trade_return = (order.executed.price / self.buy_price - 1) * order.executed.size
+        sell_date = self.data.datetime.date(0)
+        sell_price = order.executed.price
+        sell_size = order.executed.size
 
-        self.trade_returns.append(trade_return)
-        self.holding_periods.append(holding_period)
+        # Record individual sell transactions for each buy in the group
+        for buy_info in self.current_group_buys:
+          buy_date = buy_info['date']
+          buy_price = buy_info['price']
+          buy_size = buy_info['size']
 
-        if self.params.printlog:
-          print(f'{self.data.datetime.date(0)} SELL EXECUTED, Price: {order.executed.price:.2f}, '
-                f'Return: {trade_return*100:.2f}%, Holding: {holding_period} days')
+          holding_period = (sell_date - buy_date).days
+          # Calculate return correctly: (sell_price - buy_price) / buy_price
+          trade_return = (sell_price / buy_price - 1) * 100  # Return in percentage
 
-        # Log trade details
-        self.trades_log.append({
-          'buy_date': self.buy_date,
-          'sell_date': self.data.datetime.date(0),
-          'buy_price': self.buy_price,
-          'sell_price': order.executed.price,
-          'return': trade_return,
-          'holding_period': holding_period,
-          'consecutive_buys': self.group_consecutive_buys
-        })
+          self.trade_returns.append(trade_return)
+          self.holding_periods.append(holding_period)
+
+          # Record sell transaction
+          self.transactions_log.append({
+            'Date': sell_date,
+            'Action': 'Sell',
+            'Price': sell_price,
+            'Size': buy_size,
+            'RSI': self.rsi[0],
+            'MA_10': self.ma_10[0],
+            'MA_20': self.ma_20[0],
+            'Change_Rate': (self.data.close[0] / self.data.close[-1] - 1) * 100,
+            'Consecutive_Buys': self.group_consecutive_buys,
+            'Return': trade_return,
+            'Holding_Period': holding_period
+          })
+
+          if self.params.printlog:
+            print(f'{sell_date} SELL EXECUTED, Price: {sell_price:.2f}, '
+                  f'Buy Price: {buy_price:.2f}, Return: {trade_return:.2f}%, '
+                  f'Holding: {holding_period} days')
 
         # Reset group tracking after sell
         self.current_buy_group_flag = False
@@ -91,6 +134,7 @@ class DynamicBuyStrategy(bt.Strategy):
         self.group_consecutive_buys = 0
         self.last_buy_price = None
         self.group_first_buy_price = None
+        self.current_group_buys = []
 
     self.order = None
 
@@ -116,7 +160,6 @@ class DynamicBuyStrategy(bt.Strategy):
     next_buy_order = 2
 
     # Look ahead in historical data (simulation only)
-    # In live trading, this would need to be adjusted
     for i in range(1, min(200, len(self.data))):
       if start_idx + i >= len(self.data):
         break
@@ -208,7 +251,7 @@ class DynamicBuyStrategy(bt.Strategy):
     if self.params.printlog:
       print(f'\n=== Strategy Results ===')
       print(f'Total Trades: {len(self.trade_returns)}')
-      print(f'Average Return: {avg_return*100:.2f}%')
+      print(f'Average Return: {avg_return:.2f}%')
       print(f'Average Holding Period: {avg_holding:.2f} days')
       print(f'Total Buy Count: {self.buy_count}')
 
@@ -267,7 +310,7 @@ def run_backtest(ticker, name, data, start_date, end_date):
 
   results_dict = {
     'Total Return': returns_analyzer.get('rtot', 0) * 100,
-    'Average Return': (sum(strat.trade_returns) / len(strat.trade_returns) * 100) if strat.trade_returns else 0,
+    'Average Return': (sum(strat.trade_returns) / len(strat.trade_returns)) if strat.trade_returns else 0,
     'Average Holding Period': (sum(strat.holding_periods) / len(strat.holding_periods)) if strat.holding_periods else 0,
     'Buy Count': strat.buy_count,
     'Total Trades': trades_analyzer.get('total', {}).get('total', 0),
@@ -275,13 +318,17 @@ def run_backtest(ticker, name, data, start_date, end_date):
     'Max Drawdown': drawdown_analyzer.get('max', {}).get('drawdown', 0)
   }
 
-  # Save trades log
+  # Save detailed transactions log (each buy and sell as separate row)
   output_dir = 'global/backtrader-results'
   os.makedirs(output_dir, exist_ok=True)
 
-  if strat.trades_log:
-    trades_df = pd.DataFrame(strat.trades_log)
-    trades_df.to_csv(os.path.join(output_dir, f'{ticker}_trades.csv'), index=False)
+  if strat.transactions_log:
+    transactions_df = pd.DataFrame(strat.transactions_log)
+    # Sort by date and action for better readability
+    transactions_df = transactions_df.sort_values(by=['Date', 'Action'])
+    transactions_df.to_csv(os.path.join(output_dir, f'{ticker}_transactions.csv'), index=False)
+
+    print(f"Saved {len(transactions_df)} transactions to {ticker}_transactions.csv")
 
   # Plot if needed (optional - requires matplotlib)
   # cerebro.plot()
