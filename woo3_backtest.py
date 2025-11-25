@@ -19,12 +19,12 @@ class DynamicBuyStrategy(bt.Strategy):
 
   def __init__(self):
     # Indicators
-    self.rsi = bt.indicators.RSI_SMA(self.data.close, period=14)
+    self.rsi = bt.indicators.RSI(self.data.close, period=14)
     self.ma_10 = bt.indicators.SMA(self.data.close, period=10)
     self.ma_20 = bt.indicators.SMA(self.data.close, period=20)
 
     # Bullish detection (Close > MA_20)
-    self.bullish = self.data.close > self.ma_20
+    self.bullish = self.data.close > self.data.open
 
     # MA cross detection
     self.ma_10_cross = bt.indicators.CrossOver(self.data.close, self.ma_10)
