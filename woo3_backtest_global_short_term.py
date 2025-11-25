@@ -3,8 +3,6 @@ import os
 from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
-import pandas as pd
-import numpy as np
 
 import indicators
 
@@ -14,16 +12,6 @@ DEFAULT_RSI_THRESHOLD = 35
 def buy_condition(df):
   """Broad buy condition for global indices (RSI <= 35)."""
   return (df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Change_Rate'] < 0)
-
-def sell_condition_partial(df):
-  """Partial sell condition for global indices (10-MA Cross)."""
-  return df['MA_10_Cross'] & df['Bullish']
-
-def sell_condition_full(df):
-  """
-  [NOTE]: 이 전역 함수는 더 이상 5회 미만 그룹의 전체 매도 조건으로 직접 사용되지 않습니다.
-  """
-  return df['MA_20_Cross'] | df['MA_10_Break']
 
 def sell_condition_technical_bounce(df):
   """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
