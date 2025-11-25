@@ -19,7 +19,7 @@ class DynamicBuyStrategy(bt.Strategy):
 
   def __init__(self):
     # Indicators
-    self.rsi = bt.indicators.RSI(self.data.close, period=14)
+    self.rsi = bt.indicators.RSI_EMA(self.data.close, period=14)
     self.ma_10 = bt.indicators.SMA(self.data.close, period=10)
     self.ma_20 = bt.indicators.SMA(self.data.close, period=20)
 
