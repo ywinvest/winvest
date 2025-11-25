@@ -12,10 +12,6 @@ class DynamicBuyStrategy(bt.Strategy):
   Dynamic buy strategy with adaptive sell logic based on consecutive buy count.
   Supports multiple buy orders within the same group.
   Records each individual buy and sell transaction separately.
-
-  *** 개선 사항 ***
-  1. 지표를 T-1일 기준으로 확인하여 T일에 거래를 실행.
-  2. next() 내에서 2차 매수 시 RSI <= 30 조건을 누락 없이 재검증하도록 수정.
   """
   params = (
     ('rsi_threshold', 35),
@@ -32,7 +28,7 @@ class DynamicBuyStrategy(bt.Strategy):
     # Bullish detection (Close > Open)
     self.bullish = self.data.close > self.data.open
 
-    # MA cross detection (Crossover returns: 1/-1/0)
+    # MA cross detection
     self.ma_10_cross = bt.indicators.CrossOver(self.data.close, self.ma_10)
     self.ma_20_cross = bt.indicators.CrossOver(self.data.close, self.ma_20)
 
@@ -66,6 +62,7 @@ class DynamicBuyStrategy(bt.Strategy):
         buy_date = self.data.datetime.date(0)
         buy_price = order.executed.price
         buy_size = order.executed.size
+        # T일 종가 기준으로 계산된 RSI
         buy_rsi = self.rsi[0]
 
         # Record individual buy transaction
@@ -147,22 +144,20 @@ class DynamicBuyStrategy(bt.Strategy):
     self.order = None
 
   def buy_condition(self):
-    """Check if buy condition is met (using T-1 data)."""
-    # T-1일 종가 기준 변화율
-    change_rate = (self.data.close[-1] / self.data.close[-2] - 1) * 100
-
-    # T-1일의 RSI, Bullish, Change_Rate 사용
-    return (self.rsi[-1] <= self.params.rsi_threshold and
-            not self.bullish[-1] and
+    """Check if broad buy condition (RSI <= 35, Falling, Not Bullish) is met using T day data."""
+    change_rate = (self.data.close[0] / self.data.close[-1] - 1) * 100
+    # T일 RSI[0], T일 Bullish[0], T일 Change_Rate 사용
+    return (self.rsi[0] <= self.params.rsi_threshold and
+            not self.bullish[0] and
             change_rate < 0)
 
   def sell_condition_technical_bounce(self):
-    """Technical bounce sell condition - MA_10 cross (using T-1 data)."""
-    return self.ma_10_cross[-1] > 0 and self.bullish[-1]
+    """Technical bounce sell condition - MA_10 cross (T day data)."""
+    return self.ma_10_cross[0] > 0 and self.bullish[0]
 
   def sell_condition_snap_back(self):
-    """Snap back sell condition - MA_20 cross (using T-1 data)."""
-    return self.ma_20_cross[-1] > 0 and self.bullish[-1]
+    """Snap back sell condition - MA_20 cross (T day data)."""
+    return self.ma_20_cross[0] > 0 and self.bullish[0]
 
   def next(self):
     # Skip if order is pending
@@ -173,33 +168,35 @@ class DynamicBuyStrategy(bt.Strategy):
     if self.in_position and len(self.current_group_buys) > 0:
       should_sell = False
 
+      # Check sell conditions based on consecutive buys
       if self.group_consecutive_buys >= 5:
+        # Use snap back condition (MA_20 cross)
         if self.sell_condition_snap_back():
           should_sell = True
       else:
+        # Use technical bounce condition (MA_10 cross)
         if self.sell_condition_technical_bounce():
           should_sell = True
 
       if should_sell:
+        # Sell entire position (all accumulated buys)
         total_size = sum(buy['size'] for buy in self.current_group_buys)
+        # T일 종가에 체결되도록 self.sell() 실행
         self.order = self.sell(size=total_size)
         return
 
-    # Check BUY conditions
-    # T-1일 조건 확인 (1차 필터링)
+    # Check BUY conditions (T일 조건)
     if self.buy_condition():
       is_first_buy = not self.in_position
 
-      # 1. 가격 조건 check (not for first buy)
+      # Price condition check (not for first buy)
       if not is_first_buy:
-        # 가격 조건: 오늘 종가 (data.close[0])가 마지막 매수 가격보다 낮아야 함
+        # 오늘 종가(data.close[0])가 마지막 매수 가격보다 낮아야 함
         if self.last_buy_price is None or self.data.close[0] >= self.last_buy_price:
           return
 
-      # 2. RSI 재검증 조건 verification (Pandas 로직 복원)
-      # T-1일 RSI 사용
-      current_rsi = self.rsi[-1]
-
+      # RSI condition verification (2차 RSI 조건 검증)
+      current_rsi = self.rsi[0]
       if is_first_buy:
         required_rsi = self.params.rsi_threshold
       else:
@@ -212,20 +209,20 @@ class DynamicBuyStrategy(bt.Strategy):
         return
 
       # Calculate position size
-      # T-1일 종가 기준 변화율 사용
-      change_rate = (self.data.close[-1] / self.data.close[-2] - 1) * 100
+      change_rate = (self.data.close[0] / self.data.close[-1] - 1) * 100
 
       if current_rsi <= 20:
         position_size = 3
       elif current_rsi <= 30:
         position_size = 2
-      else:
+      else: # 30 < RSI <= 35 (1차, 3차+ 매수 시)
         position_size = 1
 
       if change_rate < -5:
         position_size += 1
 
       # Execute buy
+      # T일 종가에 체결되도록 self.buy() 실행
       self.order = self.buy(size=position_size)
       self.last_buy_price = self.data.close[0]
       self.current_group_buy_count += 1
@@ -235,8 +232,10 @@ class DynamicBuyStrategy(bt.Strategy):
       if is_first_buy:
         self.in_position = True
         self.group_first_buy_price = self.data.close[0]
+        # Set initial consecutive buys estimate (actual buy count tracking)
         self.group_consecutive_buys = 1
       else:
+        # Update consecutive buys count as we add more
         self.group_consecutive_buys = self.current_group_buy_count
 
   def stop(self):
@@ -274,7 +273,8 @@ def run_backtest(ticker, name, data, start_date, end_date):
   # Add data
   cerebro.adddata(bt_data)
 
-  # T일 조건으로 T일 종가에 체결되도록 설정
+  # ⭐️ 핵심 개선: T일 조건으로 T일 종가에 체결되도록 설정 (Cheat-on-Close)
+  # 이 설정을 통해 Pandas 코드의 시뮬레이션 결과와 일치하도록 매수/매도 시점을 조정합니다.
   cerebro.broker.set_coc(True)
 
   # Add strategy
@@ -378,11 +378,11 @@ if __name__ == "__main__":
   print("BACKTEST SUMMARY RESULTS")
   print("="*80)
   for name, metrics in all_results.items():
-    print(f"\n{name}:")
-    print(f"  Total Return: {metrics['Total Return']:.2f}%")
-    print(f"  Average Return per Trade: {metrics['Average Return']:.2f}%")
-    print(f"  Average Holding Period: {metrics['Average Holding Period']:.2f} days")
-    print(f"  Buy Count: {metrics['Buy Count']}")
-    print(f"  Total Trades: {metrics['Total Trades']}")
-    print(f"  Sharpe Ratio: {metrics['Sharpe Ratio']:.2f}")
-    print(f"  Max Drawdown: {metrics['Max Drawdown']:.2f}%")
+    print(f"\n{name}:\n"
+          f"  Total Return: {metrics['Total Return']:.2f}%\n"
+          f"  Average Return per Trade: {metrics['Average Return']:.2f}%\n"
+          f"  Average Holding Period: {metrics['Average Holding Period']:.2f} days\n"
+          f"  Buy Count: {metrics['Buy Count']}\n"
+          f"  Total Trades: {metrics['Total Trades']}\n"
+          f"  Sharpe Ratio: {metrics['Sharpe Ratio']:.2f}\n"
+          f"  Max Drawdown: {metrics['Max Drawdown']:.2f}%")
