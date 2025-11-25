@@ -10,6 +10,7 @@ import pandas as pd
 class DynamicBuyStrategy(bt.Strategy):
   """
   Dynamic buy strategy with adaptive sell logic based on consecutive buy count.
+  Supports multiple buy orders within the same group.
   Records each individual buy and sell transaction separately.
   """
   params = (
@@ -24,7 +25,7 @@ class DynamicBuyStrategy(bt.Strategy):
     self.ma_10 = bt.indicators.SMA(self.data.close, period=10)
     self.ma_20 = bt.indicators.SMA(self.data.close, period=20)
 
-    # Bullish detection (Close > MA_20)
+    # Bullish detection (Close > Open)
     self.bullish = self.data.close > self.data.open
 
     # MA cross detection
@@ -35,7 +36,7 @@ class DynamicBuyStrategy(bt.Strategy):
     self.order = None
 
     # Group tracking
-    self.current_buy_group_flag = False
+    self.in_position = False  # Custom position flag
     self.current_group_buy_count = 0
     self.group_consecutive_buys = 0
     self.last_buy_price = None
@@ -74,6 +75,7 @@ class DynamicBuyStrategy(bt.Strategy):
           'MA_20': self.ma_20[0],
           'Change_Rate': (self.data.close[0] / self.data.close[-1] - 1) * 100,
           'Consecutive_Buys': self.group_consecutive_buys,
+          'Group_Buy_Count': self.current_group_buy_count,
           'Return': None,
           'Holding_Period': None
         })
@@ -87,16 +89,19 @@ class DynamicBuyStrategy(bt.Strategy):
         })
 
         if self.params.printlog:
-          print(f'{buy_date} BUY EXECUTED, Price: {buy_price:.2f}, '
-                f'Size: {buy_size:.2f}, RSI: {buy_rsi:.2f}')
+          print(f'{buy_date} BUY #{self.current_group_buy_count} EXECUTED, '
+                f'Price: {buy_price:.2f}, Size: {buy_size:.2f}, RSI: {buy_rsi:.2f}')
 
       elif order.issell():
         sell_date = self.data.datetime.date(0)
         sell_price = order.executed.price
         sell_size = order.executed.size
 
+        if self.params.printlog:
+          print(f'\n{sell_date} GROUP SELL - {len(self.current_group_buys)} positions')
+
         # Record individual sell transactions for each buy in the group
-        for buy_info in self.current_group_buys:
+        for idx, buy_info in enumerate(self.current_group_buys):
           buy_date = buy_info['date']
           buy_price = buy_info['price']
           buy_size = buy_info['size']
@@ -119,17 +124,17 @@ class DynamicBuyStrategy(bt.Strategy):
             'MA_20': self.ma_20[0],
             'Change_Rate': (self.data.close[0] / self.data.close[-1] - 1) * 100,
             'Consecutive_Buys': self.group_consecutive_buys,
+            'Group_Buy_Count': len(self.current_group_buys),
             'Return': trade_return,
             'Holding_Period': holding_period
           })
 
           if self.params.printlog:
-            print(f'{sell_date} SELL EXECUTED, Price: {sell_price:.2f}, '
-                  f'Buy Price: {buy_price:.2f}, Return: {trade_return:.2f}%, '
-                  f'Holding: {holding_period} days')
+            print(f'  └─ Sell #{idx+1}: Buy@{buy_price:.2f} → Sell@{sell_price:.2f}, '
+                  f'Return: {trade_return:.2f}%, Holding: {holding_period} days')
 
         # Reset group tracking after sell
-        self.current_buy_group_flag = False
+        self.in_position = False
         self.current_group_buy_count = 0
         self.group_consecutive_buys = 0
         self.last_buy_price = None
@@ -153,95 +158,79 @@ class DynamicBuyStrategy(bt.Strategy):
     """Snap back sell condition - MA_20 cross."""
     return self.ma_20_cross[0] > 0 and self.bullish[0]
 
-  def count_potential_buys(self, start_idx):
-    """Count potential consecutive buys from start index."""
-    count = 1
-    temp_last_price = self.data.close[0]
-    next_buy_order = 2
-
-    # Look ahead in historical data (simulation only)
-    for i in range(1, min(200, len(self.data))):
-      if start_idx + i >= len(self.data):
-        break
-
-      future_close = self.data.close[-i]
-      future_rsi = self.rsi[-i]
-
-      if future_close >= temp_last_price:
-        continue
-
-      threshold = 30 if next_buy_order == 2 else self.params.rsi_threshold
-      if future_rsi <= threshold:
-        count += 1
-        temp_last_price = future_close
-        next_buy_order += 1
-
-    return count
-
   def next(self):
     # Skip if order is pending
     if self.order:
       return
 
-    # Check if we have a position
-    if not self.position:
-      # Check buy conditions
-      if self.buy_condition():
-        is_first_buy = not self.current_buy_group_flag
+    # Check SELL conditions first (if we have a position)
+    if self.in_position and len(self.current_group_buys) > 0:
+      should_sell = False
 
-        # Price condition check (not for first buy)
-        if not is_first_buy:
-          if self.last_buy_price is None or self.data.close[0] >= self.last_buy_price:
-            return
-
-        # RSI condition verification
-        current_rsi = self.rsi[0]
-        if is_first_buy:
-          required_rsi = self.params.rsi_threshold
-        else:
-          check_order = self.current_group_buy_count + 1
-          required_rsi = 30 if check_order == 2 else self.params.rsi_threshold
-
-        if current_rsi > required_rsi:
-          return
-
-        # Calculate position size
-        change_rate = (self.data.close[0] / self.data.close[-1] - 1) * 100
-
-        if current_rsi <= 20:
-          position_size = 3
-        elif current_rsi <= 30:
-          position_size = 2
-        else:
-          position_size = 1
-
-        if change_rate < -5:
-          position_size += 1
-
-        # Execute buy
-        self.order = self.buy(size=position_size)
-        self.last_buy_price = self.data.close[0]
-        self.current_group_buy_count += 1
-        self.buy_count += 1
-
-        # Group initialization
-        if is_first_buy:
-          self.current_buy_group_flag = True
-          self.group_first_buy_price = self.data.close[0]
-
-          # Estimate consecutive buys (simplified)
-          self.group_consecutive_buys = self.current_group_buy_count
-
-    else:
       # Check sell conditions based on consecutive buys
       if self.group_consecutive_buys >= 5:
         # Use snap back condition (MA_20 cross)
         if self.sell_condition_snap_back():
-          self.order = self.sell(size=self.position.size)
+          should_sell = True
       else:
         # Use technical bounce condition (MA_10 cross)
         if self.sell_condition_technical_bounce():
-          self.order = self.sell(size=self.position.size)
+          should_sell = True
+
+      if should_sell:
+        # Sell entire position (all accumulated buys)
+        total_size = sum(buy['size'] for buy in self.current_group_buys)
+        self.order = self.sell(size=total_size)
+        return
+
+    # Check BUY conditions
+    if self.buy_condition():
+      is_first_buy = not self.in_position
+
+      # Price condition check (not for first buy)
+      if not is_first_buy:
+        if self.last_buy_price is None or self.data.close[0] >= self.last_buy_price:
+          return
+
+      # RSI condition verification
+      current_rsi = self.rsi[0]
+      if is_first_buy:
+        required_rsi = self.params.rsi_threshold
+      else:
+        check_order = self.current_group_buy_count + 1
+        required_rsi = 30 if check_order == 2 else self.params.rsi_threshold
+
+      if current_rsi > required_rsi:
+        return
+
+      # Calculate position size
+      change_rate = (self.data.close[0] / self.data.close[-1] - 1) * 100
+
+      if current_rsi <= 20:
+        position_size = 3
+      elif current_rsi <= 30:
+        position_size = 2
+      else:
+        position_size = 1
+
+      if change_rate < -5:
+        position_size += 1
+
+      # Execute buy
+      self.order = self.buy(size=position_size)
+      self.last_buy_price = self.data.close[0]
+      self.current_group_buy_count += 1
+      self.buy_count += 1
+
+      # Group initialization
+      if is_first_buy:
+        self.in_position = True
+        self.group_first_buy_price = self.data.close[0]
+        # Set initial consecutive buys estimate
+        self.group_consecutive_buys = 1
+      else:
+        # Update consecutive buys count as we add more
+        self.group_consecutive_buys = self.current_group_buy_count
 
   def stop(self):
     """Called when backtest ends."""
@@ -254,6 +243,7 @@ class DynamicBuyStrategy(bt.Strategy):
       print(f'Average Return: {avg_return:.2f}%')
       print(f'Average Holding Period: {avg_holding:.2f} days')
       print(f'Total Buy Count: {self.buy_count}')
+      print(f'Total Groups: {len([t for t in self.transactions_log if t["Action"] == "Buy" and t["Group_Buy_Count"] == 1])}')
 
 
 def run_backtest(ticker, name, data, start_date, end_date):
@@ -328,7 +318,18 @@ def run_backtest(ticker, name, data, start_date, end_date):
     transactions_df = transactions_df.sort_values(by=['Date', 'Action'])
     transactions_df.to_csv(os.path.join(output_dir, f'{ticker}_transactions.csv'), index=False)
 
-    print(f"Saved {len(transactions_df)} transactions to {ticker}_transactions.csv")
+    # Print summary statistics
+    buys = transactions_df[transactions_df['Action'] == 'Buy']
+    sells = transactions_df[transactions_df['Action'] == 'Sell']
+    print(f"Total Transactions: {len(transactions_df)} (Buys: {len(buys)}, Sells: {len(sells)})")
+
+    # Count groups
+    groups = buys[buys['Group_Buy_Count'] == 1]
+    print(f"Number of Buy Groups: {len(groups)}")
+
+    if len(sells) > 0:
+      avg_group_size = len(buys) / len(groups) if len(groups) > 0 else 0
+      print(f"Average Buys per Group: {avg_group_size:.2f}")
 
   # Plot if needed (optional - requires matplotlib)
   # cerebro.plot()
