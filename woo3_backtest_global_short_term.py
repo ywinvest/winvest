@@ -153,7 +153,7 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
       consecutive_buys = count_potential_buys(buy_date, temp_sell_date, position)
 
       if consecutive_buys >= 5:
-        temp_sell_ma20 = subsequent_data[subsequent_data['MA_20_Cross']]
+        temp_sell_ma20 = subsequent_data[subsequent_data['MA_20_Cross' & df['Bullish']]]
         temp_sell_date_ma20 = temp_sell_ma20.index[0] if not temp_sell_ma20.empty else None
         consecutive_buys = count_potential_buys(buy_date, temp_sell_date_ma20, position)
 
@@ -164,12 +164,12 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     # 매도 로직 결정 - 한번에 매도
     if group_consecutive_buys >= 5:
       # 5회 이상: Full Sell = MA_20_Cross
-      override_condition = lambda d: d['MA_20_Cross']
+      override_condition = lambda d: d['MA_20_Cross' & df['Bullish']]
       sell_full_new = subsequent_data[override_condition(subsequent_data)]
       sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
     else:
       # 5회 미만: Full Sell = MA_10_Cross
-      full_sell_condition_lt_5 = lambda d: d['MA_10_Cross']
+      full_sell_condition_lt_5 = lambda d: d['MA_10_Cross' & df['Bullish']]
       sell_full = subsequent_data[full_sell_condition_lt_5(subsequent_data)] if full_sell_condition_lt_5 else pd.DataFrame()
       sell_date_full = sell_full.index[0] if not sell_full.empty else None
 
