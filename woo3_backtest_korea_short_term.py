@@ -6,7 +6,7 @@ import FinanceDataReader as fdr
 
 import indicators
 
-DEFAULT_RSI_THRESHOLD = 31
+DEFAULT_RSI_THRESHOLD = 30
 
 # 초기 필터링용 조건
 def buy_condition(df):
@@ -127,7 +127,7 @@ def backtest(data, ticker):
 
     if current_rsi <= 20:
       position_size = 3
-    elif current_rsi <= 30:
+    elif current_rsi <= 25:
       position_size = 2
     else:
       position_size = 1
