@@ -11,7 +11,7 @@ import indicators
 DEFAULT_RSI_THRESHOLD = 35
 
 # 초기 필터링용 조건
-def buy_condition_broad(df):
+def buy_condition(df):
   """Broad buy condition for global indices (RSI <= 35)."""
   return (df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Change_Rate'] < 0)
 
@@ -25,7 +25,15 @@ def sell_condition_full(df):
   """
   return df['MA_20_Cross'] | df['MA_10_Break']
 
-def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition_full):
+def sell_condition_technical_bounce(df):
+  """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
+  return df['MA_10_Cross'] & df['Bullish']
+
+def sell_condition_snap_back(df):
+  """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
+  return df['MA_20_Cross'] & df['Bullish']
+
+def backtest(data, ticker):
   """Backtest with dynamic Full Sell logic based on consecutive buy count."""
   df = indicators.calculate_indicators(data.copy())
 
@@ -147,13 +155,13 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
     if is_first_buy:
       current_buy_group_flag = True
 
-      temp_sell_partial = subsequent_data[sell_condition_partial(subsequent_data)] if sell_condition_partial else pd.DataFrame()
+      temp_sell_partial = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
       temp_sell_date = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
 
       consecutive_buys = count_potential_buys(buy_date, temp_sell_date, position)
 
       if consecutive_buys >= 5:
-        temp_sell_ma20 = subsequent_data[subsequent_data['MA_20_Cross'] & subsequent_data['Bullish']]
+        temp_sell_ma20 = subsequent_data[sell_condition_snap_back(subsequent_data)]
         temp_sell_date_ma20 = temp_sell_ma20.index[0] if not temp_sell_ma20.empty else None
         consecutive_buys = count_potential_buys(buy_date, temp_sell_date_ma20, position)
 
@@ -163,14 +171,12 @@ def backtest(data, ticker, buy_condition, sell_condition_partial, sell_condition
 
     # 매도 로직 결정 - 한번에 매도
     if group_consecutive_buys >= 5:
-      # 5회 이상: Full Sell = MA_20_Cross
-      override_condition = lambda d: d['MA_20_Cross'] & d['Bullish']
-      sell_full_new = subsequent_data[override_condition(subsequent_data)]
+      # 5회 이상: 스냅백 매도 (20일선 돌파)
+      sell_full_new = subsequent_data[sell_condition_snap_back(subsequent_data)]
       sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
     else:
-      # 5회 미만: Full Sell = MA_10_Cross
-      full_sell_condition_lt_5 = lambda d: d['MA_10_Cross'] & d['Bullish']
-      sell_full = subsequent_data[full_sell_condition_lt_5(subsequent_data)] if full_sell_condition_lt_5 else pd.DataFrame()
+      # 5회 미만: 기술적 반등 매도 (10일선 돌파)
+      sell_full = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
       sell_date_full = sell_full.index[0] if not sell_full.empty else None
 
     # --- 전체 매도 처리 ---
@@ -225,12 +231,7 @@ if __name__ == "__main__":
       print(f"No data found for {ticker}, skipping.")
       continue
 
-    avg_return, avg_holding_period, buy_count = backtest(
-        data, ticker,
-        buy_condition_broad,
-        sell_condition_partial=sell_condition_partial,
-        sell_condition_full=sell_condition_full
-    )
+    avg_return, avg_holding_period, buy_count = backtest(data, ticker)
 
     results[name] = {
       "Average Return": avg_return * 100,
