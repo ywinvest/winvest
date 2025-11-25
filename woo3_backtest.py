@@ -12,6 +12,10 @@ class DynamicBuyStrategy(bt.Strategy):
   Dynamic buy strategy with adaptive sell logic based on consecutive buy count.
   Supports multiple buy orders within the same group.
   Records each individual buy and sell transaction separately.
+
+  *** 개선 사항 ***
+  지표를 T-1일 기준으로 확인하여 T일에 거래를 실행하고,
+  Cheat-on-Close를 사용하여 T일 종가에 체결되도록 설정했습니다.
   """
   params = (
     ('rsi_threshold', 35),
@@ -28,7 +32,7 @@ class DynamicBuyStrategy(bt.Strategy):
     # Bullish detection (Close > Open)
     self.bullish = self.data.close > self.data.open
 
-    # MA cross detection
+    # MA cross detection (Crossover returns: 1/-1/0)
     self.ma_10_cross = bt.indicators.CrossOver(self.data.close, self.ma_10)
     self.ma_20_cross = bt.indicators.CrossOver(self.data.close, self.ma_20)
 
@@ -62,6 +66,7 @@ class DynamicBuyStrategy(bt.Strategy):
         buy_date = self.data.datetime.date(0)
         buy_price = order.executed.price
         buy_size = order.executed.size
+        # RSI는 주문 발생 시점(T)의 종가 기준 RSI를 기록
         buy_rsi = self.rsi[0]
 
         # Record individual buy transaction
@@ -73,6 +78,7 @@ class DynamicBuyStrategy(bt.Strategy):
           'RSI': buy_rsi,
           'MA_10': self.ma_10[0],
           'MA_20': self.ma_20[0],
+          # Change Rate는 T일 (0)과 T-1일 (-1) 종가를 기준으로 기록
           'Change_Rate': (self.data.close[0] / self.data.close[-1] - 1) * 100,
           'Consecutive_Buys': self.group_consecutive_buys,
           'Group_Buy_Count': self.current_group_buy_count,
@@ -144,19 +150,24 @@ class DynamicBuyStrategy(bt.Strategy):
     self.order = None
 
   def buy_condition(self):
-    """Check if buy condition is met."""
-    change_rate = (self.data.close[0] / self.data.close[-1] - 1) * 100
-    return (self.rsi[0] <= self.params.rsi_threshold and
-            not self.bullish[0] and
+    """Check if buy condition is met (using T-1 data)."""
+    # T-1일 종가 기준 변화율
+    change_rate = (self.data.close[-1] / self.data.close[-2] - 1) * 100
+
+    # T-1일의 RSI, Bullish, Change_Rate 사용
+    return (self.rsi[-1] <= self.params.rsi_threshold and
+            not self.bullish[-1] and
             change_rate < 0)
 
   def sell_condition_technical_bounce(self):
-    """Technical bounce sell condition - MA_10 cross."""
-    return self.ma_10_cross[0] > 0 and self.bullish[0]
+    """Technical bounce sell condition - MA_10 cross (using T-1 data)."""
+    # T-1일의 MA_10_cross (1 이상이면 돌파), T-1일의 Bullish 사용
+    return self.ma_10_cross[-1] > 0 and self.bullish[-1]
 
   def sell_condition_snap_back(self):
-    """Snap back sell condition - MA_20 cross."""
-    return self.ma_20_cross[0] > 0 and self.bullish[0]
+    """Snap back sell condition - MA_20 cross (using T-1 data)."""
+    # T-1일의 MA_20_cross (1 이상이면 돌파), T-1일의 Bullish 사용
+    return self.ma_20_cross[-1] > 0 and self.bullish[-1]
 
   def next(self):
     # Skip if order is pending
@@ -180,20 +191,23 @@ class DynamicBuyStrategy(bt.Strategy):
       if should_sell:
         # Sell entire position (all accumulated buys)
         total_size = sum(buy['size'] for buy in self.current_group_buys)
+        # T일 종가에 체결되도록 self.sell() 실행
         self.order = self.sell(size=total_size)
         return
 
     # Check BUY conditions
-    if self.buy_condition():
+    if self.buy_condition(): # T-1일 조건 확인
       is_first_buy = not self.in_position
 
       # Price condition check (not for first buy)
       if not is_first_buy:
+        # 가격 조건: 오늘 종가 (data.close[0])가 마지막 매수 가격보다 낮아야 함
         if self.last_buy_price is None or self.data.close[0] >= self.last_buy_price:
           return
 
       # RSI condition verification
-      current_rsi = self.rsi[0]
+      # T-1일 RSI 사용 (buy_condition에서 사용한 값과 동일)
+      current_rsi = self.rsi[-1]
       if is_first_buy:
         required_rsi = self.params.rsi_threshold
       else:
@@ -204,7 +218,8 @@ class DynamicBuyStrategy(bt.Strategy):
         return
 
       # Calculate position size
-      change_rate = (self.data.close[0] / self.data.close[-1] - 1) * 100
+      # T-1일 종가 기준 변화율 사용
+      change_rate = (self.data.close[-1] / self.data.close[-2] - 1) * 100
 
       if current_rsi <= 20:
         position_size = 3
@@ -217,7 +232,9 @@ class DynamicBuyStrategy(bt.Strategy):
         position_size += 1
 
       # Execute buy
+      # T일 종가에 체결되도록 self.buy() 실행
       self.order = self.buy(size=position_size)
+      # 마지막 매수 가격은 오늘 종가 (체결 가격)로 기록
       self.last_buy_price = self.data.close[0]
       self.current_group_buy_count += 1
       self.buy_count += 1
@@ -225,7 +242,7 @@ class DynamicBuyStrategy(bt.Strategy):
       # Group initialization
       if is_first_buy:
         self.in_position = True
-        self.group_first_buy_price = self.data.close[0]
+        self.group_first_buy_price = self.data.close[0] # 첫 매수 가격도 오늘 종가
         # Set initial consecutive buys estimate
         self.group_consecutive_buys = 1
       else:
@@ -266,6 +283,9 @@ def run_backtest(ticker, name, data, start_date, end_date):
 
   # Add data
   cerebro.adddata(bt_data)
+
+  # **핵심 개선:** T일 조건으로 T일 종가에 체결되도록 설정 (Pandas 코드와 유사하게)
+  cerebro.broker.set_coc(True)
 
   # Add strategy
   cerebro.addstrategy(DynamicBuyStrategy)
@@ -338,18 +358,28 @@ def run_backtest(ticker, name, data, start_date, end_date):
 
 
 if __name__ == "__main__":
-  with open('config-woo3.json', 'r') as config_file:
-    config = json.load(config_file)
+  # 현재 파일의 디렉토리를 기준으로 config-woo3.json 파일 경로 설정
+  current_dir = os.path.dirname(os.path.abspath(__file__)) if os.path.abspath(__file__) else os.getcwd()
+  config_path = os.path.join(current_dir, 'config-woo3.json')
+
+  try:
+    with open(config_path, 'r') as config_file:
+      config = json.load(config_file)
+  except FileNotFoundError:
+    print(f"Error: config-woo3.json not found at {config_path}")
+    exit(1)
 
   tickers = config["global"]["tickers"]
   all_results = {}
 
   end_date = datetime.today()
+  # 30년치 데이터 요청
   start_date = end_date - timedelta(days=30 * 365)
 
   for ticker, name in tickers.items():
     print(f"\nProcessing {ticker} ({name})...")
 
+    # FinanceDataReader를 사용하여 데이터 로드
     data = fdr.DataReader(ticker, start=start_date.strftime('%Y-%m-%d'),
                           end=end_date.strftime('%Y-%m-%d'))
 
