@@ -125,7 +125,7 @@ def backtest(data, ticker):
     current_group_buy_count += 1
     buy_count += 1
 
-    if current_rsi <= 20:
+    if current_rsi <= 25:
       position_size = 3
     elif current_rsi <= 30:
       position_size = 2
