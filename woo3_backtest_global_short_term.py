@@ -17,7 +17,7 @@ def buy_condition_broad(df):
 
 def sell_condition_partial(df):
   """Partial sell condition for global indices (10-MA Cross)."""
-  return df['MA_10_Cross']
+  return df['MA_10_Cross'] & df['Bullish']
 
 def sell_condition_full(df):
   """
