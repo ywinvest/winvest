@@ -22,7 +22,7 @@ def sell_condition_snap_back(df):
   return df['MA_20_Cross'] & df['Bullish']
 
 def backtest(data, ticker):
-  """Backtest with dynamic Full Sell logic based on consecutive buy count."""
+  """Backtest with dynamic Sell logic based on consecutive buy count."""
   df = indicators.calculate_indicators(data.copy())
 
   df['Weight'] = 0.0
@@ -34,7 +34,7 @@ def backtest(data, ticker):
   buy_count = 0
 
   current_buy_group_flag = False
-  sell_date_full = buys.index[0] if not buys.empty else None
+  sell_date = buys.index[0] if not buys.empty else None
   last_buy_price = None
 
   current_group_buy_count = 0
@@ -44,7 +44,7 @@ def backtest(data, ticker):
   group_sell_date = None
 
   # --- 내부 함수: 연속 매수 횟수 미리 계산 ---
-  def count_potential_buys(start_date, end_date, initial_price):
+  def count_potential_buys(start_date, end_date, first_buy_price):
     if end_date:
       group_data = df.loc[start_date:end_date]
     else:
@@ -53,7 +53,7 @@ def backtest(data, ticker):
     potential_candidates = group_data[buy_condition(group_data)]
 
     c_buys = 1
-    temp_last_price = initial_price
+    temp_last_price = first_buy_price
     next_buy_order = 2
 
     for idx in potential_candidates.index:
@@ -84,7 +84,7 @@ def backtest(data, ticker):
 
   for buy_date in buys.index:
     # 새 그룹 시작 여부 확인
-    if sell_date_full is not None and buy_date > sell_date_full:
+    if sell_date is not None and buy_date > sell_date:
       # 이전 그룹 정산(Flush) 수행
       flush_group_metrics()
 
@@ -118,16 +118,16 @@ def backtest(data, ticker):
       continue
 
     # --- 매수 실행 ---
-    position = df.loc[buy_date, 'Close']
+    first_buy_price = df.loc[buy_date, 'Close']
     change_rate = df.loc[buy_date, 'Change_Rate']
     df.loc[buy_date, 'Action'] = 'Buy'
-    last_buy_price = position
+    last_buy_price = first_buy_price
     current_group_buy_count += 1
     buy_count += 1
 
     if current_rsi <= 20:
       position_size = 3
-    elif current_rsi <= 25:
+    elif current_rsi <= 30:
       position_size = 2
     else:
       position_size = 1
@@ -143,15 +143,15 @@ def backtest(data, ticker):
     if is_first_buy:
       current_buy_group_flag = True
 
-      temp_sell_partial = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
-      temp_sell_date = temp_sell_partial.index[0] if not temp_sell_partial.empty else None
+      sell_technical_bounce = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
+      sell_date = sell_technical_bounce.index[0] if not sell_technical_bounce.empty else None
 
-      consecutive_buys = count_potential_buys(buy_date, temp_sell_date, position)
+      consecutive_buys = count_potential_buys(buy_date, sell_date, first_buy_price)
 
       if consecutive_buys >= 5:
-        temp_sell_ma20 = subsequent_data[sell_condition_snap_back(subsequent_data)]
-        temp_sell_date_ma20 = temp_sell_ma20.index[0] if not temp_sell_ma20.empty else None
-        consecutive_buys = count_potential_buys(buy_date, temp_sell_date_ma20, position)
+        sell_snap_back = subsequent_data[sell_condition_snap_back(subsequent_data)]
+        sell_date = sell_snap_back.index[0] if not sell_snap_back.empty else None
+        consecutive_buys = count_potential_buys(buy_date, sell_date, first_buy_price)
 
       group_consecutive_buys = consecutive_buys
 
@@ -160,29 +160,29 @@ def backtest(data, ticker):
     # 매도 로직 결정 - 한번에 매도
     if group_consecutive_buys >= 5:
       # 5회 이상: 스냅백 매도 (20일선 돌파)
-      sell_full_new = subsequent_data[sell_condition_snap_back(subsequent_data)]
-      sell_date_full = sell_full_new.index[0] if not sell_full_new.empty else None
+      sell_snap_back = subsequent_data[sell_condition_snap_back(subsequent_data)]
+      sell_date = sell_snap_back.index[0] if not sell_snap_back.empty else None
     else:
       # 5회 미만: 기술적 반등 매도 (10일선 돌파)
-      sell_full = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
-      sell_date_full = sell_full.index[0] if not sell_full.empty else None
+      sell_technical_bounce = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
+      sell_date = sell_technical_bounce.index[0] if not sell_technical_bounce.empty else None
 
     # --- 전체 매도 처리 ---
-    if sell_date_full:
-      df.loc[sell_date_full, 'Action'] = 'Sell'
-      sell_price = df.loc[sell_date_full, 'Close']
-      trade_return = (sell_price / position - 1) * position_size
+    if sell_date:
+      df.loc[sell_date, 'Action'] = 'Sell'
+      sell_price = df.loc[sell_date, 'Close']
+      trade_return = (sell_price / first_buy_price - 1) * position_size
 
       df.loc[buy_date, 'Return'] = trade_return
       returns.append(trade_return)
-      holding_periods.append((sell_date_full - buy_date).days)
+      holding_periods.append((sell_date - buy_date).days)
 
       # Weight 누적
-      df.loc[sell_date_full, 'Weight'] += position_size
+      df.loc[sell_date, 'Weight'] += position_size
 
       # 그룹 통계 수집
       group_returns.append(trade_return)
-      group_sell_date = sell_date_full
+      group_sell_date = sell_date
 
   # 루프 종료 후 마지막 그룹 정산(Flush)
   flush_group_metrics()
