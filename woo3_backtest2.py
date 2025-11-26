@@ -71,12 +71,12 @@ class RSIMAStrategy(bt.Strategy):
         self.log(f'BUY EXECUTED, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Value: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}', order.created.dt)
+                 f'Comm: {order.executed.comm:.2f}', self.data.num2date(order.created.dt).date())
       elif order.issell():
         self.log(f'SELL EXECUTED, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Value: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}', order.created.dt)
+                 f'Comm: {order.executed.comm:.2f}', self.data.num2date(order.created.dt).date())
 
     elif order.status in [order.Canceled, order.Margin, order.Rejected]:
       self.log(f'Order Canceled/Margin/Rejected - Status: {order.status}')
