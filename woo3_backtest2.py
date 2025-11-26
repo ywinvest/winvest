@@ -81,14 +81,16 @@ class RSIMAStrategy(bt.Strategy):
 
     self.log(f'TRADE PROFIT, Gross: {trade.pnl:.2f}, Net: {trade.pnlcomm:.2f}')
 
-    # 통계 저장
+    trade_size = abs(trade.size) if trade.size != 0 else 1
+    trade_value = abs(trade.price * trade.size)
+
     self.trades.append({
       'entry_date': bt.num2date(trade.dtopen),
       'exit_date': bt.num2date(trade.dtclose),
       'entry_price': trade.price,
-      'exit_price': trade.price + trade.pnl / trade.size,
+      'exit_price': trade.price + (trade.pnl / trade_size if trade_size != 0 else 0),
       'pnl': trade.pnl,
-      'pnl_pct': trade.pnl / (trade.price * trade.size) * 100,
+      'pnl_pct': (trade.pnl / trade_value * 100) if trade_value != 0 else 0,
       'holding_days': (bt.num2date(trade.dtclose) - bt.num2date(trade.dtopen)).days
     })
 
