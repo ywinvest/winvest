@@ -162,16 +162,15 @@ def run_backtest(ticker, start_date, end_date):
   # 거래 통계
   trade_analysis = strat.analyzers.trade_analyzer.get_analysis()
 
-  # 거래가 있었는지 확인
-  if trade_analysis.get('total', {}).get('total', 0) > 0:
-    total_trades = trade_analysis.total.total
+  total_trades = trade_analysis.get('total', {}).get('total', 0)
 
-    # 'won' 키가 없거나 'total' 값이 없을 경우 0으로 기본값 설정
+  if total_trades > 0:
     won_data = trade_analysis.get('won', {})
     win_trades = won_data.get('total', 0)
 
+    pnl_net = trade_analysis.get('pnl', {}).get('net', {}).get('total', 0)
+
     win_rate = (win_trades / total_trades) * 100
-    pnl_net = trade_analysis.pnl.net.total
 
     print(f"Total Trades: {total_trades}")
     print(f"Win Rate: {win_rate:.2f}%")
