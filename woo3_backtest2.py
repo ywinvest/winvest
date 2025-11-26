@@ -155,8 +155,9 @@ class RSIMAStrategy(bt.Strategy):
                f'Buy Count: {self.current_group_buy_count}, '
                f'Position Size: {self.position.size}')
 
-      # 전체 포지션 매도 - 종가에 체결
-      self.order = self.close(exectype=bt.Order.Close)
+      # [수정] bt.Order.Close -> bt.Order.Market 변경
+      # set_coc(True) 상태에서 Market 주문을 내면 당일 종가로 체결됩니다.
+      self.order = self.close(exectype=bt.Order.Market)
 
       # 상태 초기화
       self.last_buy_price = None
@@ -200,8 +201,9 @@ class RSIMAStrategy(bt.Strategy):
                f'Size: {position_size}, '
                f'Order: {self.current_group_buy_count + 1}')
 
-      # 매수 실행 - 종가에 체결
-      self.order = self.buy(size=position_size, exectype=bt.Order.Close)
+      # [수정] bt.Order.Close -> bt.Order.Market 변경
+      # set_coc(True) 덕분에 현재(당일) 종가로 즉시 체결됩니다.
+      self.order = self.buy(size=position_size, exectype=bt.Order.Market)
 
       # 상태 업데이트
       self.last_buy_price = current_price
