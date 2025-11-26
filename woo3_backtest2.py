@@ -98,7 +98,7 @@ class RSIMAStrategy(bt.Strategy):
     pnl_pct = (trade.pnl / trade_value * 100) if trade_value != 0 else 0
 
     self.log(f'TRADE CLOSED - PnL: {trade.pnl:.2f}, PnL%: {pnl_pct:.2f}%, '
-             f'Holding: {holding_days} days')
+             f'Holding: {holding_days} days', self.data.num2date(trade.dtclose).date())
 
     self.trade_results.append({
       'entry_date': entry_date,
