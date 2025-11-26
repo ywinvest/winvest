@@ -149,21 +149,51 @@ class GlobalShortTermStrategy:
     trades = portfolio.trades.records_readable
 
     if len(trades) > 0:
-      avg_return = trades['Return'].mean() * 100
+      # Return 컬럼명 찾기 (PnL, Return, Return [%] 등 가능)
+      return_col = None
+      for col in ['Return', 'PnL', 'Return [%]', 'P&L']:
+        if col in trades.columns:
+          return_col = col
+          break
+
+      if return_col:
+        avg_return = trades[return_col].mean()
+        # 퍼센트로 표시되지 않은 경우 100을 곱함
+        if return_col in ['Return', 'PnL', 'P&L']:
+          avg_return = avg_return * 100
+      else:
+        avg_return = 0
 
       # Duration 컬럼이 없을 경우 직접 계산
       if 'Duration' in trades.columns:
         avg_holding_period = trades['Duration'].mean()
       else:
-        # Entry Index와 Exit Index로 직접 계산
-        holding_periods = []
-        for idx, trade in trades.iterrows():
-          entry_idx = trade['Entry Index']
-          exit_idx = trade['Exit Index']
-          entry_date = self.df.index[int(entry_idx)]
-          exit_date = self.df.index[int(exit_idx)]
-          holding_periods.append((exit_date - entry_date).days)
-        avg_holding_period = np.mean(holding_periods) if holding_periods else 0
+        # Entry/Exit 컬럼명 찾기
+        entry_col = None
+        exit_col = None
+
+        for col in ['Entry Index', 'Entry Idx', 'EntryIdx', 'entry_idx']:
+          if col in trades.columns:
+            entry_col = col
+            break
+
+        for col in ['Exit Index', 'Exit Idx', 'ExitIdx', 'exit_idx']:
+          if col in trades.columns:
+            exit_col = col
+            break
+
+        if entry_col and exit_col:
+          holding_periods = []
+          for idx, trade in trades.iterrows():
+            entry_idx = int(trade[entry_col])
+            exit_idx = int(trade[exit_col])
+            entry_date = self.df.index[entry_idx]
+            exit_date = self.df.index[exit_idx]
+            holding_periods.append((exit_date - entry_date).days)
+          avg_holding_period = np.mean(holding_periods) if holding_periods else 0
+        else:
+          # 컬럼을 찾지 못한 경우 0으로 설정
+          avg_holding_period = 0
 
       buy_count = len(trades)
     else:
