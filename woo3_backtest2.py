@@ -15,7 +15,7 @@ class RSIMAStrategy(bt.Strategy):
   RSI 기반 매수, 이동평균선 돌파 매도 전략
   - Look-ahead 로직 제거
   - 실전형: 현재까지 매수 횟수가 5회 이상이면 목표를 20일선으로 변경
-  - 당일 종가 체결 (next_open 사용)
+  - 당일 종가 체결
   """
 
   params = (
@@ -41,21 +41,19 @@ class RSIMAStrategy(bt.Strategy):
     # 상태 변수
     self.last_buy_price = None
     self.current_group_buy_count = 0
-    self.in_position = False
     self.total_position_size = 0
     self.weighted_avg_buy_price = 0
     self.sell_target = 'MA10'  # 'MA10' 또는 'MA20'
 
+    # 매수 그룹별 추적
+    self.current_group_entries = []  # [(date, price, size), ...]
+
     # 통계 수집
-    self.trades = []
+    self.trade_results = []
     self.buy_dates = []
 
-    # 당일 주문 플래그
+    # 주문 관리
     self.order = None
-
-    # 당일 실행할 주문 정보
-    self.pending_action = None
-    self.pending_size = 0
 
   def log(self, txt, dt=None):
     """로깅 함수"""
@@ -72,17 +70,17 @@ class RSIMAStrategy(bt.Strategy):
       if order.isbuy():
         self.log(f'BUY EXECUTED, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
-                 f'Cost: {order.executed.value:.2f}')
+                 f'Cost: {order.executed.value:.2f}, '
+                 f'Comm: {order.executed.comm:.2f}')
       elif order.issell():
         self.log(f'SELL EXECUTED, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Value: {order.executed.value:.2f}, '
-                 f'PnL: {order.executed.pnl:.2f}')
+                 f'Comm: {order.executed.comm:.2f}')
 
     elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-      self.log('Order Canceled/Margin/Rejected')
+      self.log(f'Order Canceled/Margin/Rejected - Status: {order.status}')
 
-    # 주문 완료 또는 취소 시 order 플래그 초기화
     self.order = None
 
   def notify_trade(self, trade):
@@ -90,25 +88,33 @@ class RSIMAStrategy(bt.Strategy):
     if not trade.isclosed:
       return
 
-    self.log(f'TRADE PROFIT, Gross: {trade.pnl:.2f}, Net: {trade.pnlcomm:.2f}')
+    entry_date = bt.num2date(trade.dtopen).date()
+    exit_date = bt.num2date(trade.dtclose).date()
+    holding_days = (exit_date - entry_date).days
 
-    # 통계 저장 (division by zero 방지)
+    # 거래 크기와 가치 계산
     trade_size = abs(trade.size) if trade.size != 0 else 1
     trade_value = abs(trade.price * trade_size)
 
-    self.trades.append({
-      'entry_date': bt.num2date(trade.dtopen),
-      'exit_date': bt.num2date(trade.dtclose),
+    pnl_pct = (trade.pnl / trade_value * 100) if trade_value != 0 else 0
+
+    self.log(f'TRADE CLOSED - PnL: {trade.pnl:.2f}, PnL%: {pnl_pct:.2f}%, '
+             f'Holding: {holding_days} days')
+
+    # 통계 저장
+    self.trade_results.append({
+      'entry_date': entry_date,
+      'exit_date': exit_date,
       'entry_price': trade.price,
       'exit_price': trade.price + (trade.pnl / trade_size if trade_size != 0 else 0),
+      'size': trade_size,
       'pnl': trade.pnl,
-      'pnl_pct': (trade.pnl / trade_value * 100) if trade_value != 0 else 0,
-      'holding_days': (bt.num2date(trade.dtclose) - bt.num2date(trade.dtopen)).days
+      'pnl_pct': pnl_pct,
+      'holding_days': holding_days
     })
 
   def check_buy_condition(self):
     """매수 조건 확인"""
-    # 기본 조건: RSI <= 35, 종가 < MA10 (하락 추세), 당일 하락
     bullish = self.data.close[0] > self.ma10[0]
 
     return (self.rsi[0] <= DEFAULT_RSI_THRESHOLD and
@@ -120,10 +126,8 @@ class RSIMAStrategy(bt.Strategy):
     bullish = self.data.close[0] > self.ma10[0]
 
     if self.sell_target == 'MA10':
-      # 기술적 반등 매도: 10일선 돌파
       return self.ma10_cross[0] > 0 and bullish
     else:  # 'MA20'
-      # 스냅백 매도: 20일선 돌파
       return self.ma20_cross[0] > 0 and bullish
 
   def calculate_position_size(self, rsi, change_rate):
@@ -141,34 +145,33 @@ class RSIMAStrategy(bt.Strategy):
     return position_size
 
   def next(self):
-    """매 봉마다 실행되는 전략 로직 - 시그널 감지"""
-    # 대기 중인 주문이 있으면 리턴
+    """매 봉마다 실행되는 전략 로직"""
     if self.order:
       return
 
     current_date = self.datas[0].datetime.date(0)
 
-    # 매도 조건 확인 (포지션이 있을 때)
-    if self.in_position and self.check_sell_condition():
+    # 포지션이 있을 때 매도 조건 확인
+    if self.position and self.check_sell_condition():
       self.log(f'SELL SIGNAL - Target: {self.sell_target}, '
-               f'Buy Count: {self.current_group_buy_count}')
+               f'Buy Count: {self.current_group_buy_count}, '
+               f'Position Size: {self.position.size}')
 
-      # 매도 예약
-      self.pending_action = 'SELL'
-      self.pending_size = self.total_position_size
+      # 전체 포지션 매도
+      self.order = self.close()
 
-      # 상태 초기화 예약
+      # 상태 초기화
       self.last_buy_price = None
       self.current_group_buy_count = 0
-      self.in_position = False
       self.total_position_size = 0
       self.weighted_avg_buy_price = 0
       self.sell_target = 'MA10'
+      self.current_group_entries = []
       return
 
     # 매수 조건 확인
     if self.check_buy_condition():
-      is_first_buy = not self.in_position
+      is_first_buy = self.current_group_buy_count == 0
       current_price = self.data.close[0]
       current_rsi = self.rsi[0]
       current_change = self.change_rate[0]
@@ -176,7 +179,7 @@ class RSIMAStrategy(bt.Strategy):
       # 추가 매수 시 가격 조건 확인
       if not is_first_buy:
         if current_price >= self.last_buy_price:
-          return  # 가격이 이전 매수가보다 높거나 같으면 매수 안함
+          return
 
       # RSI 조건 검증
       if is_first_buy:
@@ -199,15 +202,16 @@ class RSIMAStrategy(bt.Strategy):
                f'Size: {position_size}, '
                f'Order: {self.current_group_buy_count + 1}')
 
-      # 매수 예약
-      self.pending_action = 'BUY'
-      self.pending_size = position_size
+      # 매수 실행
+      self.order = self.buy(size=position_size)
 
       # 상태 업데이트
       self.last_buy_price = current_price
       self.current_group_buy_count += 1
-      self.in_position = True
       self.buy_dates.append(current_date)
+
+      # 그룹 엔트리 추적
+      self.current_group_entries.append((current_date, current_price, position_size))
 
       # 가중 평균 매수가 계산
       prev_total_value = self.weighted_avg_buy_price * self.total_position_size
@@ -225,20 +229,6 @@ class RSIMAStrategy(bt.Strategy):
           self.log(f'>>> SELL TARGET CHANGED: MA10 -> MA20 '
                    f'(Buy count reached {self.current_group_buy_count})')
           self.sell_target = 'MA20'
-
-  def next_open(self):
-    """다음 봉 시가에 실행 - 실제로는 당일 종가 주문"""
-    if self.pending_action == 'BUY':
-      # 당일 종가에 매수 실행
-      self.order = self.buy(size=self.pending_size)
-      self.pending_action = None
-      self.pending_size = 0
-
-    elif self.pending_action == 'SELL':
-      # 당일 종가에 매도 실행
-      self.order = self.sell(size=self.pending_size)
-      self.pending_action = None
-      self.pending_size = 0
 
 
 class PandasData(bt.feeds.PandasData):
@@ -276,9 +266,6 @@ def run_backtest(ticker, name, data):
   # 수수료 설정 (0.1%)
   cerebro.broker.setcommission(commission=0.001)
 
-  # 당일 종가 체결 설정
-  cerebro.broker.set_coc(True)
-
   # 시작 포트폴리오 가치
   start_value = cerebro.broker.getvalue()
   print(f'Starting Portfolio Value: {start_value:.2f}')
@@ -290,20 +277,24 @@ def run_backtest(ticker, name, data):
   # 종료 포트폴리오 가치
   end_value = cerebro.broker.getvalue()
   print(f'Ending Portfolio Value: {end_value:.2f}')
-  print(f'Total Return: {((end_value - start_value) / start_value * 100):.2f}%')
+
+  total_return = (end_value - start_value) / start_value * 100
+  print(f'Total Return: {total_return:.2f}%')
 
   # 통계 계산
-  if strategy.trades:
-    returns = [t['pnl_pct'] for t in strategy.trades]
-    holding_periods = [t['holding_days'] for t in strategy.trades]
+  if strategy.trade_results:
+    returns = [t['pnl_pct'] for t in strategy.trade_results]
+    holding_periods = [t['holding_days'] for t in strategy.trade_results]
 
     avg_return = sum(returns) / len(returns)
     avg_holding = sum(holding_periods) / len(holding_periods)
     win_rate = len([r for r in returns if r > 0]) / len(returns) * 100
+    total_pnl = sum([t['pnl'] for t in strategy.trade_results])
 
     print(f'\nTrade Statistics:')
-    print(f'Total Trades: {len(strategy.trades)}')
+    print(f'Total Trades: {len(strategy.trade_results)}')
     print(f'Total Buy Signals: {len(strategy.buy_dates)}')
+    print(f'Total PnL: {total_pnl:.2f}')
     print(f'Average Return per Trade: {avg_return:.2f}%')
     print(f'Average Holding Period: {avg_holding:.2f} days')
     print(f'Win Rate: {win_rate:.2f}%')
@@ -312,26 +303,36 @@ def run_backtest(ticker, name, data):
     output_dir = 'global/backtrader-results'
     os.makedirs(output_dir, exist_ok=True)
 
-    trades_df = pd.DataFrame(strategy.trades)
+    trades_df = pd.DataFrame(strategy.trade_results)
     trades_df.to_csv(os.path.join(output_dir, f'{ticker}_trades.csv'), index=False)
+    print(f'Trade details saved to {output_dir}/{ticker}_trades.csv')
 
     return {
       'avg_return': avg_return,
       'avg_holding': avg_holding,
-      'total_trades': len(strategy.trades),
+      'total_trades': len(strategy.trade_results),
       'buy_count': len(strategy.buy_dates),
       'win_rate': win_rate,
-      'total_return': (end_value - start_value) / start_value * 100
+      'total_return': total_return,
+      'total_pnl': total_pnl
     }
   else:
-    print('\nNo trades executed.')
+    print(f'\nNo trades executed.')
+    print(f'Total Buy Signals: {len(strategy.buy_dates)}')
+
+    # 매수 신호는 있지만 거래가 없는 경우 디버깅 정보
+    if len(strategy.buy_dates) > 0:
+      print(f'WARNING: Buy signals detected but no completed trades!')
+      print(f'This may indicate an issue with position sizing or broker settings.')
+
     return {
       'avg_return': 0,
       'avg_holding': 0,
       'total_trades': 0,
       'buy_count': len(strategy.buy_dates),
       'win_rate': 0,
-      'total_return': 0
+      'total_return': total_return,
+      'total_pnl': 0
     }
 
 
@@ -366,6 +367,8 @@ if __name__ == "__main__":
 
     except Exception as e:
       print(f"Error processing {ticker} ({name}): {str(e)}")
+      import traceback
+      traceback.print_exc()
       continue
 
   # 최종 결과 요약
@@ -376,6 +379,7 @@ if __name__ == "__main__":
   for name, metrics in results.items():
     print(f"\n{name}:")
     print(f"  Total Return: {metrics['total_return']:.2f}%")
+    print(f"  Total PnL: {metrics['total_pnl']:.2f}")
     print(f"  Average Return per Trade: {metrics['avg_return']:.2f}%")
     print(f"  Average Holding Period: {metrics['avg_holding']:.2f} days")
     print(f"  Total Trades: {metrics['total_trades']}")
