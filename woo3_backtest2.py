@@ -15,7 +15,7 @@ class RSIMAStrategy(bt.Strategy):
   RSI 기반 매수, 이동평균선 돌파 매도 전략
   - Look-ahead 로직 제거
   - 실전형: 현재까지 매수 횟수가 5회 이상이면 목표를 20일선으로 변경
-  - 당일 종가 체결
+  - 당일 종가 체결 (next_open 사용)
   """
 
   params = (
@@ -50,8 +50,12 @@ class RSIMAStrategy(bt.Strategy):
     self.trades = []
     self.buy_dates = []
 
-    # 당일 주문 플래그 (중복 주문 방지)
+    # 당일 주문 플래그
     self.order = None
+
+    # 당일 실행할 주문 정보
+    self.pending_action = None
+    self.pending_size = 0
 
   def log(self, txt, dt=None):
     """로깅 함수"""
@@ -90,7 +94,7 @@ class RSIMAStrategy(bt.Strategy):
 
     # 통계 저장 (division by zero 방지)
     trade_size = abs(trade.size) if trade.size != 0 else 1
-    trade_value = abs(trade.price * trade.size)
+    trade_value = abs(trade.price * trade_size)
 
     self.trades.append({
       'entry_date': bt.num2date(trade.dtopen),
@@ -137,7 +141,11 @@ class RSIMAStrategy(bt.Strategy):
     return position_size
 
   def next(self):
-    """매 봉마다 실행되는 전략 로직"""
+    """매 봉마다 실행되는 전략 로직 - 시그널 감지"""
+    # 대기 중인 주문이 있으면 리턴
+    if self.order:
+      return
+
     current_date = self.datas[0].datetime.date(0)
 
     # 매도 조건 확인 (포지션이 있을 때)
@@ -145,10 +153,11 @@ class RSIMAStrategy(bt.Strategy):
       self.log(f'SELL SIGNAL - Target: {self.sell_target}, '
                f'Buy Count: {self.current_group_buy_count}')
 
-      # 전체 포지션 매도
-      self.sell(size=self.total_position_size)
+      # 매도 예약
+      self.pending_action = 'SELL'
+      self.pending_size = self.total_position_size
 
-      # 상태 초기화
+      # 상태 초기화 예약
       self.last_buy_price = None
       self.current_group_buy_count = 0
       self.in_position = False
@@ -185,12 +194,14 @@ class RSIMAStrategy(bt.Strategy):
       # 포지션 크기 계산
       position_size = self.calculate_position_size(current_rsi, current_change)
 
-      # 매수 실행
-      self.buy(size=position_size)
       self.log(f'BUY SIGNAL - RSI: {current_rsi:.2f}, '
                f'Change: {current_change:.2f}%, '
                f'Size: {position_size}, '
                f'Order: {self.current_group_buy_count + 1}')
+
+      # 매수 예약
+      self.pending_action = 'BUY'
+      self.pending_size = position_size
 
       # 상태 업데이트
       self.last_buy_price = current_price
@@ -214,6 +225,20 @@ class RSIMAStrategy(bt.Strategy):
           self.log(f'>>> SELL TARGET CHANGED: MA10 -> MA20 '
                    f'(Buy count reached {self.current_group_buy_count})')
           self.sell_target = 'MA20'
+
+  def next_open(self):
+    """다음 봉 시가에 실행 - 실제로는 당일 종가 주문"""
+    if self.pending_action == 'BUY':
+      # 당일 종가에 매수 실행
+      self.order = self.buy(size=self.pending_size)
+      self.pending_action = None
+      self.pending_size = 0
+
+    elif self.pending_action == 'SELL':
+      # 당일 종가에 매도 실행
+      self.order = self.sell(size=self.pending_size)
+      self.pending_action = None
+      self.pending_size = 0
 
 
 class PandasData(bt.feeds.PandasData):
@@ -251,11 +276,8 @@ def run_backtest(ticker, name, data):
   # 수수료 설정 (0.1%)
   cerebro.broker.setcommission(commission=0.001)
 
-  # 당일 종가 체결 설정 (cheat-on-close)
+  # 당일 종가 체결 설정
   cerebro.broker.set_coc(True)
-
-  # 당일 종가 데이터를 next()에서 사용 가능하도록 설정
-  cerebro.broker.set_checksubmit(False)
 
   # 시작 포트폴리오 가치
   start_value = cerebro.broker.getvalue()
