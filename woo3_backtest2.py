@@ -2,8 +2,8 @@ import json
 import os
 from datetime import datetime, timedelta
 
-import backtrader as bt
 import FinanceDataReader as fdr
+import backtrader as bt
 import pandas as pd
 
 # RSI 임계값
@@ -64,16 +64,25 @@ class RSIMAStrategy(bt.Strategy):
   def notify_order(self, order):
     """주문 상태 알림"""
     if order.status in [order.Submitted, order.Accepted]:
-      return
-
-    if order.status in [order.Completed]:
       if order.isbuy():
-        self.log(f'BUY EXECUTED, Price: {order.executed.price:.2f}, '
+        self.log(f'BUY ${order.status}, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Cost: {order.executed.value:.2f}, '
                  f'Comm: {order.executed.comm:.2f}')
       elif order.issell():
-        self.log(f'SELL EXECUTED, Price: {order.executed.price:.2f}, '
+        self.log(f'SELL ${order.status}, Price: {order.executed.price:.2f}, '
+                 f'Size: {order.executed.size:.0f}, '
+                 f'Value: {order.executed.value:.2f}, '
+                 f'Comm: {order.executed.comm:.2f}')
+
+    if order.status in [order.Completed]:
+      if order.isbuy():
+        self.log(f'BUY ${order.status}, Price: {order.executed.price:.2f}, '
+                 f'Size: {order.executed.size:.0f}, '
+                 f'Cost: {order.executed.value:.2f}, '
+                 f'Comm: {order.executed.comm:.2f}')
+      elif order.issell():
+        self.log(f'SELL ${order.status}, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Value: {order.executed.value:.2f}, '
                  f'Comm: {order.executed.comm:.2f}')
