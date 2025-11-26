@@ -22,7 +22,7 @@ def sell_condition_snap_back(df):
   return df['MA_20_Cross'] & df['Bullish']
 
 def backtest(data, ticker):
-  """Backtest with dynamic Sell logic based on ACTUAL consecutive buy count (no look-ahead)."""
+  """Backtest with group-level batch selling (all positions sold at once)."""
   df = indicators.calculate_indicators(data.copy())
 
   df['Weight'] = 0.0
@@ -35,14 +35,17 @@ def backtest(data, ticker):
 
   current_buy_group_flag = False
   sell_date = None
+
+  # 그룹 내 누적 데이터
+  group_positions = []  # [(buy_date, buy_price, position_size), ...]
+  current_group_buy_count = 0
   last_buy_price = None
 
-  current_group_buy_count = 0
+  # 현재 그룹의 매도 조건 함수
+  current_sell_condition = sell_condition_technical_bounce
 
   group_returns = []
   group_sell_date = None
-
-  current_sell_condition = sell_condition_technical_bounce
 
   # --- 그룹 정산(Flush) 함수 ---
   def flush_group_metrics():
@@ -55,6 +58,39 @@ def backtest(data, ticker):
     group_returns = []
     group_sell_date = None
 
+  # --- 그룹 일괄 매도 처리 함수 ---
+  def execute_group_sell(sell_date, sell_price):
+    nonlocal group_positions, returns, holding_periods, group_returns, group_sell_date
+
+    if not group_positions:
+      return
+
+    total_weighted_return = 0
+    total_weight = 0
+
+    for buy_date, buy_price, position_size in group_positions:
+      trade_return = (sell_price / buy_price - 1) * position_size
+
+      df.loc[buy_date, 'Return'] = trade_return
+      df.loc[buy_date, 'Sell Price'] = sell_price
+      df.loc[buy_date, 'Sell Date'] = sell_date
+
+      returns.append(trade_return)
+      holding_periods.append((sell_date - buy_date).days)
+
+      total_weighted_return += trade_return
+      total_weight += position_size
+
+      # Weight 누적
+      df.loc[sell_date, 'Weight'] += position_size
+
+    # 그룹 통계 수집
+    group_avg_return = total_weighted_return / len(group_positions) if group_positions else 0
+    group_returns.append(group_avg_return)
+    group_sell_date = sell_date
+
+    df.loc[sell_date, 'Action'] = 'Sell'
+
   for buy_date in buys.index:
     # 새 그룹 시작 여부 확인
     if sell_date is not None and buy_date > sell_date:
@@ -65,6 +101,7 @@ def backtest(data, ticker):
       current_buy_group_flag = False
       last_buy_price = None
       current_group_buy_count = 0
+      group_positions = []
       current_sell_condition = sell_condition_technical_bounce
 
     is_first_buy = not current_buy_group_flag
@@ -91,10 +128,10 @@ def backtest(data, ticker):
       continue
 
     # --- 매수 실행 ---
-    first_buy_price = df.loc[buy_date, 'Close']
+    buy_price = df.loc[buy_date, 'Close']
     change_rate = df.loc[buy_date, 'Change_Rate']
     df.loc[buy_date, 'Action'] = 'Buy'
-    last_buy_price = first_buy_price
+    last_buy_price = buy_price
     current_group_buy_count += 1
     buy_count += 1
 
@@ -110,10 +147,13 @@ def backtest(data, ticker):
 
     df.loc[buy_date, 'Weight'] = position_size
 
+    # 그룹 포지션에 추가
+    group_positions.append((buy_date, buy_price, position_size))
+
     # 그룹 초기 설정
     if is_first_buy:
       current_buy_group_flag = True
-      current_sell_condition = sell_condition_technical_bounce  # 첫 매수는 10일선
+      current_sell_condition = sell_condition_technical_bounce
 
     # *** 실전형 로직: 5회 이상 매수 시 즉시 매도 조건 변경 ***
     if current_group_buy_count >= 5:
@@ -126,24 +166,12 @@ def backtest(data, ticker):
     sell_signals = subsequent_data[current_sell_condition(subsequent_data)]
     sell_date = sell_signals.index[0] if not sell_signals.empty else None
 
-    # --- 전체 매도 처리 ---
-    if sell_date:
-      df.loc[sell_date, 'Action'] = 'Sell'
-      sell_price = df.loc[sell_date, 'Close']
-      trade_return = (sell_price / first_buy_price - 1) * position_size
+  # 루프 종료 후 마지막 그룹 일괄 매도 처리
+  if sell_date and group_positions:
+    sell_price = df.loc[sell_date, 'Close']
+    execute_group_sell(sell_date, sell_price)
 
-      df.loc[buy_date, 'Return'] = trade_return
-      returns.append(trade_return)
-      holding_periods.append((sell_date - buy_date).days)
-
-      # Weight 누적
-      df.loc[sell_date, 'Weight'] += position_size
-
-      # 그룹 통계 수집
-      group_returns.append(trade_return)
-      group_sell_date = sell_date
-
-  # 루프 종료 후 마지막 그룹 정산(Flush)
+  # 마지막 그룹 정산(Flush)
   flush_group_metrics()
 
   avg_return = sum(returns) / len(returns) if returns else 0
