@@ -10,12 +10,63 @@ import pandas as pd
 DEFAULT_RSI_THRESHOLD = 35
 
 
+class CloseOrderExecutor(bt.observers.Broker):
+  """당일 종가 체결을 위한 커스텀 Executor"""
+  pass
+
+
+class InstantBroker(bt.brokers.BackBroker):
+  """
+  당일 종가에 즉시 체결되는 커스텀 브로커
+  백테스트 전용 - 실전에서는 애프터장 활용
+  """
+
+  def __init__(self):
+    super(InstantBroker, self).__init__()
+
+  def _execute(self, order, ago=0, price=None):
+    """주문을 당일 종가에 즉시 체결"""
+    # 현재 데이터의 종가 가져오기
+    if price is None:
+      price = order.data.close[ago]
+
+    # 주문 체결 처리
+    order.execute(
+        order.data.datetime[ago],
+        order.size,
+        price,
+        0,  # closed
+        0.0,  # closedvalue
+        0.0,  # closedcomm
+        0.0,  # openedvalue
+        0.0,  # openedcomm
+        0.0,  # margin
+        0.0,  # pnl
+        0.0,  # psize
+        0.0  # pprice
+    )
+
+    order.completed()
+    self.notify(order)
+    self._bracketize(order, cancel=True)
+
+    return order
+
+  def next(self):
+    """매 틱마다 실행 - 주문을 당일 종가에 체결"""
+    # 대기 중인 모든 주문 처리
+    for order in list(self.orders):
+      if order.status == order.Submitted:
+        # 당일 종가로 즉시 체결
+        self._execute(order, ago=0)
+
+
 class RSIMAStrategy(bt.Strategy):
   """
   RSI 기반 매수, 이동평균선 돌파 매도 전략
   - Look-ahead 로직 제거
   - 실전형: 현재까지 매수 횟수가 5회 이상이면 목표를 20일선으로 변경
-  - 당일 종가 체결
+  - 당일 종가 체결 (커스텀 브로커 사용)
   """
 
   params = (
@@ -43,10 +94,10 @@ class RSIMAStrategy(bt.Strategy):
     self.current_group_buy_count = 0
     self.total_position_size = 0
     self.weighted_avg_buy_price = 0
-    self.sell_target = 'MA10'  # 'MA10' 또는 'MA20'
+    self.sell_target = 'MA10'
 
     # 매수 그룹별 추적
-    self.current_group_entries = []  # [(date, price, size), ...]
+    self.current_group_entries = []
 
     # 통계 수집
     self.trade_results = []
@@ -92,7 +143,6 @@ class RSIMAStrategy(bt.Strategy):
     exit_date = bt.num2date(trade.dtclose).date()
     holding_days = (exit_date - entry_date).days
 
-    # 거래 크기와 가치 계산
     trade_size = abs(trade.size) if trade.size != 0 else 1
     trade_value = abs(trade.price * trade_size)
 
@@ -101,7 +151,6 @@ class RSIMAStrategy(bt.Strategy):
     self.log(f'TRADE CLOSED - PnL: {trade.pnl:.2f}, PnL%: {pnl_pct:.2f}%, '
              f'Holding: {holding_days} days')
 
-    # 통계 저장
     self.trade_results.append({
       'entry_date': entry_date,
       'exit_date': exit_date,
@@ -127,7 +176,7 @@ class RSIMAStrategy(bt.Strategy):
 
     if self.sell_target == 'MA10':
       return self.ma10_cross[0] > 0 and bullish
-    else:  # 'MA20'
+    else:
       return self.ma20_cross[0] > 0 and bullish
 
   def calculate_position_size(self, rsi, change_rate):
@@ -145,7 +194,7 @@ class RSIMAStrategy(bt.Strategy):
     return position_size
 
   def next(self):
-    """매 봉마다 실행되는 전략 로직"""
+    """매 봉마다 실행 - 당일 종가 데이터로 시그널 감지 및 즉시 체결"""
     if self.order:
       return
 
@@ -157,7 +206,7 @@ class RSIMAStrategy(bt.Strategy):
                f'Buy Count: {self.current_group_buy_count}, '
                f'Position Size: {self.position.size}')
 
-      # 전체 포지션 매도
+      # 전체 포지션 매도 (커스텀 브로커가 당일 종가에 체결)
       self.order = self.close()
 
       # 상태 초기화
@@ -202,7 +251,7 @@ class RSIMAStrategy(bt.Strategy):
                f'Size: {position_size}, '
                f'Order: {self.current_group_buy_count + 1}')
 
-      # 매수 실행
+      # 매수 실행 (커스텀 브로커가 당일 종가에 체결)
       self.order = self.buy(size=position_size)
 
       # 상태 업데이트
@@ -210,7 +259,6 @@ class RSIMAStrategy(bt.Strategy):
       self.current_group_buy_count += 1
       self.buy_dates.append(current_date)
 
-      # 그룹 엔트리 추적
       self.current_group_entries.append((current_date, current_price, position_size))
 
       # 가중 평균 매수가 계산
@@ -253,6 +301,9 @@ def run_backtest(ticker, name, data):
   # Cerebro 엔진 생성
   cerebro = bt.Cerebro()
 
+  # *** 커스텀 브로커 설정 (당일 종가 체결) ***
+  cerebro.broker = InstantBroker()
+
   # 전략 추가
   cerebro.addstrategy(RSIMAStrategy, printlog=True)
 
@@ -269,6 +320,7 @@ def run_backtest(ticker, name, data):
   # 시작 포트폴리오 가치
   start_value = cerebro.broker.getvalue()
   print(f'Starting Portfolio Value: {start_value:.2f}')
+  print('NOTE: Using custom broker for same-day close execution (backtest only)')
 
   # 백테스트 실행
   results = cerebro.run()
@@ -320,10 +372,8 @@ def run_backtest(ticker, name, data):
     print(f'\nNo trades executed.')
     print(f'Total Buy Signals: {len(strategy.buy_dates)}')
 
-    # 매수 신호는 있지만 거래가 없는 경우 디버깅 정보
     if len(strategy.buy_dates) > 0:
       print(f'WARNING: Buy signals detected but no completed trades!')
-      print(f'This may indicate an issue with position sizing or broker settings.')
 
     return {
       'avg_return': 0,
