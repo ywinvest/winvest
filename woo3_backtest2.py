@@ -10,70 +10,12 @@ import pandas as pd
 DEFAULT_RSI_THRESHOLD = 35
 
 
-class CloseOrderExecutor(bt.observers.Broker):
-  """당일 종가 체결을 위한 커스텀 Executor"""
-  pass
-
-
-class InstantBroker(bt.brokers.BackBroker):
-  """
-  당일 종가에 즉시 체결되는 커스텀 브로커
-  백테스트 전용 - 실전에서는 애프터장 활용
-  """
-
-  def __init__(self):
-    super(InstantBroker, self).__init__()
-
-  def _execute(self, order, ago=0, price=None):
-    """주문을 당일 종가에 즉시 체결"""
-    # 현재 데이터의 종가 가져오기
-    if price is None:
-      price = order.data.close[ago]
-
-    # 체결 수량
-    size = order.size
-
-    # 수수료 계산
-    commission = self.getcommissioninfo(order.data).getcommission(size, price)
-
-    # 주문 체결 처리 (올바른 인자 순서)
-    order.execute(
-        dt=order.data.datetime[ago],
-        size=size,
-        price=price,
-        closed=0,
-        closedvalue=0.0,
-        closedcomm=0.0,
-        opened=size,
-        openedvalue=abs(size) * price,
-        openedcomm=commission,
-        margin=0.0,
-        pnl=0.0,
-        psize=0,
-        pprice=0.0
-    )
-
-    order.completed()
-    self.notify(order)
-    self._bracketize(order, cancel=True)
-
-    return order
-
-  def next(self):
-    """매 틱마다 실행 - 주문을 당일 종가에 체결"""
-    # 대기 중인 모든 주문 처리
-    for order in list(self.orders):
-      if order.status == order.Submitted:
-        # 당일 종가로 즉시 체결
-        self._execute(order, ago=0)
-
-
 class RSIMAStrategy(bt.Strategy):
   """
   RSI 기반 매수, 이동평균선 돌파 매도 전략
   - Look-ahead 로직 제거
   - 실전형: 현재까지 매수 횟수가 5회 이상이면 목표를 20일선으로 변경
-  - 당일 종가 체결 (커스텀 브로커 사용)
+  - 당일 종가 체결 (Market order with exectype=Close)
   """
 
   params = (
@@ -201,7 +143,7 @@ class RSIMAStrategy(bt.Strategy):
     return position_size
 
   def next(self):
-    """매 봉마다 실행 - 당일 종가 데이터로 시그널 감지 및 즉시 체결"""
+    """매 봉마다 실행 - 당일 종가 데이터로 시그널 감지 및 종가 주문"""
     if self.order:
       return
 
@@ -213,8 +155,8 @@ class RSIMAStrategy(bt.Strategy):
                f'Buy Count: {self.current_group_buy_count}, '
                f'Position Size: {self.position.size}')
 
-      # 전체 포지션 매도 (커스텀 브로커가 당일 종가에 체결)
-      self.order = self.close()
+      # 전체 포지션 매도 - 종가에 체결
+      self.order = self.close(exectype=bt.Order.Close)
 
       # 상태 초기화
       self.last_buy_price = None
@@ -258,8 +200,8 @@ class RSIMAStrategy(bt.Strategy):
                f'Size: {position_size}, '
                f'Order: {self.current_group_buy_count + 1}')
 
-      # 매수 실행 (커스텀 브로커가 당일 종가에 체결)
-      self.order = self.buy(size=position_size)
+      # 매수 실행 - 종가에 체결
+      self.order = self.buy(size=position_size, exectype=bt.Order.Close)
 
       # 상태 업데이트
       self.last_buy_price = current_price
@@ -308,9 +250,6 @@ def run_backtest(ticker, name, data):
   # Cerebro 엔진 생성
   cerebro = bt.Cerebro()
 
-  # *** 커스텀 브로커 설정 (당일 종가 체결) ***
-  cerebro.broker = InstantBroker()
-
   # 전략 추가
   cerebro.addstrategy(RSIMAStrategy, printlog=True)
 
@@ -327,7 +266,7 @@ def run_backtest(ticker, name, data):
   # 시작 포트폴리오 가치
   start_value = cerebro.broker.getvalue()
   print(f'Starting Portfolio Value: {start_value:.2f}')
-  print('NOTE: Using custom broker for same-day close execution (backtest only)')
+  print('NOTE: Using Order.Close exectype for same-day close execution')
 
   # 백테스트 실행
   results = cerebro.run()
