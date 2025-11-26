@@ -150,7 +150,21 @@ class GlobalShortTermStrategy:
 
     if len(trades) > 0:
       avg_return = trades['Return'].mean() * 100
-      avg_holding_period = trades['Duration'].mean()
+
+      # Duration 컬럼이 없을 경우 직접 계산
+      if 'Duration' in trades.columns:
+        avg_holding_period = trades['Duration'].mean()
+      else:
+        # Entry Index와 Exit Index로 직접 계산
+        holding_periods = []
+        for idx, trade in trades.iterrows():
+          entry_idx = trade['Entry Index']
+          exit_idx = trade['Exit Index']
+          entry_date = self.df.index[int(entry_idx)]
+          exit_date = self.df.index[int(exit_idx)]
+          holding_periods.append((exit_date - entry_date).days)
+        avg_holding_period = np.mean(holding_periods) if holding_periods else 0
+
       buy_count = len(trades)
     else:
       avg_return = 0
