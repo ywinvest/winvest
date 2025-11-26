@@ -64,28 +64,19 @@ class RSIMAStrategy(bt.Strategy):
   def notify_order(self, order):
     """주문 상태 알림"""
     if order.status in [order.Submitted, order.Accepted]:
-      if order.isbuy():
-        self.log(f'BUY ${order.status}, Price: {order.executed.price:.2f}, '
-                 f'Size: {order.executed.size:.0f}, '
-                 f'Cost: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}')
-      elif order.issell():
-        self.log(f'SELL ${order.status}, Price: {order.executed.price:.2f}, '
-                 f'Size: {order.executed.size:.0f}, '
-                 f'Value: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}')
+      return
 
     if order.status in [order.Completed]:
       if order.isbuy():
         self.log(f'BUY ${order.status}, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Cost: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}')
+                 f'Comm: {order.executed.comm:.2f}', self.data.num2date(order.created.dt))
       elif order.issell():
         self.log(f'SELL ${order.status}, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Value: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}')
+                 f'Comm: {order.executed.comm:.2f}', self.data.num2date(order.created.dt))
 
     elif order.status in [order.Canceled, order.Margin, order.Rejected]:
       self.log(f'Order Canceled/Margin/Rejected - Status: {order.status}')
@@ -164,7 +155,6 @@ class RSIMAStrategy(bt.Strategy):
                f'Buy Count: {self.current_group_buy_count}, '
                f'Position Size: {self.position.size}')
 
-      # [수정] bt.Order.Close -> bt.Order.Market 변경
       # set_coc(True) 상태에서 Market 주문을 내면 당일 종가로 체결됩니다.
       self.order = self.close(exectype=bt.Order.Market)
 
