@@ -1,193 +1,356 @@
-import datetime
+import json
+import os
+from datetime import datetime, timedelta
+
 import backtrader as bt
 import FinanceDataReader as fdr
 import pandas as pd
 
-# ----------------------------------------
-# 1. 전략 클래스 정의
-# ----------------------------------------
-class RSIMultiBuyStrategy(bt.Strategy):
+# RSI 임계값
+DEFAULT_RSI_THRESHOLD = 35
+
+
+class RSIMAStrategy(bt.Strategy):
+  """
+  RSI 기반 매수, 이동평균선 돌파 매도 전략
+  - Look-ahead 로직 제거
+  - 실전형: 현재까지 매수 횟수가 5회 이상이면 목표를 20일선으로 변경
+  """
+
   params = (
     ('rsi_period', 14),
-    ('ma_fast', 10),
-    ('ma_slow', 20),
-    ('rsi_threshold', 35),
+    ('ma10_period', 10),
+    ('ma20_period', 20),
+    ('printlog', True),
   )
 
   def __init__(self):
     # 지표 계산
     self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
-    self.sma10 = bt.indicators.SMA(self.data.close, period=self.params.ma_fast)
-    self.sma20 = bt.indicators.SMA(self.data.close, period=self.params.ma_slow)
+    self.ma10 = bt.indicators.SMA(self.data.close, period=self.params.ma10_period)
+    self.ma20 = bt.indicators.SMA(self.data.close, period=self.params.ma20_period)
 
-    # 캔들 분석용 (Bullish 여부 등)
-    self.close = self.data.close
-    self.open = self.data.open
+    # 이동평균선 교차 지표
+    self.ma10_cross = bt.indicators.CrossOver(self.data.close, self.ma10)
+    self.ma20_cross = bt.indicators.CrossOver(self.data.close, self.ma20)
 
-    # 내부 상태 변수
-    self.order = None
-    self.buy_price_history = [] # 이번 그룹의 매수 가격들
-    self.group_buy_count = 0    # 이번 그룹의 매수 횟수
+    # 변화율 계산
+    self.change_rate = (self.data.close - self.data.close(-1)) / self.data.close(-1) * 100
+
+    # 상태 변수
+    self.last_buy_price = None
+    self.current_group_buy_count = 0
+    self.in_position = False
+    self.total_position_size = 0
+    self.weighted_avg_buy_price = 0
+    self.sell_target = 'MA10'  # 'MA10' 또는 'MA20'
+
+    # 통계 수집
+    self.trades = []
+    self.buy_dates = []
 
   def log(self, txt, dt=None):
-    '''로깅 함수'''
-    dt = dt or self.datas[0].datetime.date(0)
-    # print(f'{dt.isoformat()}, {txt}') # 필요시 주석 해제하여 로그 확인
+    """로깅 함수"""
+    if self.params.printlog:
+      dt = dt or self.datas[0].datetime.date(0)
+      print(f'{dt.isoformat()}: {txt}')
 
-  def next(self):
-    # 1. 현재 캔들 정보
-    current_close = self.close[0]
-    current_open = self.open[0]
-    current_rsi = self.rsi[0]
-
-    # 전일 대비 등락률 계산 (%)
-    if len(self.close) > 1:
-      prev_close = self.close[-1]
-      change_rate = ((current_close - prev_close) / prev_close) * 100
-    else:
-      change_rate = 0
-
-    # Bullish(양봉) 여부
-    is_bullish = current_close >= current_open
-
-    # ----------------------------------------
-    # 2. 매도 로직 (청산)
-    # ----------------------------------------
-    if self.position:
-      # 매수 횟수가 5회 미만이면 10일선, 5회 이상이면 20일선 사용
-      # 원본 로직: 스냅백(5회 이상) vs 기술적 반등(5회 미만)
-      target_ma = self.sma20[0] if self.group_buy_count >= 5 else self.sma10[0]
-
-      # 매도 조건: 양봉이면서 이동평균선 돌파 (Close가 MA보다 위)
-      # 원본: df['MA_Cross'] & df['Bullish']
-      # 여기서는 당일 종가가 MA보다 높고 양봉이면 매도 (종가 매도 원칙)
-      if is_bullish and current_close > target_ma:
-        self.close() # 보유 전량 매도
-        self.log(f'SELL ALL Executed, Price: {current_close:.2f}, Count: {self.group_buy_count}')
-
-        # 그룹 상태 초기화
-        self.buy_price_history = []
-        self.group_buy_count = 0
-        return
-
-    # ----------------------------------------
-    # 3. 매수 로직 (진입 & 물타기)
-    # ----------------------------------------
-
-    # 3-1. 매수 기본 조건
-    # (RSI <= 35) & (~Bullish) & (Change_Rate < 0)
-    # 단, 2번째 매수부터는 RSI 조건이 30으로 강화될 수 있음 (원본 로직 반영)
-
-    required_rsi = self.params.rsi_threshold
-    if self.group_buy_count == 1: # 이미 1번 샀고 2번째 살 차례라면
-      required_rsi = 30
-
-    condition_met = (
-        (current_rsi <= required_rsi) and
-        (not is_bullish) and
-        (change_rate < 0)
-    )
-
-    if not condition_met:
+  def notify_order(self, order):
+    """주문 상태 알림"""
+    if order.status in [order.Submitted, order.Accepted]:
       return
 
-    # 3-2. 가격 조건 (물타기 시 평단가 고려)
-    # 원본: current_price >= last_buy_price 이면 매수 안함
-    if self.group_buy_count > 0:
-      last_buy_price = self.buy_price_history[-1]
-      if current_close >= last_buy_price:
-        return
+    if order.status in [order.Completed]:
+      if order.isbuy():
+        self.log(f'BUY EXECUTED, Price: {order.executed.price:.2f}, '
+                 f'Size: {order.executed.size:.0f}, '
+                 f'Cost: {order.executed.value:.2f}')
+      elif order.issell():
+        self.log(f'SELL EXECUTED, Price: {order.executed.price:.2f}, '
+                 f'Size: {order.executed.size:.0f}, '
+                 f'Value: {order.executed.value:.2f}, '
+                 f'PnL: {order.executed.pnl:.2f}')
 
-    # 3-3. 비중(Weight) 계산
-    position_size = 1
-    if current_rsi <= 20:
+    elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+      self.log('Order Canceled/Margin/Rejected')
+
+  def notify_trade(self, trade):
+    """거래 완료 알림"""
+    if not trade.isclosed:
+      return
+
+    self.log(f'TRADE PROFIT, Gross: {trade.pnl:.2f}, Net: {trade.pnlcomm:.2f}')
+
+    # 통계 저장
+    self.trades.append({
+      'entry_date': bt.num2date(trade.dtopen),
+      'exit_date': bt.num2date(trade.dtclose),
+      'entry_price': trade.price,
+      'exit_price': trade.price + trade.pnl / trade.size,
+      'pnl': trade.pnl,
+      'pnl_pct': trade.pnl / (trade.price * trade.size) * 100,
+      'holding_days': (bt.num2date(trade.dtclose) - bt.num2date(trade.dtopen)).days
+    })
+
+  def check_buy_condition(self):
+    """매수 조건 확인"""
+    # 기본 조건: RSI <= 35, 종가 < MA10 (하락 추세), 당일 하락
+    bullish = self.data.close[0] > self.ma10[0]
+
+    return (self.rsi[0] <= DEFAULT_RSI_THRESHOLD and
+            not bullish and
+            self.change_rate[0] < 0)
+
+  def check_sell_condition(self):
+    """매도 조건 확인"""
+    bullish = self.data.close[0] > self.ma10[0]
+
+    if self.sell_target == 'MA10':
+      # 기술적 반등 매도: 10일선 돌파
+      return self.ma10_cross[0] > 0 and bullish
+    else:  # 'MA20'
+      # 스냅백 매도: 20일선 돌파
+      return self.ma20_cross[0] > 0 and bullish
+
+  def calculate_position_size(self, rsi, change_rate):
+    """포지션 크기 계산"""
+    if rsi <= 20:
       position_size = 3
-    elif current_rsi <= 30:
+    elif rsi <= 30:
       position_size = 2
+    else:
+      position_size = 1
 
     if change_rate < -5:
       position_size += 1
 
-    # 3-4. 매수 실행 (종가 매수)
-    # Backtrader의 buy()는 기본적으로 1주를 삽니다. size 파라미터로 조절.
-    # 여기서는 Weight를 주식 수(size)로 단순화하여 처리합니다.
-    self.buy(size=position_size)
+    return position_size
 
-    self.group_buy_count += 1
-    self.buy_price_history.append(current_close)
-    self.log(f'BUY Executed, Price: {current_close:.2f}, RSI: {current_rsi:.2f}, Size: {position_size}, Total Count: {self.group_buy_count}')
+  def next(self):
+    """매 봉마다 실행되는 전략 로직"""
+    current_date = self.datas[0].datetime.date(0)
+
+    # 매도 조건 확인 (포지션이 있을 때)
+    if self.in_position and self.check_sell_condition():
+      self.log(f'SELL SIGNAL - Target: {self.sell_target}, '
+               f'Buy Count: {self.current_group_buy_count}')
+
+      # 전체 포지션 매도
+      self.sell(size=self.total_position_size)
+
+      # 상태 초기화
+      self.last_buy_price = None
+      self.current_group_buy_count = 0
+      self.in_position = False
+      self.total_position_size = 0
+      self.weighted_avg_buy_price = 0
+      self.sell_target = 'MA10'
+      return
+
+    # 매수 조건 확인
+    if self.check_buy_condition():
+      is_first_buy = not self.in_position
+      current_price = self.data.close[0]
+      current_rsi = self.rsi[0]
+      current_change = self.change_rate[0]
+
+      # 추가 매수 시 가격 조건 확인
+      if not is_first_buy:
+        if current_price >= self.last_buy_price:
+          return  # 가격이 이전 매수가보다 높거나 같으면 매수 안함
+
+      # RSI 조건 검증
+      if is_first_buy:
+        required_rsi = DEFAULT_RSI_THRESHOLD
+      else:
+        check_order = self.current_group_buy_count + 1
+        if check_order == 2:
+          required_rsi = 30
+        else:
+          required_rsi = DEFAULT_RSI_THRESHOLD
+
+      if current_rsi > required_rsi:
+        return
+
+      # 포지션 크기 계산
+      position_size = self.calculate_position_size(current_rsi, current_change)
+
+      # 매수 실행
+      self.buy(size=position_size)
+      self.log(f'BUY SIGNAL - RSI: {current_rsi:.2f}, '
+               f'Change: {current_change:.2f}%, '
+               f'Size: {position_size}, '
+               f'Order: {self.current_group_buy_count + 1}')
+
+      # 상태 업데이트
+      self.last_buy_price = current_price
+      self.current_group_buy_count += 1
+      self.in_position = True
+      self.buy_dates.append(current_date)
+
+      # 가중 평균 매수가 계산
+      prev_total_value = self.weighted_avg_buy_price * self.total_position_size
+      new_value = current_price * position_size
+      self.total_position_size += position_size
+      self.weighted_avg_buy_price = (prev_total_value + new_value) / self.total_position_size
+
+      # 첫 매수일 때는 10일선 목표로 시작
+      if self.current_group_buy_count == 1:
+        self.sell_target = 'MA10'
+
+      # 실전형 로직: 매수 횟수가 5회 이상이면 즉시 20일선으로 변경
+      if self.current_group_buy_count >= 5:
+        if self.sell_target != 'MA20':
+          self.log(f'>>> SELL TARGET CHANGED: MA10 -> MA20 '
+                   f'(Buy count reached {self.current_group_buy_count})')
+          self.sell_target = 'MA20'
 
 
-# ----------------------------------------
-# 4. 실행 및 설정
-# ----------------------------------------
-def run_backtest(ticker, start_date, end_date):
+class PandasData(bt.feeds.PandasData):
+  """FinanceDataReader 데이터를 위한 커스텀 데이터 피드"""
+  params = (
+    ('datetime', None),
+    ('open', 'Open'),
+    ('high', 'High'),
+    ('low', 'Low'),
+    ('close', 'Close'),
+    ('volume', 'Volume'),
+    ('openinterest', -1),
+  )
+
+
+def run_backtest(ticker, name, data):
+  """백테스트 실행"""
+  print(f"\n{'='*60}")
+  print(f"Processing {ticker} ({name})...")
+  print(f"{'='*60}")
+
+  # Cerebro 엔진 생성
   cerebro = bt.Cerebro()
 
-  # 데이터 가져오기 (FinanceDataReader -> Pandas -> Backtrader)
-  df = fdr.DataReader(ticker, start=start_date, end=end_date)
-
-  if df.empty:
-    print(f"No data for {ticker}")
-    return
-
-  # Backtrader용 데이터 피드로 변환
-  data = bt.feeds.PandasData(dataname=df)
-  cerebro.adddata(data)
-
   # 전략 추가
-  cerebro.addstrategy(RSIMultiBuyStrategy)
+  cerebro.addstrategy(RSIMAStrategy, printlog=True)
 
-  # 브로커 설정
-  cerebro.broker.setcash(10000000) # 초기 자본금 (천만원)
+  # 데이터 추가
+  data_feed = PandasData(dataname=data)
+  cerebro.adddata(data_feed)
 
-  # *** 핵심: 종가 매매 설정 ***
-  # set_coc(True): Cheat-On-Close.
-  # 신호가 나온 당일 종가(Close)로 체결을 시킵니다.
+  # 초기 자본금 설정
+  cerebro.broker.setcash(100000.0)
+
+  # 수수료 설정 (0.1%)
+  cerebro.broker.setcommission(commission=0.001)
+
+  # 종가 거래로 설정
   cerebro.broker.set_coc(True)
 
-  print(f'\nStarting Portfolio Value for {ticker}: {cerebro.broker.getvalue():.2f}')
+  # 시작 포트폴리오 가치
+  start_value = cerebro.broker.getvalue()
+  print(f'Starting Portfolio Value: {start_value:.2f}')
 
-  # 분석기 추가 (승률, 수익률 등)
-  cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trade_analyzer')
-
-  # 실행
+  # 백테스트 실행
   results = cerebro.run()
-  strat = results[0]
+  strategy = results[0]
 
-  # 결과 출력
-  final_value = cerebro.broker.getvalue()
-  print(f'Final Portfolio Value for {ticker}: {final_value:.2f}')
+  # 종료 포트폴리오 가치
+  end_value = cerebro.broker.getvalue()
+  print(f'Ending Portfolio Value: {end_value:.2f}')
+  print(f'Total Return: {((end_value - start_value) / start_value * 100):.2f}%')
 
-  # 거래 통계
-  trade_analysis = strat.analyzers.trade_analyzer.get_analysis()
+  # 통계 계산
+  if strategy.trades:
+    returns = [t['pnl_pct'] for t in strategy.trades]
+    holding_periods = [t['holding_days'] for t in strategy.trades]
 
-  total_trades = trade_analysis.get('total', {}).get('total', 0)
+    avg_return = sum(returns) / len(returns)
+    avg_holding = sum(holding_periods) / len(holding_periods)
+    win_rate = len([r for r in returns if r > 0]) / len(returns) * 100
 
-  if total_trades > 0:
-    won_data = trade_analysis.get('won', {})
-    win_trades = won_data.get('total', 0)
+    print(f'\nTrade Statistics:')
+    print(f'Total Trades: {len(strategy.trades)}')
+    print(f'Total Buy Signals: {len(strategy.buy_dates)}')
+    print(f'Average Return per Trade: {avg_return:.2f}%')
+    print(f'Average Holding Period: {avg_holding:.2f} days')
+    print(f'Win Rate: {win_rate:.2f}%')
 
-    pnl_net = trade_analysis.get('pnl', {}).get('net', {}).get('total', 0)
+    # 결과 저장
+    output_dir = 'global/backtrader-results'
+    os.makedirs(output_dir, exist_ok=True)
 
-    win_rate = (win_trades / total_trades) * 100
+    trades_df = pd.DataFrame(strategy.trades)
+    trades_df.to_csv(os.path.join(output_dir, f'{ticker}_trades.csv'), index=False)
 
-    print(f"Total Trades: {total_trades}")
-    print(f"Win Rate: {win_rate:.2f}%")
-    print(f"Net Profit: {pnl_net:.2f}")
+    return {
+      'avg_return': avg_return,
+      'avg_holding': avg_holding,
+      'total_trades': len(strategy.trades),
+      'buy_count': len(strategy.buy_dates),
+      'win_rate': win_rate,
+      'total_return': (end_value - start_value) / start_value * 100
+    }
   else:
-    print("No trades occurred.")
+    print('\nNo trades executed.')
+    return {
+      'avg_return': 0,
+      'avg_holding': 0,
+      'total_trades': 0,
+      'buy_count': len(strategy.buy_dates),
+      'win_rate': 0,
+      'total_return': 0
+    }
 
-# 메인 실행 블록
-if __name__ == '__main__':
-  # 예시 설정
-  tickers = {
-    "IXIC": "Nasdaq",
-  }
 
-  end_date = datetime.datetime.now().strftime('%Y-%m-%d')
-  start_date = (datetime.datetime.now() - datetime.timedelta(days=365*30)).strftime('%Y-%m-%d')
+if __name__ == "__main__":
+  # 설정 파일 로드
+  with open('config-woo3.json', 'r') as config_file:
+    config = json.load(config_file)
 
+  tickers = config["global"]["tickers"]
+  results = {}
+
+  # 데이터 기간 설정 (최근 30년)
+  end_date = datetime.today()
+  start_date = end_date - timedelta(days=30 * 365)
+
+  end_date_str = end_date.strftime('%Y-%m-%d')
+  start_date_str = start_date.strftime('%Y-%m-%d')
+
+  # 각 티커별로 백테스트 실행
   for ticker, name in tickers.items():
-    print(f"Processing {ticker} ({name})...")
-    run_backtest(ticker, start_date, end_date)
+    try:
+      # 데이터 다운로드
+      data = fdr.DataReader(ticker, start=start_date_str, end=end_date_str)
+
+      if data.empty:
+        print(f"No data found for {ticker}, skipping.")
+        continue
+
+      # 백테스트 실행
+      result = run_backtest(ticker, name, data)
+      results[name] = result
+
+    except Exception as e:
+      print(f"Error processing {ticker} ({name}): {str(e)}")
+      continue
+
+  # 최종 결과 요약
+  print("\n" + "="*80)
+  print("BACKTEST RESULTS SUMMARY")
+  print("="*80)
+
+  for name, metrics in results.items():
+    print(f"\n{name}:")
+    print(f"  Total Return: {metrics['total_return']:.2f}%")
+    print(f"  Average Return per Trade: {metrics['avg_return']:.2f}%")
+    print(f"  Average Holding Period: {metrics['avg_holding']:.2f} days")
+    print(f"  Total Trades: {metrics['total_trades']}")
+    print(f"  Buy Signals: {metrics['buy_count']}")
+    print(f"  Win Rate: {metrics['win_rate']:.2f}%")
+
+  # 전체 결과를 CSV로 저장
+  output_dir = 'global/backtrader-results'
+  os.makedirs(output_dir, exist_ok=True)
+
+  summary_df = pd.DataFrame(results).T
+  summary_df.to_csv(os.path.join(output_dir, 'backtest_summary.csv'))
+  print(f"\nResults saved to {output_dir}/")
