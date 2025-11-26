@@ -47,6 +47,8 @@ class RSIMAStrategy(bt.Strategy):
 
     # 매수 그룹별 추적
     self.current_group_entries = []
+    self.group_returns = []  # 그룹별 수익률
+    self.group_sell_date = None
 
     # 통계 수집
     self.trade_results = []
@@ -54,6 +56,9 @@ class RSIMAStrategy(bt.Strategy):
 
     # 주문 관리
     self.order = None
+
+    # CSV 출력용 데이터 저장
+    self.daily_data = {}
 
   def log(self, txt, dt=None):
     """로깅 함수"""
@@ -100,6 +105,7 @@ class RSIMAStrategy(bt.Strategy):
     self.log(f'TRADE CLOSED - PnL: {trade.pnl:.2f}, PnL%: {pnl_pct:.2f}%, '
              f'Holding: {holding_days} days', self.data.num2date(trade.dtclose).date())
 
+    # 거래 통계 저장
     self.trade_results.append({
       'entry_date': entry_date,
       'exit_date': exit_date,
@@ -110,6 +116,16 @@ class RSIMAStrategy(bt.Strategy):
       'pnl_pct': pnl_pct,
       'holding_days': holding_days
     })
+
+    # 그룹 내 각 매수별 수익률 계산 및 저장
+    exit_price = trade.price + (trade.pnl / trade_size if trade_size != 0 else 0)
+    for entry in self.current_group_entries:
+      entry_return = (exit_price / entry['price'] - 1) * entry['size']
+      self.group_returns.append(entry_return)
+
+      # 각 매수일에 Return 기록
+      if entry['date'] in self.daily_data:
+        self.daily_data[entry['date']]['Return'] = entry_return
 
   def check_buy_condition(self):
     """매수 조건 확인"""
@@ -149,14 +165,39 @@ class RSIMAStrategy(bt.Strategy):
 
     current_date = self.datas[0].datetime.date(0)
 
+    # 매일 데이터 기록 초기화
+    if current_date not in self.daily_data:
+      self.daily_data[current_date] = {
+        'RSI': self.rsi[0],
+        'MA_10': self.ma10[0],
+        'MA_20': self.ma20[0],
+        'Weight': 0.0,
+        'Action': None,
+        'Consecutive Buys': None,
+        'Return': None,
+        'Group Return': None
+      }
+
     # 포지션이 있을 때 매도 조건 확인
     if self.position and self.check_sell_condition():
       self.log(f'SELL SIGNAL - Target: {self.sell_target}, '
                f'Buy Count: {self.current_group_buy_count}, '
                f'Position Size: {self.position.size}')
 
-      # set_coc(True) 상태에서 Market 주문을 내면 당일 종가로 체결됩니다.
-      self.order = self.close(exectype=bt.Order.Market)
+      # 매도 액션 기록
+      self.daily_data[current_date]['Action'] = 'Sell'
+      self.daily_data[current_date]['Weight'] = self.total_position_size
+
+      # 그룹 수익률 계산 및 기록
+      if self.group_returns:
+        avg_group_return = sum(self.group_returns) / len(self.group_returns)
+        self.daily_data[current_date]['Group Return'] = avg_group_return
+
+      # 전체 포지션 매도
+      self.order = self.close(exectype=bt.Order.Close)
+
+      # 그룹 정산
+      self.group_sell_date = current_date
 
       # 상태 초기화
       self.last_buy_price = None
@@ -165,6 +206,8 @@ class RSIMAStrategy(bt.Strategy):
       self.weighted_avg_buy_price = 0
       self.sell_target = 'MA10'
       self.current_group_entries = []
+      self.group_returns = []
+      self.group_sell_date = None
       return
 
     # 매수 조건 확인
@@ -200,16 +243,23 @@ class RSIMAStrategy(bt.Strategy):
                f'Size: {position_size}, '
                f'Order: {self.current_group_buy_count + 1}')
 
-      # [수정] bt.Order.Close -> bt.Order.Market 변경
-      # set_coc(True) 덕분에 현재(당일) 종가로 즉시 체결됩니다.
-      self.order = self.buy(size=position_size, exectype=bt.Order.Market)
+      # 매수 액션 기록
+      self.daily_data[current_date]['Action'] = 'Buy'
+      self.daily_data[current_date]['Weight'] = position_size
+
+      # 매수 실행
+      self.order = self.buy(size=position_size, exectype=bt.Order.Close)
 
       # 상태 업데이트
       self.last_buy_price = current_price
       self.current_group_buy_count += 1
       self.buy_dates.append(current_date)
 
-      self.current_group_entries.append((current_date, current_price, position_size))
+      self.current_group_entries.append({
+        'date': current_date,
+        'price': current_price,
+        'size': position_size
+      })
 
       # 가중 평균 매수가 계산
       prev_total_value = self.weighted_avg_buy_price * self.total_position_size
@@ -220,6 +270,9 @@ class RSIMAStrategy(bt.Strategy):
       # 첫 매수일 때는 10일선 목표로 시작
       if self.current_group_buy_count == 1:
         self.sell_target = 'MA10'
+
+      # Consecutive Buys 기록
+      self.daily_data[current_date]['Consecutive Buys'] = self.current_group_buy_count
 
       # 실전형 로직: 매수 횟수가 5회 이상이면 즉시 20일선으로 변경
       if self.current_group_buy_count >= 5:
@@ -286,6 +339,40 @@ def run_backtest(ticker, name, data):
   total_return = (end_value - start_value) / start_value * 100
   print(f'Total Return: {total_return:.2f}%')
 
+  # === CSV 파일 생성 (원본 형식) ===
+  # 원본 데이터에 지표 및 액션 추가
+  output_df = data.copy()
+
+  # 일자별 데이터 병합
+  for date, day_data in strategy.daily_data.items():
+    if date in output_df.index:
+      output_df.loc[date, 'RSI'] = day_data['RSI']
+      output_df.loc[date, 'MA_10'] = day_data['MA_10']
+      output_df.loc[date, 'MA_20'] = day_data['MA_20']
+      output_df.loc[date, 'Weight'] = day_data['Weight']
+      output_df.loc[date, 'Action'] = day_data['Action']
+      output_df.loc[date, 'Consecutive Buys'] = day_data['Consecutive Buys']
+      output_df.loc[date, 'Return'] = day_data['Return']
+      output_df.loc[date, 'Group Return'] = day_data['Group Return']
+
+  # Change_Rate 계산 (원본과 동일)
+  output_df['Change_Rate'] = output_df['Close'].pct_change() * 100
+
+  # Bullish 계산 (Close > MA_10)
+  output_df['Bullish'] = output_df['Close'] > output_df['MA_10']
+
+  # MA Cross 계산
+  output_df['MA_10_Cross'] = (output_df['Close'] > output_df['MA_10']) & (output_df['Close'].shift(1) <= output_df['MA_10'].shift(1))
+  output_df['MA_20_Cross'] = (output_df['Close'] > output_df['MA_20']) & (output_df['Close'].shift(1) <= output_df['MA_20'].shift(1))
+
+  # 결과 저장
+  output_dir = 'global/backtrader-results'
+  os.makedirs(output_dir, exist_ok=True)
+
+  # 전체 데이터 CSV 저장
+  output_df.to_csv(os.path.join(output_dir, f'{ticker}_backtest_results.csv'))
+  print(f'Full backtest data saved to {output_dir}/{ticker}_backtest_results.csv')
+
   # 통계 계산
   if strategy.trade_results:
     returns = [t['pnl_pct'] for t in strategy.trade_results]
@@ -304,10 +391,7 @@ def run_backtest(ticker, name, data):
     print(f'Average Holding Period: {avg_holding:.2f} days')
     print(f'Win Rate: {win_rate:.2f}%')
 
-    # 결과 저장
-    output_dir = 'global/backtrader-results'
-    os.makedirs(output_dir, exist_ok=True)
-
+    # 거래 내역 CSV 저장 (추가)
     trades_df = pd.DataFrame(strategy.trade_results)
     trades_df.to_csv(os.path.join(output_dir, f'{ticker}_trades.csv'), index=False)
     print(f'Trade details saved to {output_dir}/{ticker}_trades.csv')
