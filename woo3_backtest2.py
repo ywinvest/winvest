@@ -15,6 +15,7 @@ class RSIMAStrategy(bt.Strategy):
   RSI 기반 매수, 이동평균선 돌파 매도 전략
   - Look-ahead 로직 제거
   - 실전형: 현재까지 매수 횟수가 5회 이상이면 목표를 20일선으로 변경
+  - 당일 종가 체결
   """
 
   params = (
@@ -49,6 +50,9 @@ class RSIMAStrategy(bt.Strategy):
     self.trades = []
     self.buy_dates = []
 
+    # 당일 주문 플래그 (중복 주문 방지)
+    self.order = None
+
   def log(self, txt, dt=None):
     """로깅 함수"""
     if self.params.printlog:
@@ -74,6 +78,9 @@ class RSIMAStrategy(bt.Strategy):
     elif order.status in [order.Canceled, order.Margin, order.Rejected]:
       self.log('Order Canceled/Margin/Rejected')
 
+    # 주문 완료 또는 취소 시 order 플래그 초기화
+    self.order = None
+
   def notify_trade(self, trade):
     """거래 완료 알림"""
     if not trade.isclosed:
@@ -81,6 +88,7 @@ class RSIMAStrategy(bt.Strategy):
 
     self.log(f'TRADE PROFIT, Gross: {trade.pnl:.2f}, Net: {trade.pnlcomm:.2f}')
 
+    # 통계 저장 (division by zero 방지)
     trade_size = abs(trade.size) if trade.size != 0 else 1
     trade_value = abs(trade.price * trade.size)
 
@@ -243,8 +251,11 @@ def run_backtest(ticker, name, data):
   # 수수료 설정 (0.1%)
   cerebro.broker.setcommission(commission=0.001)
 
-  # 종가 거래로 설정
+  # 당일 종가 체결 설정 (cheat-on-close)
   cerebro.broker.set_coc(True)
+
+  # 당일 종가 데이터를 next()에서 사용 가능하도록 설정
+  cerebro.broker.set_checksubmit(False)
 
   # 시작 포트폴리오 가치
   start_value = cerebro.broker.getvalue()
