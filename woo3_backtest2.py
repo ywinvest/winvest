@@ -68,15 +68,15 @@ class RSIMAStrategy(bt.Strategy):
 
     if order.status in [order.Completed]:
       if order.isbuy():
-        self.log(f'BUY ${order.status}, Price: {order.executed.price:.2f}, '
-                 f'Size: {order.executed.size:.0f}, '
-                 f'Cost: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}', self.data.num2date(order.created.dt))
-      elif order.issell():
-        self.log(f'SELL ${order.status}, Price: {order.executed.price:.2f}, '
+        self.log(f'BUY EXECUTED, Price: {order.executed.price:.2f}, '
                  f'Size: {order.executed.size:.0f}, '
                  f'Value: {order.executed.value:.2f}, '
-                 f'Comm: {order.executed.comm:.2f}', self.data.num2date(order.created.dt))
+                 f'Comm: {order.executed.comm:.2f}', order.created.dt)
+      elif order.issell():
+        self.log(f'SELL EXECUTED, Price: {order.executed.price:.2f}, '
+                 f'Size: {order.executed.size:.0f}, '
+                 f'Value: {order.executed.value:.2f}, '
+                 f'Comm: {order.executed.comm:.2f}', order.created.dt)
 
     elif order.status in [order.Canceled, order.Margin, order.Rejected]:
       self.log(f'Order Canceled/Margin/Rejected - Status: {order.status}')
@@ -262,7 +262,7 @@ def run_backtest(ticker, name, data):
   cerebro.broker.setcash(100000.0)
 
   # 수수료 설정 (0.1%)
-  cerebro.broker.setcommission(commission=0.001)
+  # cerebro.broker.setcommission(commission=0.001)
 
   # ------------------------------------------------------------------
   # Cheat-On-Close 활성화
