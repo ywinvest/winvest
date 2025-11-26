@@ -30,20 +30,27 @@ class InstantBroker(bt.brokers.BackBroker):
     if price is None:
       price = order.data.close[ago]
 
-    # 주문 체결 처리
+    # 체결 수량
+    size = order.size
+
+    # 수수료 계산
+    commission = self.getcommissioninfo(order.data).getcommission(size, price)
+
+    # 주문 체결 처리 (올바른 인자 순서)
     order.execute(
-        order.data.datetime[ago],
-        order.size,
-        price,
-        0,  # closed
-        0.0,  # closedvalue
-        0.0,  # closedcomm
-        0.0,  # openedvalue
-        0.0,  # openedcomm
-        0.0,  # margin
-        0.0,  # pnl
-        0.0,  # psize
-        0.0  # pprice
+        dt=order.data.datetime[ago],
+        size=size,
+        price=price,
+        closed=0,
+        closedvalue=0.0,
+        closedcomm=0.0,
+        opened=size,
+        openedvalue=abs(size) * price,
+        openedcomm=commission,
+        margin=0.0,
+        pnl=0.0,
+        psize=0,
+        pprice=0.0
     )
 
     order.completed()
