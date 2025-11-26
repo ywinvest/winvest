@@ -263,6 +263,12 @@ def run_backtest(ticker, name, data):
   # 수수료 설정 (0.1%)
   cerebro.broker.setcommission(commission=0.001)
 
+  # ------------------------------------------------------------------
+  # Cheat-On-Close 활성화
+  # 이 옵션을 켜야 당일 종가(Signal 발생일)에 즉시 체결됩니다.
+  # ------------------------------------------------------------------
+  cerebro.broker.set_coc(True)
+
   # 시작 포트폴리오 가치
   start_value = cerebro.broker.getvalue()
   print(f'Starting Portfolio Value: {start_value:.2f}')
