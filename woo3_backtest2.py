@@ -343,6 +343,16 @@ def run_backtest(ticker, name, data):
   # 원본 데이터에 지표 및 액션 추가
   output_df = data.copy()
 
+  # 컬럼 초기화 (NaN으로)
+  output_df['RSI'] = None
+  output_df['MA_10'] = None
+  output_df['MA_20'] = None
+  output_df['Weight'] = 0.0
+  output_df['Action'] = None
+  output_df['Consecutive Buys'] = None
+  output_df['Return'] = None
+  output_df['Group Return'] = None
+
   # 일자별 데이터 병합
   for date, day_data in strategy.daily_data.items():
     if date in output_df.index:
@@ -356,7 +366,7 @@ def run_backtest(ticker, name, data):
       output_df.loc[date, 'Group Return'] = day_data['Group Return']
 
   # Change_Rate 계산 (원본과 동일)
-  output_df['Change_Rate'] = output_df['Close'].pct_change() * 100
+  output_df['Change_Rate'] = output_df['Close'].pct_change(fill_method=None) * 100
 
   # Bullish 계산 (Close > MA_10)
   output_df['Bullish'] = output_df['Close'] > output_df['MA_10']
