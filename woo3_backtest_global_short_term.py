@@ -123,40 +123,41 @@ def backtest(data, ticker):
       if rsi > rsi_threshold:
         should_buy = False
 
-    # --- 매수 실행 ---
-    buy_price = df.loc[buy_date, 'Close']
-    change_rate = df.loc[buy_date, 'Change_Rate']
+    if should_buy:
+      # --- 매수 실행 ---
+      buy_price = df.loc[buy_date, 'Close']
+      change_rate = df.loc[buy_date, 'Change_Rate']
 
-    df.loc[buy_date, 'Action'] = 'Buy'
-    last_buy_price = buy_price
-    current_group_buy_count += 1
-    buy_count += 1
+      df.loc[buy_date, 'Action'] = 'Buy'
+      last_buy_price = buy_price
+      current_group_buy_count += 1
+      buy_count += 1
 
-    if rsi <= 20:
-      position_size = 3
-    elif rsi <= 30:
-      position_size = 2
-    else:
-      position_size = 1
+      if rsi <= 20:
+        position_size = 3
+      elif rsi <= 30:
+        position_size = 2
+      else:
+        position_size = 1
 
-    if change_rate < -5:
-      position_size += 1
+      if change_rate < -5:
+        position_size += 1
 
-    df.loc[buy_date, 'Weight'] = position_size
+      df.loc[buy_date, 'Weight'] = position_size
 
-    # 그룹 포지션에 추가
-    group_positions.append((buy_date, buy_price, position_size))
+      # 그룹 포지션에 추가
+      group_positions.append((buy_date, buy_price, position_size))
 
-    # 5회 이상 매수 시 즉시 매도 조건 변경
-    if current_group_buy_count >= 5:
-      current_sell_condition = sell_condition_snap_back
+      # 5회 이상 매수 시 즉시 매도 조건 변경
+      if current_group_buy_count >= 5:
+        current_sell_condition = sell_condition_snap_back
 
-    df.loc[buy_date, 'Consecutive Buys'] = current_group_buy_count
+      df.loc[buy_date, 'Consecutive Buys'] = current_group_buy_count
 
-    # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)
-    subsequent_data = df.loc[buy_date:]
-    sell_signals = subsequent_data[current_sell_condition(subsequent_data)]
-    sell_date = sell_signals.index[0] if not sell_signals.empty else None
+      # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)
+      subsequent_data = df.loc[buy_date:]
+      sell_signals = subsequent_data[current_sell_condition(subsequent_data)]
+      sell_date = sell_signals.index[0] if not sell_signals.empty else None
 
     # 매도 신호가 다음 매수 전에 발생하는지 확인
     next_buy_date = buys.index[i + 1] if i + 1 < len(buys.index) else None
