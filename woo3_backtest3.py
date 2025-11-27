@@ -136,7 +136,7 @@ def run_backtest(data, ticker, name):
       size=sizes,
       size_type='Amount',
       accumulate=True,
-      upon_long_exit='close',
+      # upon_long_exit='close',
       init_cash='auto',
       freq='1D',
       fees=0.001
