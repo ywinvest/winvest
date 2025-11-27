@@ -133,11 +133,7 @@ def backtest(data, ticker):
     # 그룹 포지션에 추가
     group_positions.append((buy_date, buy_price, position_size))
 
-    # 첫 매수 시 그룹 초기 설정
-    # if is_first_buy:
-    #   current_sell_condition = sell_condition_technical_bounce
-
-    # *** 실전형 로직: 5회 이상 매수 시 즉시 매도 조건 변경 ***
+    # 5회 이상 매수 시 즉시 매도 조건 변경
     if current_group_buy_count >= 5:
       current_sell_condition = sell_condition_snap_back
 
@@ -166,9 +162,9 @@ def backtest(data, ticker):
         current_sell_condition = sell_condition_technical_bounce
 
   # 루프 종료 후 마지막 그룹 일괄 매도 처리
-  if sell_date and group_positions:
-    sell_price = df.loc[sell_date, 'Close']
-    execute_group_sell(sell_date, sell_price)
+  # if sell_date and group_positions:
+  #   sell_price = df.loc[sell_date, 'Close']
+  #   execute_group_sell(sell_date, sell_price)
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
