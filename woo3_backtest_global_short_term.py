@@ -93,11 +93,11 @@ def backtest(data, ticker):
     rsi = df.loc[buy_date, 'RSI']
 
     # --- 매수 조건 검증 ---
-    if is_first_buy:
-      # 첫 매수: RSI만 확인
-      if rsi > DEFAULT_RSI_THRESHOLD:
-        continue
-    else:
+    # if is_first_buy:
+    #   # 첫 매수: RSI만 확인
+    #   if rsi > DEFAULT_RSI_THRESHOLD:
+    #     continue
+    if not is_first_buy:
       # 추가 매수: 가격 하락 + RSI 조건 모두 확인
       current_price = df.loc[buy_date, 'Close']
       if last_buy_price is None or current_price >= last_buy_price:
