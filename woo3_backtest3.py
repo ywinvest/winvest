@@ -1,287 +1,210 @@
 import json
 import os
 from datetime import datetime, timedelta
+
+import FinanceDataReader as fdr
 import numpy as np
 import pandas as pd
-import FinanceDataReader as fdr
 import vectorbt as vbt
 
-import indicators
-
+# --- 설정 ---
 DEFAULT_RSI_THRESHOLD = 35
 
+# CSV 출력 경로 설정
+OUTPUT_DIR = 'global/vbt_backtest_results'
 
-class GlobalShortTermStrategy:
-  """vectorbt를 사용한 글로벌 단기 전략 백테스트"""
+def get_indicators(data):
+  """지표 계산 및 캔들 정보 추가"""
+  close = data['Close']
+  open_price = data['Open']
 
-  def __init__(self, data, ticker):
-    self.data = data
-    self.ticker = ticker
-    self.df = indicators.calculate_indicators(data.copy())
+  rsi = vbt.RSI.run(close, window=14).rsi
+  ma10 = vbt.MA.run(close, window=10).ma
+  ma20 = vbt.MA.run(close, window=20).ma
+  # Change Rate는 퍼센트 단위로 변환
+  change_rate = close.pct_change() * 100
 
-  def generate_signals(self):
-    """매수/매도 신호 생성 (실전형 로직 - look-ahead 제거)"""
-    df = self.df
-    n = len(df)
+  # === [수정된 부분] ===
+  # 'Bullish' 대신 is_green_candle (양봉) 사용
+  is_green_candle = close > open_price
+  # =====================
 
-    # 신호 배열 초기화
-    entries = np.zeros(n, dtype=bool)
-    exits = np.zeros(n, dtype=bool)
-    size = np.zeros(n, dtype=float)
+  return rsi, ma10, ma20, change_rate, is_green_candle
 
-    # 추적 변수
-    in_position = False
-    position_count = 0  # 현재 그룹의 총 매수 횟수
-    last_buy_price = None
-    first_buy_idx = None
-    use_ma20 = False  # 20일선 사용 여부
+def generate_signals(close, rsi, ma10, ma20, change_rate, is_green_candle):
+  """
+  State-dependent 로직을 처리하여 Entry/Exit 신호 및 사이즈(Weight) 배열 생성
+  """
+  n = len(close)
+  entries = np.full(n, False)
+  exits = np.full(n, False)
+  sizes = np.full(n, 0.0) # 매수 시 진입 크기(Weight)
 
-    # 그룹 통계 추적
-    group_buy_indices = []
-    group_weights = []
+  # 상태 변수
+  in_position = False
+  group_buy_count = 0
+  last_buy_price = None
 
-    for i in range(n):
-      current_price = df['Close'].iloc[i]
-      current_rsi = df['RSI'].iloc[i]
-      change_rate = df['Change_Rate'].iloc[i]
+  # Numpy 배열로 변환
+  close_np = close.values
+  rsi_np = rsi.values
+  ma10_np = ma10.values
+  ma20_np = ma20.values
+  change_np = change_rate.values
+  is_green_np = is_green_candle.values
 
-      # 매도 조건 체크 (포지션이 있을 때만)
-      if in_position:
-        sell_signal = False
+  for i in range(1, n):
+    # 1. 매도(청산) 로직 확인
+    if in_position:
+      # 매수 횟수가 5회 이상이면 Snap Back(20일선), 아니면 Tech Bounce(10일선)
 
-        if use_ma20:
-          # 20일선 돌파 (스냅백)
-          if df['MA_20_Cross'].iloc[i] and df['Bullish'].iloc[i]:
-            sell_signal = True
-        else:
-          # 10일선 돌파 (기술적 반등)
-          if df['MA_10_Cross'].iloc[i] and df['Bullish'].iloc[i]:
-            sell_signal = True
+      # 원본: sell_condition_technical_bounce: df['MA_10_Cross'] & df['Bullish']
+      # 원본: sell_condition_snap_back: df['MA_20_Cross'] & df['Bullish']
+      # 'Bullish'는 양봉이므로, 매도 조건은 '현재 양봉이면서 이평선을 돌파했을 때'로 해석됩니다.
 
-        if sell_signal:
-          exits[i] = True
-          # 그룹 전체 청산
-          in_position = False
-          position_count = 0
-          last_buy_price = None
-          first_buy_idx = None
-          use_ma20 = False
-          group_buy_indices = []
-          group_weights = []
-          continue
-
-      # 매수 조건 체크
-      # 기본 조건: RSI <= 35, 하락 추세, 변동률 < 0
-      if current_rsi <= DEFAULT_RSI_THRESHOLD and not df['Bullish'].iloc[i] and change_rate < 0:
-
-        is_first_buy = not in_position
-
-        # 추가 매수 시 가격 조건 확인
-        if not is_first_buy:
-          if last_buy_price is None or current_price >= last_buy_price:
-            continue
-
-        # RSI 조건 검증
-        if is_first_buy:
-          required_rsi = DEFAULT_RSI_THRESHOLD
-        else:
-          # 2차 매수는 RSI 30 이하
-          if position_count == 1:
-            required_rsi = 30
-          else:
-            required_rsi = DEFAULT_RSI_THRESHOLD
-
-        if current_rsi > required_rsi:
-          continue
-
-        # 매수 실행
-        entries[i] = True
-        last_buy_price = current_price
-
-        # 포지션 사이즈 결정
-        position_size = 1
-        if current_rsi <= 20:
-          position_size = 3
-        elif current_rsi <= 30:
-          position_size = 2
-
-        if change_rate < -5:
-          position_size += 1
-
-        size[i] = position_size
-
-        # 그룹 추적
-        group_buy_indices.append(i)
-        group_weights.append(position_size)
-
-        if is_first_buy:
-          in_position = True
-          first_buy_idx = i
-          position_count = 1
-          use_ma20 = False
-        else:
-          position_count += 1
-
-          # 실전형 로직: 5회 이상 매수 시 즉시 목표를 20일선으로 변경
-          if position_count >= 5:
-            use_ma20 = True
-
-    return entries, exits, size, group_buy_indices, group_weights
-
-  def run_backtest(self):
-    """vectorbt를 사용한 백테스트 실행"""
-    entries, exits, size, group_buy_indices, group_weights = self.generate_signals()
-
-    # vectorbt 포트폴리오 생성
-    portfolio = vbt.Portfolio.from_signals(
-        close=self.df['Close'],
-        entries=entries,
-        exits=exits,
-        size=size,
-        size_type='amount',
-        init_cash=100,
-        fees=0.0,
-        slippage=0.0,
-        freq='D'
-    )
-
-    # 결과 수집
-    trades = portfolio.trades.records_readable
-
-    if len(trades) > 0:
-      # Return 컬럼명 찾기 (PnL, Return, Return [%] 등 가능)
-      return_col = None
-      for col in ['Return', 'PnL', 'Return [%]', 'P&L']:
-        if col in trades.columns:
-          return_col = col
-          break
-
-      if return_col:
-        avg_return = trades[return_col].mean()
-        # 퍼센트로 표시되지 않은 경우 100을 곱함
-        if return_col in ['Return', 'PnL', 'P&L']:
-          avg_return = avg_return * 100
+      # 이평선 돌파를 Cross-Over로 단순화하고, 'Bullish'는 is_green_candle로 대체
+      if group_buy_count >= 5:
+        # 20일선 돌파 & 양봉
+        sell_signal = (close_np[i] > ma20_np[i]) and (is_green_np[i])
       else:
-        avg_return = 0
+        # 10일선 돌파 & 양봉
+        sell_signal = (close_np[i] > ma10_np[i]) and (is_green_np[i])
 
-      # Duration 컬럼이 없을 경우 직접 계산
-      if 'Duration' in trades.columns:
-        avg_holding_period = trades['Duration'].mean()
-      else:
-        # Entry/Exit 컬럼명 찾기
-        entry_col = None
-        exit_col = None
+      if sell_signal:
+        exits[i] = True
+        # 상태 초기화
+        in_position = False
+        group_buy_count = 0
+        last_buy_price = None
+        continue # 매도한 날은 매수하지 않음
 
-        for col in ['Entry Index', 'Entry Idx', 'EntryIdx', 'entry_idx']:
-          if col in trades.columns:
-            entry_col = col
-            break
+    # 2. 매수 로직 확인
 
-        for col in ['Exit Index', 'Exit Idx', 'ExitIdx', 'exit_idx']:
-          if col in trades.columns:
-            exit_col = col
-            break
+    # 원본: buy_condition: (df['RSI'] <= 35) & (~df['Bullish']) & (df['Change_Rate'] < 0)
 
-        if entry_col and exit_col:
-          holding_periods = []
-          for idx, trade in trades.iterrows():
-            entry_idx = int(trade[entry_col])
-            exit_idx = int(trade[exit_col])
-            entry_date = self.df.index[entry_idx]
-            exit_date = self.df.index[exit_idx]
-            holding_periods.append((exit_date - entry_date).days)
-          avg_holding_period = np.mean(holding_periods) if holding_periods else 0
-        else:
-          # 컬럼을 찾지 못한 경우 0으로 설정
-          avg_holding_period = 0
+    # 매수 조건 A: RSI 조건 (RSI < 30 또는 35)
+    current_rsi_threshold = 30 if group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
+    cond_rsi = rsi_np[i] <= current_rsi_threshold
 
-      buy_count = len(trades)
-    else:
-      avg_return = 0
-      avg_holding_period = 0
-      buy_count = 0
+    # 매수 조건 B: ~Bullish (음봉) & 당일 하락 (Change < 0)
+    cond_candle = (~is_green_np[i]) and (change_np[i] < 0)
 
-    # CSV 출력을 위한 데이터프레임 생성
-    result_df = self.df.copy()
-    result_df['Action'] = ''
-    result_df['Weight'] = 0.0
-    result_df['Return'] = np.nan
-    result_df['Consecutive Buys'] = np.nan
-    result_df['Group Return'] = np.nan
+    should_buy = cond_rsi and cond_candle
 
-    # 매수/매도 액션 기록
-    result_df.loc[entries, 'Action'] = 'Buy'
-    result_df.loc[exits, 'Action'] = 'Sell'
-    result_df.loc[entries, 'Weight'] = size[entries]
+    # 매수 조건 C: 가격 피라미딩 (첫 매수가 아니면, 이전 매수가보다 낮아야 함)
+    if should_buy and group_buy_count > 0:
+      if last_buy_price is not None and close_np[i] >= last_buy_price:
+        should_buy = False
 
-    # 거래별 정보 기록
-    for idx, trade in trades.iterrows():
-      entry_idx = trade['Entry Index']
-      exit_idx = trade['Exit Index']
+    if should_buy:
+      entries[i] = True
 
-      result_df.iloc[entry_idx, result_df.columns.get_loc('Return')] = trade['Return']
+      # 사이즈(Weight) 계산
+      pos_size = 1
+      if rsi_np[i] <= 20:
+        pos_size = 3
+      elif rsi_np[i] <= 30:
+        pos_size = 2
 
-      # Weight 누적 (매도 시)
-      if exit_idx < len(result_df):
-        current_weight = result_df.iloc[exit_idx, result_df.columns.get_loc('Weight')]
-        result_df.iloc[exit_idx, result_df.columns.get_loc('Weight')] = current_weight + trade['Size']
+      if change_np[i] < -5:
+        pos_size += 1
 
-    # 그룹별 연속 매수 횟수 기록 (근사치)
-    # vectorbt에서는 그룹 정보를 직접 추적하기 어려우므로 단순화
-    buy_indices = np.where(entries)[0]
-    consecutive_count = 0
-    last_sell_idx = -1
+      sizes[i] = pos_size
 
-    for i in buy_indices:
-      if i > last_sell_idx:
-        consecutive_count = 1
-      else:
-        consecutive_count += 1
+      # 상태 업데이트
+      in_position = True
+      group_buy_count += 1
+      last_buy_price = close_np[i]
 
-      result_df.iloc[i, result_df.columns.get_loc('Consecutive Buys')] = consecutive_count
+  return entries, exits, sizes
 
-      # 다음 매도 찾기
-      future_exits = np.where(exits[i:])[0]
-      if len(future_exits) > 0:
-        last_sell_idx = i + future_exits[0]
+def run_backtest(data, ticker, name):
 
-    # CSV 저장
-    output_dir = 'global/vectorbt'
-    os.makedirs(output_dir, exist_ok=True)
-    result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
+  close = data['Close']
 
-    return avg_return, avg_holding_period, buy_count, portfolio
+  # 지표 계산
+  rsi, ma10, ma20, change_rate, is_green_candle = get_indicators(data)
 
+  # 신호 생성 (Custom Loop)
+  entries, exits, sizes = generate_signals(close, rsi, ma10, ma20, change_rate, is_green_candle)
 
-def backtest(data, ticker):
-  """백테스트 메인 함수 (호환성 유지)"""
-  strategy = GlobalShortTermStrategy(data, ticker)
-  avg_return, avg_holding_period, buy_count, portfolio = strategy.run_backtest()
-  return avg_return, avg_holding_period, buy_count
+  # vectorbt 포트폴리오 실행
+  pf = vbt.Portfolio.from_signals(
+      close,
+      entries,
+      exits,
+      size=sizes,
+      size_type='Amount',
+      accumulate=True,
+      upon_long_exit='close',
+      init_cash='auto',
+      freq='1D',
+      fees=0.001
+  )
+
+  # --- 결과 집계 및 CSV 출력 ---
+  os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+  # 백테스트 결과 DataFrame 생성 (기존 코드와 유사하게 매매 시점 정보 포함)
+  # vbt.trades를 사용하여 매매 정보를 추출하고 원본 코드와 유사하게 포맷합니다.
+  trades_df = pf.trades.records_long.copy()
+
+  # 매매가 없는 경우 빈 데이터프레임 저장 후 종료
+  if trades_df.empty:
+    empty_df = pd.DataFrame(columns=['Buy Date', 'Sell Date', 'Buy Price', 'Sell Price', 'Return (%)', 'Holding Period (Days)', 'Size'])
+    empty_df.to_csv(os.path.join(OUTPUT_DIR, f'{ticker}_backtest_results.csv'), index=False)
+    return pf, 0, 0, 0
+
+  # Entry/Exit 인덱스를 날짜로 변환
+  trades_df['Buy Date'] = close.index[trades_df['entry_idx']]
+  trades_df['Sell Date'] = close.index[trades_df['exit_idx']]
+
+  # 가격 및 수익률
+  trades_df['Buy Price'] = trades_df['entry_price']
+  trades_df['Sell Price'] = trades_df['exit_price']
+  trades_df['Return (%)'] = trades_df['pnl_perc']
+  trades_df['Size'] = trades_df['size']
+  trades_df['Holding Period (Days)'] = (trades_df['exit_date'] - trades_df['entry_date']).dt.days
+
+  # 필요한 컬럼만 선택하여 저장
+  output_df = trades_df[['Buy Date', 'Sell Date', 'Buy Price', 'Sell Price', 'Return (%)', 'Holding Period (Days)', 'Size']]
+  output_df.to_csv(os.path.join(OUTPUT_DIR, f'{ticker}_backtest_results.csv'), index=False)
+
+  # 최종 지표 계산
+  avg_return = output_df['Return (%)'].mean()
+  avg_holding_period = output_df['Holding Period (Days)'].mean()
+  buy_count = len(output_df) # 총 매수(체결) 횟수
+
+  return pf, avg_return, avg_holding_period, buy_count
 
 
 if __name__ == "__main__":
-  with open('config-woo3.json', 'r') as config_file:
-    config = json.load(config_file)
-
-  tickers = config["global"]["tickers"]
-  results = {}
+  try:
+    with open('config-woo3.json', 'r') as config_file:
+      config = json.load(config_file)
+    tickers = config["global"]["tickers"]
+  except FileNotFoundError:
+    tickers = {"SPY": "S&P 500", "QQQ": "Nasdaq 100"}
+    print("Config file not found. Using default tickers.")
 
   end_date = datetime.today()
   start_date = end_date - timedelta(days=30 * 365)
 
-  end_date_str = end_date.strftime('%Y-%m-%d')
-  start_date_str = start_date.strftime('%Y-%m-%d')
+  results = {}
+
+  print(f"Backtest Results (Using vectorbt, Results saved to '{OUTPUT_DIR}'):")
+  print(f"{'Ticker':<10} | {'Name':<15} | {'Avg. Return':<13} | {'Avg. Hold Days':<14} | {'Buy Count':<10}")
+  print("-" * 75)
 
   for ticker, name in tickers.items():
     print(f"Processing {ticker} ({name})...")
-    data = fdr.DataReader(ticker, start=start_date_str, end=end_date_str)
+    data = fdr.DataReader(ticker, start=start_date, end=end_date)
 
     if data.empty:
       print(f"No data found for {ticker}, skipping.")
       continue
 
-    avg_return, avg_holding_period, buy_count = backtest(data, ticker)
+    pf, avg_return, avg_holding_period, buy_count = run_backtest(data, ticker, name)
 
     results[name] = {
       "Average Return": avg_return,
@@ -289,8 +212,8 @@ if __name__ == "__main__":
       "Buy Count": buy_count
     }
 
-  print("\nBacktest Results:")
+    print(f"{ticker:<10} | {name:<15} | {avg_return:>12.2f}% | {avg_holding_period:>13.1f} | {buy_count:>10}")
+
+  print("\nBacktest Summary:")
   for name, metrics in results.items():
-    print(f"{name}: Average Return: {metrics['Average Return']:.2f}%, "
-          f"Average Holding Period: {metrics['Average Holding Period']:.2f} days, "
-          f"Buy Count: {metrics['Buy Count']}")
+    print(f"{name}: Average Return: {metrics['Average Return']:.2f}%, Average Holding Period: {metrics['Average Holding Period']:.2f} days, Buy Count: {metrics['Buy Count']}")
