@@ -146,25 +146,20 @@ def backtest(data, ticker):
 
     # *** 매도 신호가 다음 매수 전에 발생하는지 확인 ***
     # 현재 매수 이후의 매수 목록
-    remaining_buys = buys[buys.index > buy_date]
-    next_buy_date = remaining_buys.index[0] if not remaining_buys.empty else None
-
-    # 매도 신호가 다음 매수 전에 발생하면 즉시 그룹 청산
-    if sell_date is not None:
-      if next_buy_date is None or sell_date <= next_buy_date:
-        sell_price = df.loc[sell_date, 'Close']
-        execute_group_sell(sell_date, sell_price)
-
-        # 그룹 종료 후 상태 초기화
-        last_buy_price = None
-        current_group_buy_count = 0
-        group_positions = []
-        current_sell_condition = sell_condition_technical_bounce
-
-  # 루프 종료 후 마지막 그룹 일괄 매도 처리
-  # if sell_date and group_positions:
-  #   sell_price = df.loc[sell_date, 'Close']
-  #   execute_group_sell(sell_date, sell_price)
+    # remaining_buys = buys[buys.index > buy_date]
+    # next_buy_date = remaining_buys.index[0] if not remaining_buys.empty else None
+    #
+    # # 매도 신호가 다음 매수 전에 발생하면 즉시 그룹 청산
+    # if sell_date is not None:
+    #   if next_buy_date is None or sell_date <= next_buy_date:
+    #     sell_price = df.loc[sell_date, 'Close']
+    #     execute_group_sell(sell_date, sell_price)
+    #
+    #     # 그룹 종료 후 상태 초기화
+    #     last_buy_price = None
+    #     current_group_buy_count = 0
+    #     group_positions = []
+    #     current_sell_condition = sell_condition_technical_bounce
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
