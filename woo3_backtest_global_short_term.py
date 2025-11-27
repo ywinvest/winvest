@@ -75,38 +75,8 @@ def backtest(data, ticker):
     df.loc[sell_date, 'Action'] = 'Sell'
 
   for i, buy_date in enumerate(buys.index):
-    # # 새 그룹 시작 여부 확인
-    # if sell_date is not None and buy_date > sell_date:
-    #   # 이전 그룹 일괄 매도 실행
-    #   if group_positions:
-    #     sell_price = df.loc[sell_date, 'Close']
-    #     execute_group_sell(sell_date, sell_price)
-    #
-    #   # 상태 초기화
-    #   last_buy_price = None
-    #   current_group_buy_count = 0
-    #   group_positions = []
-    #   current_sell_condition = sell_condition_technical_bounce
-    #   sell_date = None
-
     is_first_buy = len(group_positions) == 0
     rsi = df.loc[buy_date, 'RSI']
-
-    # --- 매수 조건 검증 ---
-    # if is_first_buy:
-    #   # 첫 매수: RSI만 확인
-    #   if rsi > DEFAULT_RSI_THRESHOLD:
-    #     continue
-    # if not is_first_buy:
-    #   # 추가 매수: 가격 하락 + RSI 조건 모두 확인
-    #   current_price = df.loc[buy_date, 'Close']
-    #   if last_buy_price is None or current_price >= last_buy_price:
-    #     continue
-    #
-    #   rsi_threshold = 30 if current_group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
-    #
-    #   if rsi > rsi_threshold:
-    #     continue
 
     should_buy = True
 
@@ -170,23 +140,6 @@ def backtest(data, ticker):
       current_group_buy_count = 0
       group_positions = []
       current_sell_condition = sell_condition_technical_bounce
-
-    # *** 매도 신호가 다음 매수 전에 발생하는지 확인 ***
-    # 현재 매수 이후의 매수 목록
-    # remaining_buys = buys[buys.index > buy_date]
-    # next_buy_date = remaining_buys.index[0] if not remaining_buys.empty else None
-    #
-    # # 매도 신호가 다음 매수 전에 발생하면 즉시 그룹 청산
-    # if sell_date is not None:
-    #   if next_buy_date is None or sell_date <= next_buy_date:
-    #     sell_price = df.loc[sell_date, 'Close']
-    #     execute_group_sell(sell_date, sell_price)
-    #
-    #     # 그룹 종료 후 상태 초기화
-    #     last_buy_price = None
-    #     current_group_buy_count = 0
-    #     group_positions = []
-    #     current_sell_condition = sell_condition_technical_bounce
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
