@@ -74,7 +74,21 @@ def backtest(data, ticker):
     df.loc[sell_date, 'Group Return'] = group_avg_return
     df.loc[sell_date, 'Action'] = 'Sell'
 
-  for buy_date in buys.index:
+  for i, buy_date in enumerate(buys.index):
+    # # 새 그룹 시작 여부 확인
+    # if sell_date is not None and buy_date > sell_date:
+    #   # 이전 그룹 일괄 매도 실행
+    #   if group_positions:
+    #     sell_price = df.loc[sell_date, 'Close']
+    #     execute_group_sell(sell_date, sell_price)
+    #
+    #   # 상태 초기화
+    #   last_buy_price = None
+    #   current_group_buy_count = 0
+    #   group_positions = []
+    #   current_sell_condition = sell_condition_technical_bounce
+    #   sell_date = None
+
     is_first_buy = len(group_positions) == 0
     rsi = df.loc[buy_date, 'RSI']
 
@@ -129,6 +143,18 @@ def backtest(data, ticker):
     sell_signals = subsequent_data[current_sell_condition(subsequent_data)]
     sell_date = sell_signals.index[0] if not sell_signals.empty else None
 
+    # 매도 신호가 다음 매수 전에 발생하는지 확인
+    next_buy_date = buys.index[i + 1] if i + 1 < len(buys.index) else None
+
+    # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
+    if sell_date is not None and (next_buy_date is None or sell_date <= next_buy_date):
+      sell_price = df.loc[sell_date, 'Close']
+      execute_group_sell(sell_date, sell_price)
+      last_buy_price = None
+      current_group_buy_count = 0
+      group_positions = []
+      current_sell_condition = sell_condition_technical_bounce
+
     # *** 매도 신호가 다음 매수 전에 발생하는지 확인 ***
     # 현재 매수 이후의 매수 목록
     # remaining_buys = buys[buys.index > buy_date]
@@ -145,19 +171,6 @@ def backtest(data, ticker):
     #     current_group_buy_count = 0
     #     group_positions = []
     #     current_sell_condition = sell_condition_technical_bounce
-    # 새 그룹 시작 여부 확인
-    if sell_date is not None and buy_date > sell_date:
-      # 이전 그룹 일괄 매도 실행
-      if group_positions:
-        sell_price = df.loc[sell_date, 'Close']
-        execute_group_sell(sell_date, sell_price)
-
-      # 상태 초기화
-      last_buy_price = None
-      current_group_buy_count = 0
-      group_positions = []
-      current_sell_condition = sell_condition_technical_bounce
-      sell_date = None
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
