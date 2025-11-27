@@ -125,7 +125,7 @@ class GlobalShortTermStrategy:
     portfolio = vbt.Portfolio.from_orders(
         close=self.df['Close'],
         size=orders,
-        size_type='amount',
+        size_type='percent',
         direction='longonly',
         init_cash=init_cash,
         fees=fees,
