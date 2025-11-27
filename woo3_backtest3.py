@@ -116,7 +116,7 @@ class GlobalShortTermStrategy:
 
     return entries, exits, size
 
-  def run_backtest(self, init_cash=10000, fees=0.001):
+  def run_backtest(self, init_cash=10000, fees=0.0):
     """vectorbt를 사용한 백테스트 실행"""
     entries, exits, size = self.generate_signals()
 
@@ -127,6 +127,7 @@ class GlobalShortTermStrategy:
         exits=exits,
         size=size,
         size_type='amount',
+        accumulate=True,    # 분할 매수 허용
         init_cash=init_cash,
         fees=fees,
         freq='1D'
