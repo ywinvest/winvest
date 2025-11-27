@@ -76,18 +76,18 @@ def backtest(data, ticker):
 
   for i, buy_date in enumerate(buys.index):
     # # 새 그룹 시작 여부 확인
-    # if sell_date is not None and buy_date > sell_date:
-    #   # 이전 그룹 일괄 매도 실행
-    #   if group_positions:
-    #     sell_price = df.loc[sell_date, 'Close']
-    #     execute_group_sell(sell_date, sell_price)
-    #
-    #   # 상태 초기화
-    #   last_buy_price = None
-    #   current_group_buy_count = 0
-    #   group_positions = []
-    #   current_sell_condition = sell_condition_technical_bounce
-    #   sell_date = None
+    if sell_date is not None and buy_date > sell_date:
+      # 이전 그룹 일괄 매도 실행
+      if group_positions:
+        sell_price = df.loc[sell_date, 'Close']
+        execute_group_sell(sell_date, sell_price)
+
+      # 상태 초기화
+      last_buy_price = None
+      current_group_buy_count = 0
+      group_positions = []
+      current_sell_condition = sell_condition_technical_bounce
+      sell_date = None
 
     is_first_buy = len(group_positions) == 0
     rsi = df.loc[buy_date, 'RSI']
