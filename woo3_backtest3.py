@@ -147,13 +147,22 @@ def run_backtest(data, ticker, name):
 
   # 백테스트 결과 DataFrame 생성 (기존 코드와 유사하게 매매 시점 정보 포함)
   # vbt.trades를 사용하여 매매 정보를 추출하고 원본 코드와 유사하게 포맷합니다.
-  trades_df = pf.trades.records_long.copy()
+  trade_records = pf.trades.records_arr
 
-  # 매매가 없는 경우 빈 데이터프레임 저장 후 종료
-  if trades_df.empty:
+  # trade_records가 비어 있는지 확인
+  if trade_records.size == 0:
     empty_df = pd.DataFrame(columns=['Buy Date', 'Sell Date', 'Buy Price', 'Sell Price', 'Return (%)', 'Holding Period (Days)', 'Size'])
-    empty_df.to_csv(os.path.join(OUTPUT_DIR, f'{ticker}_backtest_results.csv'), index=False)
+    output_csv_path = os.path.join(OUTPUT_DIR, f'{ticker}_backtest_results.csv')
+    empty_df.to_csv(output_csv_path, index=False)
+    print(f"No trades executed for {ticker}. Empty result saved to {output_csv_path}")
     return pf, 0, 0, 0
+
+  # records_arr는 NumPy structured array이므로, Pandas DataFrame으로 변환
+  # 'ExitTrades'의 record 구조를 기반으로 필드를 정의합니다.
+  trades_df = pd.DataFrame(trade_records)
+
+  # DataFrame 컬럼 이름 매핑 (vectorbt의 내부 필드 이름 사용)
+  # NumPy 배열에서 데이터프레임으로 변환 시 'entry_idx', 'exit_idx' 등은 필드 이름 그대로 사용됨
 
   # Entry/Exit 인덱스를 날짜로 변환
   trades_df['Buy Date'] = close.index[trades_df['entry_idx']]
@@ -162,15 +171,18 @@ def run_backtest(data, ticker, name):
   # 가격 및 수익률
   trades_df['Buy Price'] = trades_df['entry_price']
   trades_df['Sell Price'] = trades_df['exit_price']
+  # pnl_perc는 수익률 (%)을 나타냅니다. (pnl_perc * 100 할 필요 없음, 이미 퍼센트임)
   trades_df['Return (%)'] = trades_df['pnl_perc']
   trades_df['Size'] = trades_df['size']
-  trades_df['Holding Period (Days)'] = (trades_df['exit_date'] - trades_df['entry_date']).dt.days
+  trades_df['Holding Period (Days)'] = (trades_df['Sell Date'] - trades_df['Buy Date']).dt.days
 
   # 필요한 컬럼만 선택하여 저장
   output_df = trades_df[['Buy Date', 'Sell Date', 'Buy Price', 'Sell Price', 'Return (%)', 'Holding Period (Days)', 'Size']]
-  output_df.to_csv(os.path.join(OUTPUT_DIR, f'{ticker}_backtest_results.csv'), index=False)
+  output_csv_path = os.path.join(OUTPUT_DIR, f'{ticker}_backtest_results.csv')
+  output_df.to_csv(output_csv_path, index=False)
 
   # 최종 지표 계산
+  # 'Return (%)'이 이미 퍼센트 단위라고 가정하고, 평균을 구합니다.
   avg_return = output_df['Return (%)'].mean()
   avg_holding_period = output_df['Holding Period (Days)'].mean()
   buy_count = len(output_df) # 총 매수(체결) 횟수
