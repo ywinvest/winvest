@@ -76,18 +76,18 @@ def backtest(data, ticker):
 
   for i, buy_date in enumerate(buys.index):
     # # 새 그룹 시작 여부 확인
-    if sell_date is not None and buy_date > sell_date:
-      # 이전 그룹 일괄 매도 실행
-      if group_positions:
-        sell_price = df.loc[sell_date, 'Close']
-        execute_group_sell(sell_date, sell_price)
-
-      # 상태 초기화
-      last_buy_price = None
-      current_group_buy_count = 0
-      group_positions = []
-      current_sell_condition = sell_condition_technical_bounce
-      sell_date = None
+    # if sell_date is not None and buy_date > sell_date:
+    #   # 이전 그룹 일괄 매도 실행
+    #   if group_positions:
+    #     sell_price = df.loc[sell_date, 'Close']
+    #     execute_group_sell(sell_date, sell_price)
+    #
+    #   # 상태 초기화
+    #   last_buy_price = None
+    #   current_group_buy_count = 0
+    #   group_positions = []
+    #   current_sell_condition = sell_condition_technical_bounce
+    #   sell_date = None
 
     is_first_buy = len(group_positions) == 0
     rsi = df.loc[buy_date, 'RSI']
@@ -97,16 +97,31 @@ def backtest(data, ticker):
     #   # 첫 매수: RSI만 확인
     #   if rsi > DEFAULT_RSI_THRESHOLD:
     #     continue
+    # if not is_first_buy:
+    #   # 추가 매수: 가격 하락 + RSI 조건 모두 확인
+    #   current_price = df.loc[buy_date, 'Close']
+    #   if last_buy_price is None or current_price >= last_buy_price:
+    #     continue
+    #
+    #   rsi_threshold = 30 if current_group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
+    #
+    #   if rsi > rsi_threshold:
+    #     continue
+
+    should_buy = True
+
+    # [조건 1] 첫 매수가 아닌데 가격이 올랐으면 매수 스킵
     if not is_first_buy:
-      # 추가 매수: 가격 하락 + RSI 조건 모두 확인
       current_price = df.loc[buy_date, 'Close']
       if last_buy_price is None or current_price >= last_buy_price:
-        continue
+        should_buy = False
 
+    # [조건 2] RSI 조건이 안 맞으면 매수 스킵
+    if should_buy and not is_first_buy:
+      rsi = df.loc[buy_date, 'RSI']
       rsi_threshold = 30 if current_group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
-
       if rsi > rsi_threshold:
-        continue
+        should_buy = False
 
     # --- 매수 실행 ---
     buy_price = df.loc[buy_date, 'Close']
