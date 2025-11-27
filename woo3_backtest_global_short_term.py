@@ -93,30 +93,30 @@ def backtest(data, ticker):
 
     is_first_buy = not current_buy_group_flag
 
-    # 가격 조건 확인
-    if not is_first_buy:
+    # --- 매수 조건 검증 ---
+    if is_first_buy:
+      # 첫 매수: RSI만 확인
+      current_rsi = df.loc[buy_date, 'RSI']
+      if current_rsi > DEFAULT_RSI_THRESHOLD:
+        continue
+    else:
+      # 추가 매수: 가격 하락 + RSI 조건 모두 확인
       current_price = df.loc[buy_date, 'Close']
       if last_buy_price is None or current_price >= last_buy_price:
         continue
 
-    # RSI 조건 검증
-    current_rsi = df.loc[buy_date, 'RSI']
-    required_rsi = DEFAULT_RSI_THRESHOLD
-    if is_first_buy:
-      required_rsi = DEFAULT_RSI_THRESHOLD
-    else:
+      current_rsi = df.loc[buy_date, 'RSI']
       check_order = current_group_buy_count + 1
-      if check_order == 2:
-        required_rsi = 30
-      else:
-        required_rsi = DEFAULT_RSI_THRESHOLD
+      required_rsi = 30 if check_order == 2 else DEFAULT_RSI_THRESHOLD
 
-    if current_rsi > required_rsi:
-      continue
+      if current_rsi > required_rsi:
+        continue
 
     # --- 매수 실행 ---
     buy_price = df.loc[buy_date, 'Close']
     change_rate = df.loc[buy_date, 'Change_Rate']
+    current_rsi = df.loc[buy_date, 'RSI']
+
     df.loc[buy_date, 'Action'] = 'Buy'
     last_buy_price = buy_price
     current_group_buy_count += 1
