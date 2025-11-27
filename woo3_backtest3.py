@@ -2,8 +2,9 @@ import json
 import os
 from datetime import datetime, timedelta
 
-import FinanceDataReader as fdr
+import numpy as np
 import pandas as pd
+import FinanceDataReader as fdr
 import vectorbt as vbt
 
 import indicators
@@ -110,7 +111,8 @@ class GlobalShortTermStrategy:
             sell_mask = df['MA_10_Cross'].iloc[i:] & df['Bullish'].iloc[i:]
 
           if sell_mask.any():
-            sell_date_idx = i + sell_mask.idxmax() - df.index[i]
+            sell_date = sell_mask.idxmax()
+            sell_date_idx = df.index.get_loc(sell_date)
 
     return entries, exits, size
 
