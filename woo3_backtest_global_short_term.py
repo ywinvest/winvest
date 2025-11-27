@@ -44,23 +44,9 @@ def backtest(data, ticker):
   # 현재 그룹의 매도 조건 함수
   current_sell_condition = sell_condition_technical_bounce
 
-  group_returns = []
-  group_sell_date = None
-
-  # --- 그룹 정산(Flush) 함수 ---
-  def flush_group_metrics():
-    nonlocal group_returns, group_sell_date
-
-    if group_sell_date and group_returns:
-      avg_return = sum(group_returns) / len(group_returns)
-      df.loc[group_sell_date, 'Group Return'] = avg_return
-
-    group_returns = []
-    group_sell_date = None
-
-  # --- 그룹 일괄 매도 처리 함수 ---
+  # --- 그룹 일괄 매도 및 정산 함수 ---
   def execute_group_sell(sell_date, sell_price):
-    nonlocal group_positions, returns, holding_periods, group_returns, group_sell_date
+    nonlocal group_positions, returns, holding_periods
 
     if not group_positions:
       return
@@ -84,11 +70,9 @@ def backtest(data, ticker):
       # Weight 누적
       df.loc[sell_date, 'Weight'] += position_size
 
-    # 그룹 통계 수집
+    # 그룹 평균 수익률 계산 및 기록
     group_avg_return = total_weighted_return / len(group_positions) if group_positions else 0
-    group_returns.append(group_avg_return)
-    group_sell_date = sell_date
-
+    df.loc[sell_date, 'Group Return'] = group_avg_return
     df.loc[sell_date, 'Action'] = 'Sell'
 
   for buy_date in buys.index:
@@ -98,9 +82,6 @@ def backtest(data, ticker):
       if group_positions:
         sell_price = df.loc[sell_date, 'Close']
         execute_group_sell(sell_date, sell_price)
-
-      # 이전 그룹 정산(Flush) 수행
-      flush_group_metrics()
 
       # 상태 초기화
       current_buy_group_flag = False
@@ -182,7 +163,6 @@ def backtest(data, ticker):
       if next_buy_date is None or sell_date <= next_buy_date:
         sell_price = df.loc[sell_date, 'Close']
         execute_group_sell(sell_date, sell_price)
-        flush_group_metrics()
 
         # 그룹 종료 후 상태 초기화
         current_buy_group_flag = False
@@ -195,9 +175,6 @@ def backtest(data, ticker):
   if sell_date and group_positions:
     sell_price = df.loc[sell_date, 'Close']
     execute_group_sell(sell_date, sell_price)
-
-  # 마지막 그룹 정산(Flush)
-  flush_group_metrics()
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
