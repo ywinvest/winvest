@@ -94,6 +94,11 @@ def backtest(data, ticker):
   for buy_date in buys.index:
     # 새 그룹 시작 여부 확인
     if sell_date is not None and buy_date > sell_date:
+      # 이전 그룹 일괄 매도 실행
+      if group_positions:
+        sell_price = df.loc[sell_date, 'Close']
+        execute_group_sell(sell_date, sell_price)
+
       # 이전 그룹 정산(Flush) 수행
       flush_group_metrics()
 
@@ -103,6 +108,7 @@ def backtest(data, ticker):
       current_group_buy_count = 0
       group_positions = []
       current_sell_condition = sell_condition_technical_bounce
+      sell_date = None
 
     is_first_buy = not current_buy_group_flag
 
@@ -165,6 +171,25 @@ def backtest(data, ticker):
     subsequent_data = df.loc[buy_date:]
     sell_signals = subsequent_data[current_sell_condition(subsequent_data)]
     sell_date = sell_signals.index[0] if not sell_signals.empty else None
+
+    # *** 매도 신호가 다음 매수 전에 발생하는지 확인 ***
+    # 현재 매수 이후의 매수 목록
+    remaining_buys = buys[buys.index > buy_date]
+    next_buy_date = remaining_buys.index[0] if not remaining_buys.empty else None
+
+    # 매도 신호가 다음 매수 전에 발생하면 즉시 그룹 청산
+    if sell_date is not None:
+      if next_buy_date is None or sell_date <= next_buy_date:
+        sell_price = df.loc[sell_date, 'Close']
+        execute_group_sell(sell_date, sell_price)
+        flush_group_metrics()
+
+        # 그룹 종료 후 상태 초기화
+        current_buy_group_flag = False
+        last_buy_price = None
+        current_group_buy_count = 0
+        group_positions = []
+        current_sell_condition = sell_condition_technical_bounce
 
   # 루프 종료 후 마지막 그룹 일괄 매도 처리
   if sell_date and group_positions:
