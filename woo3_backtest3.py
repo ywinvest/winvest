@@ -2,9 +2,8 @@ import json
 import os
 from datetime import datetime, timedelta
 
-import numpy as np
-import pandas as pd
 import FinanceDataReader as fdr
+import pandas as pd
 import vectorbt as vbt
 
 import indicators
@@ -20,14 +19,12 @@ class GlobalShortTermStrategy:
     self.ticker = ticker
     self.df = indicators.calculate_indicators(data.copy())
 
-  def generate_signals(self):
-    """매수/매도 신호 생성"""
+  def generate_orders(self):
+    """매수/매도 주문 생성 (그룹 단위 거래 지원)"""
     df = self.df
 
-    # 초기화
-    entries = pd.Series(False, index=df.index)
-    exits = pd.Series(False, index=df.index)
-    size = pd.Series(0.0, index=df.index)
+    # 주문 배열 초기화 (양수: 매수, 음수: 매도)
+    orders = pd.Series(0.0, index=df.index)
 
     # 상태 변수
     group_positions = []
@@ -35,6 +32,7 @@ class GlobalShortTermStrategy:
     last_buy_price = None
     sell_date_idx = None
     use_snapback = False
+    total_position = 0  # 현재 보유 포지션 총량
 
     for i in range(len(df)):
       current_date = df.index[i]
@@ -42,13 +40,16 @@ class GlobalShortTermStrategy:
       # 매도 신호 확인
       if sell_date_idx is not None and i >= sell_date_idx:
         if group_positions:
-          exits.iloc[i] = True
-          # 그룹 전체 청산
+          # 그룹 전체 청산 (음수로 표시)
+          orders.iloc[i] = -total_position
+
+          # 상태 초기화
           group_positions = []
           group_buy_count = 0
           last_buy_price = None
           use_snapback = False
           sell_date_idx = None
+          total_position = 0
 
       # 매수 조건 확인
       buy_cond = (df['RSI'].iloc[i] <= DEFAULT_RSI_THRESHOLD and
@@ -90,8 +91,8 @@ class GlobalShortTermStrategy:
             position_size += 1
 
           # 매수 실행
-          entries.iloc[i] = True
-          size.iloc[i] = position_size
+          orders.iloc[i] = position_size
+          total_position += position_size
 
           buy_price = df['Close'].iloc[i]
           group_positions.append((i, buy_price, position_size))
@@ -114,20 +115,17 @@ class GlobalShortTermStrategy:
             sell_date = sell_mask.idxmax()
             sell_date_idx = df.index.get_loc(sell_date)
 
-    return entries, exits, size
+    return orders
 
-  def run_backtest(self, init_cash=10000, fees=0.0):
-    """vectorbt를 사용한 백테스트 실행"""
-    entries, exits, size = self.generate_signals()
+  def run_backtest(self, init_cash=10000, fees=0):
+    """vectorbt를 사용한 백테스트 실행 (from_orders 사용)"""
+    orders = self.generate_orders()
 
-    # vectorbt Portfolio 생성
-    portfolio = vbt.Portfolio.from_signals(
+    # vectorbt Portfolio 생성 (from_orders 사용)
+    portfolio = vbt.Portfolio.from_orders(
         close=self.df['Close'],
-        entries=entries,
-        exits=exits,
-        size=size,
+        size=orders,
         size_type='amount',
-        accumulate=True,    # 분할 매수 허용
         init_cash=init_cash,
         fees=fees,
         freq='1D'
@@ -150,21 +148,18 @@ class GlobalShortTermStrategy:
         'sharpe_ratio': 0
       }
 
-    # vectorbt 컬럼명 확인 및 수익률 계산
-    # 'Return' 또는 'PnL' 컬럼 사용
+    # 수익률 계산
     if 'Return' in trades.columns:
       returns = trades['Return'].values
     elif 'PnL' in trades.columns:
       returns = trades['PnL'].values / portfolio.init_cash
     else:
-      # 수동으로 수익률 계산
       returns = (trades['Exit Price'] - trades['Entry Price']) / trades['Entry Price']
       returns = returns.values
 
     avg_return = returns.mean() if len(returns) > 0 else 0
 
-    # 보유 기간 계산 (일 단위)
-    # vectorbt의 실제 컬럼명 확인
+    # 보유 기간 계산
     exit_col = None
     entry_col = None
 
@@ -179,7 +174,6 @@ class GlobalShortTermStrategy:
     elif 'Duration' in trades.columns:
       holding_periods = trades['Duration']
     else:
-      # Duration을 직접 계산
       holding_periods = pd.Series([0] * len(trades))
 
     avg_holding_period = holding_periods.mean() if len(holding_periods) > 0 else 0
@@ -213,12 +207,10 @@ class GlobalShortTermStrategy:
     portfolio_value = portfolio.value()
     portfolio_value.to_csv(os.path.join(output_dir, f'{self.ticker}_portfolio_value.csv'))
 
-    # 상세 데이터프레임 저장 (신호 포함)
-    entries, exits, size = self.generate_signals()
+    # 상세 데이터프레임 저장 (주문 포함)
+    orders = self.generate_orders()
     result_df = self.df.copy()
-    result_df['Entry'] = entries
-    result_df['Exit'] = exits
-    result_df['Size'] = size
+    result_df['Orders'] = orders
     result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
 
 
