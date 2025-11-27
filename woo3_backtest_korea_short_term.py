@@ -22,7 +22,7 @@ def sell_condition_snap_back(df):
   return df['MA_20_Cross'] & df['Bullish']
 
 def backtest(data, ticker):
-  """Backtest with dynamic Sell logic based on consecutive buy count."""
+  """Backtest with group-level batch selling (all positions sold at once)."""
   df = indicators.calculate_indicators(data.copy())
 
   df['Weight'] = 0.0
@@ -33,159 +33,112 @@ def backtest(data, ticker):
   holding_periods = []
   buy_count = 0
 
-  current_buy_group_flag = False
-  sell_date = buys.index[0] if not buys.empty else None
+  sell_date = None
+
+  # 그룹 내 누적 데이터
+  group_positions = []  # [(buy_date, buy_price, position_size), ...]
+  group_buy_count = 0
   last_buy_price = None
 
-  current_group_buy_count = 0
-  group_consecutive_buys = 0
+  # 현재 그룹의 매도 조건 함수
+  current_sell_condition = sell_condition_technical_bounce
 
-  group_returns = []
-  group_sell_date = None
+  # --- 그룹 일괄 매도 및 정산 함수 ---
+  def execute_group_sell(sell_date, sell_price):
+    nonlocal group_positions, returns, holding_periods
 
-  # --- 내부 함수: 연속 매수 횟수 미리 계산 ---
-  def count_potential_buys(start_date, end_date, first_buy_price):
-    if end_date:
-      group_data = df.loc[start_date:end_date]
-    else:
-      group_data = df.loc[start_date:]
+    if not group_positions:
+      return
 
-    potential_candidates = group_data[buy_condition(group_data)]
+    total_weighted_return = 0
+    total_weight = 0
 
-    c_buys = 1
-    temp_last_price = first_buy_price
-    next_buy_order = 2
-
-    for idx in potential_candidates.index:
-      if idx <= start_date:
-        continue
-      current_close = group_data.loc[idx, 'Close']
-      current_rsi = group_data.loc[idx, 'RSI']
-
-      if current_close >= temp_last_price:
-        continue
-      threshold = 30 if next_buy_order == 2 else DEFAULT_RSI_THRESHOLD
-      if current_rsi <= threshold:
-        c_buys += 1
-        temp_last_price = current_close
-        next_buy_order += 1
-    return c_buys
-
-  # --- 그룹 정산(Flush) 함수 ---
-  def flush_group_metrics():
-    nonlocal group_returns, group_sell_date
-
-    if group_sell_date and group_returns:
-      avg_return = sum(group_returns) / len(group_returns)
-      df.loc[group_sell_date, 'Group Return'] = avg_return
-
-    group_returns = []
-    group_sell_date = None
-
-  for buy_date in buys.index:
-    # 새 그룹 시작 여부 확인
-    if sell_date is not None and buy_date > sell_date:
-      # 이전 그룹 정산(Flush) 수행
-      flush_group_metrics()
-
-      # 상태 초기화
-      current_buy_group_flag = False
-      last_buy_price = None
-      current_group_buy_count = 0
-      group_consecutive_buys = 0
-
-    is_first_buy = not current_buy_group_flag
-
-    # 가격 조건 확인
-    if not is_first_buy:
-      current_price = df.loc[buy_date, 'Close']
-      if last_buy_price is None or current_price >= last_buy_price:
-        continue
-
-    # RSI 조건 검증
-    current_rsi = df.loc[buy_date, 'RSI']
-    required_rsi = DEFAULT_RSI_THRESHOLD
-    if is_first_buy:
-      required_rsi = DEFAULT_RSI_THRESHOLD
-    else:
-      check_order = current_group_buy_count + 1
-      if check_order == 2:
-        required_rsi = 30
-      else:
-        required_rsi = DEFAULT_RSI_THRESHOLD
-
-    if current_rsi > required_rsi:
-      continue
-
-    # --- 매수 실행 ---
-    first_buy_price = df.loc[buy_date, 'Close']
-    change_rate = df.loc[buy_date, 'Change_Rate']
-    df.loc[buy_date, 'Action'] = 'Buy'
-    last_buy_price = first_buy_price
-    current_group_buy_count += 1
-    buy_count += 1
-
-    if current_rsi <= 20:
-      position_size = 3
-    elif current_rsi <= 25:
-      position_size = 2
-    else:
-      position_size = 1
-
-    if change_rate < -5:
-      position_size += 1
-
-    df.loc[buy_date, 'Weight'] = position_size
-
-    subsequent_data = df.loc[buy_date:]
-
-    # 그룹 초기 설정
-    if is_first_buy:
-      current_buy_group_flag = True
-
-      sell_technical_bounce = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
-      sell_date = sell_technical_bounce.index[0] if not sell_technical_bounce.empty else None
-
-      consecutive_buys = count_potential_buys(buy_date, sell_date, first_buy_price)
-
-      if consecutive_buys >= 5:
-        sell_snap_back = subsequent_data[sell_condition_snap_back(subsequent_data)]
-        sell_date = sell_snap_back.index[0] if not sell_snap_back.empty else None
-        consecutive_buys = count_potential_buys(buy_date, sell_date, first_buy_price)
-
-      group_consecutive_buys = consecutive_buys
-
-    df.loc[buy_date, 'Consecutive Buys'] = group_consecutive_buys
-
-    # 매도 로직 결정 - 한번에 매도
-    if group_consecutive_buys >= 5:
-      # 5회 이상: 스냅백 매도 (20일선 돌파)
-      sell_snap_back = subsequent_data[sell_condition_snap_back(subsequent_data)]
-      sell_date = sell_snap_back.index[0] if not sell_snap_back.empty else None
-    else:
-      # 5회 미만: 기술적 반등 매도 (10일선 돌파)
-      sell_technical_bounce = subsequent_data[sell_condition_technical_bounce(subsequent_data)]
-      sell_date = sell_technical_bounce.index[0] if not sell_technical_bounce.empty else None
-
-    # --- 전체 매도 처리 ---
-    if sell_date:
-      df.loc[sell_date, 'Action'] = 'Sell'
-      sell_price = df.loc[sell_date, 'Close']
-      trade_return = (sell_price / first_buy_price - 1) * position_size
+    for buy_date, buy_price, position_size in group_positions:
+      trade_return = (sell_price / buy_price - 1) * position_size
 
       df.loc[buy_date, 'Return'] = trade_return
+      df.loc[buy_date, 'Sell Price'] = sell_price
+      df.loc[buy_date, 'Sell Date'] = sell_date
+
       returns.append(trade_return)
       holding_periods.append((sell_date - buy_date).days)
+
+      total_weighted_return += trade_return
+      total_weight += position_size
 
       # Weight 누적
       df.loc[sell_date, 'Weight'] += position_size
 
-      # 그룹 통계 수집
-      group_returns.append(trade_return)
-      group_sell_date = sell_date
+    # 그룹 평균 수익률 계산 및 기록
+    group_avg_return = total_weighted_return / len(group_positions) if group_positions else 0
+    df.loc[sell_date, 'Group Return'] = group_avg_return
+    df.loc[sell_date, 'Group Buys'] = group_buy_count
+    df.loc[sell_date, 'Action'] = 'Sell'
 
-  # 루프 종료 후 마지막 그룹 정산(Flush)
-  flush_group_metrics()
+  for i, buy_date in enumerate(buys.index):
+    is_first_buy = len(group_positions) == 0
+    rsi = df.loc[buy_date, 'RSI']
+
+    should_buy = True
+
+    # [조건 1] 첫 매수가 아닌데 가격이 올랐으면 매수 스킵
+    if not is_first_buy:
+      current_price = df.loc[buy_date, 'Close']
+      if last_buy_price is None or current_price >= last_buy_price:
+        should_buy = False
+
+    # [조건 2] RSI 조건이 안 맞으면 매수 스킵
+    if should_buy and not is_first_buy:
+      rsi = df.loc[buy_date, 'RSI']
+      rsi_threshold = 30 if group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
+      if rsi > rsi_threshold:
+        should_buy = False
+
+    if should_buy:
+      # --- 매수 실행 ---
+      buy_price = df.loc[buy_date, 'Close']
+      change_rate = df.loc[buy_date, 'Change_Rate']
+
+      df.loc[buy_date, 'Action'] = 'Buy'
+      last_buy_price = buy_price
+      group_buy_count += 1
+      buy_count += 1
+
+      if rsi <= 20:
+        position_size = 3
+      elif rsi <= 25:
+        position_size = 2
+      else:
+        position_size = 1
+
+      if change_rate < -5:
+        position_size += 1
+
+      df.loc[buy_date, 'Weight'] = position_size
+
+      # 그룹 포지션에 추가
+      group_positions.append((buy_date, buy_price, position_size))
+
+      # 5회 이상 매수 시 즉시 매도 조건 변경
+      if group_buy_count >= 5:
+        current_sell_condition = sell_condition_snap_back
+
+      # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)
+      subsequent_data = df.loc[buy_date:]
+      sell_signals = subsequent_data[current_sell_condition(subsequent_data)]
+      sell_date = sell_signals.index[0] if not sell_signals.empty else None
+
+    # 매도 신호가 다음 매수 전에 발생하는지 확인
+    next_buy_date = buys.index[i + 1] if i + 1 < len(buys.index) else None
+
+    # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
+    if sell_date is not None and (next_buy_date is None or sell_date <= next_buy_date):
+      sell_price = df.loc[sell_date, 'Close']
+      execute_group_sell(sell_date, sell_price)
+      last_buy_price = None
+      group_buy_count = 0
+      group_positions = []
+      current_sell_condition = sell_condition_technical_bounce
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
