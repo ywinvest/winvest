@@ -126,6 +126,7 @@ class GlobalShortTermStrategy:
         close=self.df['Close'],
         size=orders,
         size_type='amount',
+        direction='longonly',
         init_cash=init_cash,
         fees=fees,
         freq='1D'
