@@ -72,6 +72,7 @@ def backtest(data, ticker):
     # 그룹 평균 수익률 계산 및 기록
     group_avg_return = total_weighted_return / len(group_positions) if group_positions else 0
     df.loc[sell_date, 'Group Return'] = group_avg_return
+    df.loc[sell_date, 'Group Buys'] = current_group_buy_count
     df.loc[sell_date, 'Action'] = 'Sell'
 
   for i, buy_date in enumerate(buys.index):
@@ -122,7 +123,7 @@ def backtest(data, ticker):
       if current_group_buy_count >= 5:
         current_sell_condition = sell_condition_snap_back
 
-      df.loc[buy_date, 'Consecutive Buys'] = current_group_buy_count
+      # df.loc[buy_date, 'Consecutive Buys'] = current_group_buy_count
 
       # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)
       subsequent_data = df.loc[buy_date:]
