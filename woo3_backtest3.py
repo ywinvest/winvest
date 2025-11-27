@@ -145,15 +145,42 @@ class GlobalShortTermStrategy:
         'buy_count': 0,
         'total_return': 0,
         'win_rate': 0,
-        'max_drawdown': 0
+        'max_drawdown': 0,
+        'sharpe_ratio': 0
       }
 
-    # 수익률 계산
-    returns = trades['Return'].values
+    # vectorbt 컬럼명 확인 및 수익률 계산
+    # 'Return' 또는 'PnL' 컬럼 사용
+    if 'Return' in trades.columns:
+      returns = trades['Return'].values
+    elif 'PnL' in trades.columns:
+      returns = trades['PnL'].values / portfolio.init_cash
+    else:
+      # 수동으로 수익률 계산
+      returns = (trades['Exit Price'] - trades['Entry Price']) / trades['Entry Price']
+      returns = returns.values
+
     avg_return = returns.mean() if len(returns) > 0 else 0
 
     # 보유 기간 계산 (일 단위)
-    holding_periods = (trades['Exit Date'] - trades['Entry Date']).dt.days
+    # vectorbt의 실제 컬럼명 확인
+    exit_col = None
+    entry_col = None
+
+    for col in trades.columns:
+      if 'exit' in col.lower() and 'date' in col.lower():
+        exit_col = col
+      if 'entry' in col.lower() and 'date' in col.lower():
+        entry_col = col
+
+    if exit_col and entry_col:
+      holding_periods = (trades[exit_col] - trades[entry_col]).dt.days
+    elif 'Duration' in trades.columns:
+      holding_periods = trades['Duration']
+    else:
+      # Duration을 직접 계산
+      holding_periods = pd.Series([0] * len(trades))
+
     avg_holding_period = holding_periods.mean() if len(holding_periods) > 0 else 0
 
     # 기타 통계
