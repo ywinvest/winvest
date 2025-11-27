@@ -33,7 +33,6 @@ def backtest(data, ticker):
   holding_periods = []
   buy_count = 0
 
-  current_buy_group_flag = False
   sell_date = None
 
   # 그룹 내 누적 데이터
@@ -76,20 +75,6 @@ def backtest(data, ticker):
     df.loc[sell_date, 'Action'] = 'Sell'
 
   for buy_date in buys.index:
-    # 새 그룹 시작 여부 확인
-    if sell_date is not None and buy_date > sell_date:
-      # 이전 그룹 일괄 매도 실행
-      if group_positions:
-        sell_price = df.loc[sell_date, 'Close']
-        execute_group_sell(sell_date, sell_price)
-
-      # 상태 초기화
-      last_buy_price = None
-      current_group_buy_count = 0
-      group_positions = []
-      current_sell_condition = sell_condition_technical_bounce
-      sell_date = None
-
     is_first_buy = len(group_positions) == 0
     rsi = df.loc[buy_date, 'RSI']
 
@@ -160,6 +145,19 @@ def backtest(data, ticker):
     #     current_group_buy_count = 0
     #     group_positions = []
     #     current_sell_condition = sell_condition_technical_bounce
+    # 새 그룹 시작 여부 확인
+    if sell_date is not None and buy_date > sell_date:
+      # 이전 그룹 일괄 매도 실행
+      if group_positions:
+        sell_price = df.loc[sell_date, 'Close']
+        execute_group_sell(sell_date, sell_price)
+
+      # 상태 초기화
+      last_buy_price = None
+      current_group_buy_count = 0
+      group_positions = []
+      current_sell_condition = sell_condition_technical_bounce
+      sell_date = None
 
   avg_return = sum(returns) / len(returns) if returns else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
