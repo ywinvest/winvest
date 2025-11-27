@@ -84,14 +84,13 @@ def backtest(data, ticker):
         execute_group_sell(sell_date, sell_price)
 
       # 상태 초기화
-      current_buy_group_flag = False
       last_buy_price = None
       current_group_buy_count = 0
       group_positions = []
       current_sell_condition = sell_condition_technical_bounce
       sell_date = None
 
-    is_first_buy = not current_buy_group_flag
+    is_first_buy = len(group_positions) == 0
 
     # --- 매수 조건 검증 ---
     if is_first_buy:
@@ -115,7 +114,7 @@ def backtest(data, ticker):
     # --- 매수 실행 ---
     buy_price = df.loc[buy_date, 'Close']
     change_rate = df.loc[buy_date, 'Change_Rate']
-    current_rsi = df.loc[buy_date, 'RSI']
+    current_rsi = df.loc[buy_date, 'RSI']  # 이미 위에서 계산됨
 
     df.loc[buy_date, 'Action'] = 'Buy'
     last_buy_price = buy_price
@@ -137,10 +136,9 @@ def backtest(data, ticker):
     # 그룹 포지션에 추가
     group_positions.append((buy_date, buy_price, position_size))
 
-    # 그룹 초기 설정
-    if is_first_buy:
-      current_buy_group_flag = True
-      current_sell_condition = sell_condition_technical_bounce
+    # 첫 매수 시 그룹 초기 설정
+    # if is_first_buy:
+    #   current_sell_condition = sell_condition_technical_bounce
 
     # *** 실전형 로직: 5회 이상 매수 시 즉시 매도 조건 변경 ***
     if current_group_buy_count >= 5:
@@ -165,7 +163,6 @@ def backtest(data, ticker):
         execute_group_sell(sell_date, sell_price)
 
         # 그룹 종료 후 상태 초기화
-        current_buy_group_flag = False
         last_buy_price = None
         current_group_buy_count = 0
         group_positions = []
