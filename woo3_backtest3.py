@@ -171,8 +171,8 @@ def run_backtest(data, ticker, name):
   # 가격 및 수익률
   trades_df['Buy Price'] = trades_df['entry_price']
   trades_df['Sell Price'] = trades_df['exit_price']
-  # pnl_perc는 수익률 (%)을 나타냅니다. (pnl_perc * 100 할 필요 없음, 이미 퍼센트임)
-  trades_df['Return (%)'] = trades_df['pnl_perc']
+  # vbt의 'return'은 이미 퍼센트(%)가 아닌 비율 (0.01 = 1%)로 되어 있습니다.
+  trades_df['Return (%)'] = trades_df['return']
   trades_df['Size'] = trades_df['size']
   trades_df['Holding Period (Days)'] = (trades_df['Sell Date'] - trades_df['Buy Date']).dt.days
 
