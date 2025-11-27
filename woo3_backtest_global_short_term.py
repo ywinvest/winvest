@@ -37,7 +37,7 @@ def backtest(data, ticker):
 
   # 그룹 내 누적 데이터
   group_positions = []  # [(buy_date, buy_price, position_size), ...]
-  current_group_buy_count = 0
+  group_buy_count = 0
   last_buy_price = None
 
   # 현재 그룹의 매도 조건 함수
@@ -72,7 +72,7 @@ def backtest(data, ticker):
     # 그룹 평균 수익률 계산 및 기록
     group_avg_return = total_weighted_return / len(group_positions) if group_positions else 0
     df.loc[sell_date, 'Group Return'] = group_avg_return
-    df.loc[sell_date, 'Group Buys'] = current_group_buy_count
+    df.loc[sell_date, 'Group Buys'] = group_buy_count
     df.loc[sell_date, 'Action'] = 'Sell'
 
   for i, buy_date in enumerate(buys.index):
@@ -90,7 +90,7 @@ def backtest(data, ticker):
     # [조건 2] RSI 조건이 안 맞으면 매수 스킵
     if should_buy and not is_first_buy:
       rsi = df.loc[buy_date, 'RSI']
-      rsi_threshold = 30 if current_group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
+      rsi_threshold = 30 if group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
       if rsi > rsi_threshold:
         should_buy = False
 
@@ -101,7 +101,7 @@ def backtest(data, ticker):
 
       df.loc[buy_date, 'Action'] = 'Buy'
       last_buy_price = buy_price
-      current_group_buy_count += 1
+      group_buy_count += 1
       buy_count += 1
 
       if rsi <= 20:
@@ -120,10 +120,8 @@ def backtest(data, ticker):
       group_positions.append((buy_date, buy_price, position_size))
 
       # 5회 이상 매수 시 즉시 매도 조건 변경
-      if current_group_buy_count >= 5:
+      if group_buy_count >= 5:
         current_sell_condition = sell_condition_snap_back
-
-      # df.loc[buy_date, 'Consecutive Buys'] = current_group_buy_count
 
       # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)
       subsequent_data = df.loc[buy_date:]
@@ -138,7 +136,7 @@ def backtest(data, ticker):
       sell_price = df.loc[sell_date, 'Close']
       execute_group_sell(sell_date, sell_price)
       last_buy_price = None
-      current_group_buy_count = 0
+      group_buy_count = 0
       group_positions = []
       current_sell_condition = sell_condition_technical_bounce
 
