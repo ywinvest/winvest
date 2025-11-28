@@ -19,6 +19,18 @@ class GlobalShortTermStrategy:
     self.ticker = ticker
     self.df = indicators.calculate_indicators(data.copy())
 
+  def buy_condition(self, df):
+    """Broad buy condition for global indices (RSI <= 35)."""
+    return (df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Change_Rate'] < 0)
+
+  def sell_condition_technical_bounce(self, df):
+    """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
+    return df['MA_10_Cross'] & df['Bullish']
+
+  def sell_condition_snap_back(self, df):
+    """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
+    return df['MA_20_Cross'] & df['Bullish']
+
   def generate_orders(self):
     """매수/매도 주문 생성 (그룹 단위 거래 지원)"""
     df = self.df
@@ -26,94 +38,105 @@ class GlobalShortTermStrategy:
     # 주문 배열 초기화 (양수: 매수, 음수: 매도)
     orders = pd.Series(0.0, index=df.index)
 
+    # 초기 매수 후보 필터링 (buy_condition 메서드 사용)
+    buy_candidates_mask = self.buy_condition(df)
+    buy_candidates = df[buy_candidates_mask]
+
     # 상태 변수
     group_positions = []
     group_buy_count = 0
     last_buy_price = None
     sell_date_idx = None
-    use_snapback = False
+    current_sell_condition = self.sell_condition_technical_bounce  # 현재 매도 조건 함수
     total_position = 0  # 현재 보유 포지션 총량
 
-    for i in range(len(df)):
-      current_date = df.index[i]
+    for i, buy_date in enumerate(buy_candidates.index):
+      buy_date_idx = df.index.get_loc(buy_date)
 
       # 매도 신호 확인
-      if sell_date_idx is not None and i >= sell_date_idx:
+      if sell_date_idx is not None and buy_date_idx >= sell_date_idx:
         if group_positions:
           # 그룹 전체 청산 (음수로 표시)
-          orders.iloc[i] = -total_position
+          orders.iloc[sell_date_idx] = -total_position
 
           # 상태 초기화
           group_positions = []
           group_buy_count = 0
           last_buy_price = None
-          use_snapback = False
+          current_sell_condition = self.sell_condition_technical_bounce
           sell_date_idx = None
           total_position = 0
 
-      # 매수 조건 확인
-      buy_cond = (df['RSI'].iloc[i] <= DEFAULT_RSI_THRESHOLD and
-                  not df['Bullish'].iloc[i] and
-                  df['Change_Rate'].iloc[i] < 0)
+      should_buy = True
+      is_first_buy = len(group_positions) == 0
 
-      if buy_cond:
-        should_buy = True
-        position_size = 1
+      # 첫 매수가 아닌 경우 추가 검증
+      if not is_first_buy:
+        current_price = df.loc[buy_date, 'Close']
 
-        # 첫 매수가 아닌 경우 추가 검증
-        if group_positions:
-          current_price = df['Close'].iloc[i]
+        # 조건 1: 가격이 올랐으면 스킵
+        if last_buy_price is not None and current_price >= last_buy_price:
+          should_buy = False
 
-          # 조건 1: 가격이 올랐으면 스킵
-          if last_buy_price is not None and current_price >= last_buy_price:
+        # 조건 2: RSI 조건
+        if should_buy:
+          rsi = df.loc[buy_date, 'RSI']
+          rsi_threshold = 30 if group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
+          if rsi > rsi_threshold:
             should_buy = False
 
-          # 조건 2: RSI 조건
-          if should_buy:
-            rsi = df['RSI'].iloc[i]
-            rsi_threshold = 30 if group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
-            if rsi > rsi_threshold:
-              should_buy = False
+      if should_buy:
+        # 포지션 사이즈 계산
+        rsi = df.loc[buy_date, 'RSI']
+        change_rate = df.loc[buy_date, 'Change_Rate']
 
-        if should_buy:
-          # 포지션 사이즈 계산
-          rsi = df['RSI'].iloc[i]
-          change_rate = df['Change_Rate'].iloc[i]
+        if rsi <= 20:
+          position_size = 3
+        elif rsi <= 30:
+          position_size = 2
+        else:
+          position_size = 1
 
-          if rsi <= 20:
-            position_size = 3
-          elif rsi <= 30:
-            position_size = 2
-          else:
-            position_size = 1
+        if change_rate < -5:
+          position_size += 1
 
-          if change_rate < -5:
-            position_size += 1
+        # 매수 실행
+        orders.loc[buy_date] = position_size
+        total_position += position_size
 
-          # 매수 실행
-          orders.iloc[i] = position_size
-          total_position += position_size
+        buy_price = df.loc[buy_date, 'Close']
+        group_positions.append((buy_date, buy_price, position_size))
+        group_buy_count += 1
+        last_buy_price = buy_price
 
-          buy_price = df['Close'].iloc[i]
-          group_positions.append((i, buy_price, position_size))
-          group_buy_count += 1
-          last_buy_price = buy_price
+        # 5회 이상 매수 시 스냅백 조건으로 전환
+        if group_buy_count >= 5:
+          current_sell_condition = self.sell_condition_snap_back
 
-          # 5회 이상 매수 시 스냅백 조건으로 전환
-          if group_buy_count >= 5:
-            use_snapback = True
+        # 매도 날짜 계산 (current_sell_condition 사용)
+        subsequent_data = df.loc[buy_date:]
+        sell_mask = current_sell_condition(subsequent_data)
 
-          # 매도 날짜 계산
-          if use_snapback:
-            # 스냅백: MA_20 돌파
-            sell_mask = df['MA_20_Cross'].iloc[i:] & df['Bullish'].iloc[i:]
-          else:
-            # 기술적 반등: MA_10 돌파
-            sell_mask = df['MA_10_Cross'].iloc[i:] & df['Bullish'].iloc[i:]
+        if sell_mask.any():
+          sell_date = sell_mask.idxmax()
+          sell_date_idx = df.index.get_loc(sell_date)
 
-          if sell_mask.any():
-            sell_date = sell_mask.idxmax()
-            sell_date_idx = df.index.get_loc(sell_date)
+      # 매도 신호가 다음 매수 전에 발생하는지 확인
+      next_buy_date = buy_candidates.index[i + 1] if i + 1 < len(buy_candidates.index) else None
+
+      # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
+      if sell_date_idx is not None and (next_buy_date is None or df.index[sell_date_idx] <= next_buy_date):
+        if group_positions:
+          sell_price = df.iloc[sell_date_idx]['Close']
+          orders.iloc[sell_date_idx] = -total_position
+
+          # 상태 초기화
+          group_positions = []
+          group_buy_count = 0
+          last_buy_price = None
+          current_sell_condition = self.sell_condition_technical_bounce
+          sell_date_idx = None
+          total_position = 0
 
     return orders
 
