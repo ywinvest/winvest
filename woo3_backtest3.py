@@ -31,8 +31,13 @@ class GlobalShortTermStrategy:
     """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
     return df['MA_20_Cross'] & df['Bullish']
 
-  def generate_orders(self):
-    """매수/매도 주문 생성 (그룹 단위 거래 지원)"""
+  def generate_orders(self, init_cash=10000000, max_positions=10):
+    """매수/매도 주문 생성 (그룹 단위 거래 지원)
+
+    Args:
+        init_cash: 초기 자본금
+        max_positions: 최대 동시 보유 포지션 수 (기본값: 10)
+    """
     df = self.df
 
     # 주문 배열 초기화 (양수: 매수, 음수: 매도)
@@ -50,23 +55,10 @@ class GlobalShortTermStrategy:
     current_sell_condition = self.sell_condition_technical_bounce  # 현재 매도 조건 함수
     total_position = 0  # 현재 보유 포지션 총량
 
+    # 각 매수 시 투자할 기본 금액 계산 (초기 자본을 최대 포지션 수로 분할)
+    base_investment = init_cash / max_positions
+
     for i, buy_date in enumerate(buy_candidates.index):
-      # buy_date_idx = df.index.get_loc(buy_date)
-
-      # # 매도 신호 확인
-      # if sell_date_idx is not None and buy_date_idx >= sell_date_idx:
-      #   if group_positions:
-      #     # 그룹 전체 청산 (음수로 표시)
-      #     orders.iloc[sell_date_idx] = -total_position
-      #
-      #     # 상태 초기화
-      #     group_positions = []
-      #     group_buy_count = 0
-      #     last_buy_price = None
-      #     current_sell_condition = self.sell_condition_technical_bounce
-      #     sell_date_idx = None
-      #     total_position = 0
-
       should_buy = True
       is_first_buy = len(group_positions) == 0
 
@@ -86,25 +78,31 @@ class GlobalShortTermStrategy:
             should_buy = False
 
       if should_buy:
-        # 포지션 사이즈 계산
+        # 포지션 사이즈 가중치 계산
         rsi = df.loc[buy_date, 'RSI']
         change_rate = df.loc[buy_date, 'Change_Rate']
 
         if rsi <= 20:
-          position_size = 3
+          weight = 3
         elif rsi <= 30:
-          position_size = 2
+          weight = 2
         else:
-          position_size = 1
+          weight = 1
 
         if change_rate < -5:
-          position_size += 1
+          weight += 1
+
+        # 실제 투자 금액 계산
+        investment_amount = base_investment * weight
+        buy_price = df.loc[buy_date, 'Close']
+
+        # 매수할 수량 계산 (금액 / 종가)
+        position_size = investment_amount / buy_price
 
         # 매수 실행
         orders.loc[buy_date] = position_size
         total_position += position_size
 
-        buy_price = df.loc[buy_date, 'Close']
         group_positions.append((buy_date, buy_price, position_size))
         group_buy_count += 1
         last_buy_price = buy_price
@@ -140,9 +138,15 @@ class GlobalShortTermStrategy:
 
     return orders
 
-  def run_backtest(self, init_cash=10000000, fees=0):
-    """vectorbt를 사용한 백테스트 실행 (from_orders 사용)"""
-    orders = self.generate_orders()
+  def run_backtest(self, init_cash=10000000, fees=0, max_positions=10):
+    """vectorbt를 사용한 백테스트 실행 (from_orders 사용)
+
+    Args:
+        init_cash: 초기 자본금
+        fees: 거래 수수료 (비율)
+        max_positions: 최대 동시 보유 포지션 수
+    """
+    orders = self.generate_orders(init_cash=init_cash, max_positions=max_positions)
 
     # vectorbt Portfolio 생성 (from_orders 사용)
     portfolio = vbt.Portfolio.from_orders(
@@ -210,7 +214,7 @@ class GlobalShortTermStrategy:
     portfolio_value.to_csv(os.path.join(output_dir, f'{self.ticker}_portfolio_value.csv'))
 
     # 상세 데이터프레임 저장 (주문 포함)
-    orders = self.generate_orders()
+    orders = self.generate_orders(init_cash=10000000, max_positions=20)
     result_df = self.df.copy()
     result_df['Orders'] = orders
     result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
