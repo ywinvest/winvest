@@ -221,70 +221,70 @@ class GlobalShortTermStrategy:
     result_df['Orders'] = orders
     result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
 
-def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
-  """vectorbt 내장 기능을 최대한 활용한 시각화"""
-  os.makedirs(output_dir, exist_ok=True)
+  def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
+    """vectorbt 내장 기능을 최대한 활용한 시각화"""
+    os.makedirs(output_dir, exist_ok=True)
 
-  # 1. [핵심 수정] FigureWidget 대신 Figure 객체를 사용하도록 설정 변경
-  # 이렇게 하면 anywidget 의존성 및 FigureWidget 관련 오류를 우회할 수 있습니다.
-  with vbt.settings.plotting.context(use_widgets=False, template='plotly_white'):
+    # 1. [핵심 수정] FigureWidget 대신 Figure 객체를 사용하도록 설정 변경
+    # 이렇게 하면 anywidget 의존성 및 FigureWidget 관련 오류를 우회할 수 있습니다.
+    with vbt.settings.plotting.context(use_widgets=False, template='plotly_white'):
 
-    # 2. vectorbt 내장 함수를 사용하여 서브플롯 틀 생성
-    fig = vbt.make_subplots(
-        rows=3, cols=1,
-        shared_xaxes=True,
-        row_heights=[0.5, 0.25, 0.25],
-        subplot_titles=('Price & Trades', 'RSI', 'Equity')
-    )
+      # 2. vectorbt 내장 함수를 사용하여 서브플롯 틀 생성
+      fig = vbt.make_subplots(
+          rows=3, cols=1,
+          shared_xaxes=True,
+          row_heights=[0.5, 0.25, 0.25],
+          subplot_titles=('Price & Trades', 'RSI', 'Equity')
+      )
 
-    # 3. 가격 및 이동평균선 그리기 (.vbt.plot 사용)
-    # add_trace_kwargs에 row, col을 전달하는 vectorbt의 표준 방식을 사용합니다.
-    self.df['Close'].vbt.plot(
-        fig=fig,
-        add_trace_kwargs=dict(row=1, col=1),
-        trace_kwargs=dict(name='Close', line=dict(color='gray'))
-    )
-
-    if 'MA_10' in self.df.columns:
-      self.df['MA_10'].vbt.plot(
+      # 3. 가격 및 이동평균선 그리기 (.vbt.plot 사용)
+      # add_trace_kwargs에 row, col을 전달하는 vectorbt의 표준 방식을 사용합니다.
+      self.df['Close'].vbt.plot(
           fig=fig,
           add_trace_kwargs=dict(row=1, col=1),
-          trace_kwargs=dict(name='MA 10', line=dict(color='orange'))
+          trace_kwargs=dict(name='Close', line=dict(color='gray'))
       )
-    if 'MA_20' in self.df.columns:
-      self.df['MA_20'].vbt.plot(
+
+      if 'MA_10' in self.df.columns:
+        self.df['MA_10'].vbt.plot(
+            fig=fig,
+            add_trace_kwargs=dict(row=1, col=1),
+            trace_kwargs=dict(name='MA 10', line=dict(color='orange'))
+        )
+      if 'MA_20' in self.df.columns:
+        self.df['MA_20'].vbt.plot(
+            fig=fig,
+            add_trace_kwargs=dict(row=1, col=1),
+            trace_kwargs=dict(name='MA 20', line=dict(color='blue'))
+        )
+
+      # 4. 매매 마커 추가 (vectorbt의 가장 간결한 기능)
+      portfolio.plot_trades(fig=fig, add_trace_kwargs=dict(row=1, col=1))
+
+      # 5. RSI 그리기
+      if 'RSI' in self.df.columns:
+        self.df['RSI'].vbt.plot(
+            fig=fig,
+            add_trace_kwargs=dict(row=2, col=1),
+            trace_kwargs=dict(name='RSI', line=dict(color='purple'))
+        )
+        # 기준선 추가 (vectorbt가 아닌 plotly 명령어를 사용해야 합니다)
+        fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+        fig.add_hline(y=DEFAULT_RSI_THRESHOLD, line_dash="dot", line_color="red", row=2, col=1)
+
+      # 6. 포트폴리오 가치 그리기
+      portfolio.value().vbt.plot(
           fig=fig,
-          add_trace_kwargs=dict(row=1, col=1),
-          trace_kwargs=dict(name='MA 20', line=dict(color='blue'))
+          add_trace_kwargs=dict(row=3, col=1),
+          trace_kwargs=dict(name='Equity', line=dict(color='black'))
       )
 
-    # 4. 매매 마커 추가 (vectorbt의 가장 간결한 기능)
-    portfolio.plot_trades(fig=fig, add_trace_kwargs=dict(row=1, col=1))
+      # 7. 레이아웃 업데이트 및 저장
+      fig.update_layout(title_text=f"{self.ticker} Strategy Analysis", height=1000) # template은 context에서 설정했으므로 제거
 
-    # 5. RSI 그리기
-    if 'RSI' in self.df.columns:
-      self.df['RSI'].vbt.plot(
-          fig=fig,
-          add_trace_kwargs=dict(row=2, col=1),
-          trace_kwargs=dict(name='RSI', line=dict(color='purple'))
-      )
-      # 기준선 추가 (vectorbt가 아닌 plotly 명령어를 사용해야 합니다)
-      fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-      fig.add_hline(y=DEFAULT_RSI_THRESHOLD, line_dash="dot", line_color="red", row=2, col=1)
-
-    # 6. 포트폴리오 가치 그리기
-    portfolio.value().vbt.plot(
-        fig=fig,
-        add_trace_kwargs=dict(row=3, col=1),
-        trace_kwargs=dict(name='Equity', line=dict(color='black'))
-    )
-
-    # 7. 레이아웃 업데이트 및 저장
-    fig.update_layout(title_text=f"{self.ticker} Strategy Analysis", height=1000) # template은 context에서 설정했으므로 제거
-
-    output_path = os.path.join(output_dir, f'{self.ticker}_analysis.html')
-    fig.write_html(output_path)
-    print(f"  [Plot Saved] {output_path}")
+      output_path = os.path.join(output_dir, f'{self.ticker}_analysis.html')
+      fig.write_html(output_path)
+      print(f"  [Plot Saved] {output_path}")
 
 def run_backtest_for_ticker(ticker, name, start_date_str, end_date_str):
   """개별 티커에 대한 백테스트 실행"""
