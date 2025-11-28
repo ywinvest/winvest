@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import FinanceDataReader as fdr
 import pandas as pd
 import vectorbt as vbt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 import indicators
 
@@ -220,66 +222,82 @@ class GlobalShortTermStrategy:
     result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
 
   def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
-    """전략 시각화 및 HTML 저장"""
+    """전략 시각화 및 HTML 저장 (Plotly 직접 사용으로 anywidget 의존성 제거)"""
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. 서브플롯 설정 (가격+MA / RSI / 포트폴리오 가치)
-    fig = vbt.make_subplots(
+    # 1. 서브플롯 생성
+    fig = make_subplots(
         rows=3, cols=1,
         shared_xaxes=True,
         vertical_spacing=0.05,
-        row_heights=[0.5, 0.25, 0.25], # 상단 차트를 가장 크게
+        row_heights=[0.5, 0.25, 0.25],
         subplot_titles=('Price, MAs & Trades', 'RSI', 'Portfolio Value')
     )
 
     # --- Row 1: 가격, 이동평균선, 매매 마커 ---
     # 종가
-    self.df['Close'].vbt.plot(add_trace_kwargs=dict(row=1, col=1), fig=fig, trace_kwargs=dict(name='Close', line=dict(color='gray', width=1)))
+    fig.add_trace(
+        go.Scatter(x=self.df.index, y=self.df['Close'], name='Close', line=dict(color='gray', width=1)),
+        row=1, col=1
+    )
 
-    # 이동평균선 (있는 경우에만)
+    # 이동평균선
     if 'MA_10' in self.df.columns:
-      self.df['MA_10'].vbt.plot(add_trace_kwargs=dict(row=1, col=1), fig=fig, trace_kwargs=dict(name='MA 10', line=dict(color='orange', width=1)))
+      fig.add_trace(
+          go.Scatter(x=self.df.index, y=self.df['MA_10'], name='MA 10', line=dict(color='orange', width=1)),
+          row=1, col=1
+      )
     if 'MA_20' in self.df.columns:
-      self.df['MA_20'].vbt.plot(add_trace_kwargs=dict(row=1, col=1), fig=fig, trace_kwargs=dict(name='MA 20', line=dict(color='blue', width=1)))
-
-    # 매수/매도 마커 (Portfolio 객체 활용)
-    # Buy Markers
-    buy_signals = portfolio.entry_trades.records_readable
-    if not buy_signals.empty:
-      fig.add_scatter(
-          x=buy_signals['Entry Timestamp'],
-          y=buy_signals['Avg Entry Price'],
-          mode='markers',
-          marker=dict(symbol='triangle-up', color='red', size=8),
-          name='Buy',
+      fig.add_trace(
+          go.Scatter(x=self.df.index, y=self.df['MA_20'], name='MA 20', line=dict(color='blue', width=1)),
           row=1, col=1
       )
 
-    # Sell Markers
+    # 매수/매도 마커
+    buy_signals = portfolio.entry_trades.records_readable
+    if not buy_signals.empty:
+      fig.add_trace(
+          go.Scatter(
+              x=buy_signals['Entry Timestamp'],
+              y=buy_signals['Avg Entry Price'],
+              mode='markers',
+              marker=dict(symbol='triangle-up', color='red', size=8),
+              name='Buy'
+          ),
+          row=1, col=1
+      )
+
     sell_signals = portfolio.exit_trades.records_readable
     if not sell_signals.empty:
-      fig.add_scatter(
-          x=sell_signals['Exit Timestamp'],
-          y=sell_signals['Avg Exit Price'],
-          mode='markers',
-          marker=dict(symbol='triangle-down', color='green', size=8),
-          name='Sell',
+      fig.add_trace(
+          go.Scatter(
+              x=sell_signals['Exit Timestamp'],
+              y=sell_signals['Avg Exit Price'],
+              mode='markers',
+              marker=dict(symbol='triangle-down', color='green', size=8),
+              name='Sell'
+          ),
           row=1, col=1
       )
 
     # --- Row 2: RSI ---
     if 'RSI' in self.df.columns:
-      self.df['RSI'].vbt.plot(add_trace_kwargs=dict(row=2, col=1), fig=fig, trace_kwargs=dict(name='RSI', line=dict(color='purple')))
-      # RSI 기준선 (30, 35, 70 등)
+      fig.add_trace(
+          go.Scatter(x=self.df.index, y=self.df['RSI'], name='RSI', line=dict(color='purple')),
+          row=2, col=1
+      )
       fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
       fig.add_hline(y=DEFAULT_RSI_THRESHOLD, line_dash="dot", line_color="red", row=2, col=1)
 
-    # --- Row 3: 포트폴리오 가치 (Equity Curve) ---
-    portfolio.value().vbt.plot(add_trace_kwargs=dict(row=3, col=1), fig=fig, trace_kwargs=dict(name='Equity', line=dict(color='black')))
+    # --- Row 3: 포트폴리오 가치 ---
+    equity = portfolio.value()
+    fig.add_trace(
+        go.Scatter(x=equity.index, y=equity.values, name='Equity', line=dict(color='black')),
+        row=3, col=1
+    )
 
     # 레이아웃 조정 및 저장
-    fig.update_layout(title_text=f"{self.ticker} Strategy Analysis", height=1200, template='plotly_white')
-
+    fig.update_layout(title_text=f"{self.ticker} Strategy Analysis", height=1000, template='plotly_white')
     output_path = os.path.join(output_dir, f'{self.ticker}_analysis.html')
     fig.write_html(output_path)
     print(f"  [Plot Saved] {output_path}")
