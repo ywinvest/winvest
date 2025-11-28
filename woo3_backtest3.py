@@ -51,21 +51,21 @@ class GlobalShortTermStrategy:
     total_position = 0  # 현재 보유 포지션 총량
 
     for i, buy_date in enumerate(buy_candidates.index):
-      buy_date_idx = df.index.get_loc(buy_date)
+      # buy_date_idx = df.index.get_loc(buy_date)
 
-      # 매도 신호 확인
-      if sell_date_idx is not None and buy_date_idx >= sell_date_idx:
-        if group_positions:
-          # 그룹 전체 청산 (음수로 표시)
-          orders.iloc[sell_date_idx] = -total_position
-
-          # 상태 초기화
-          group_positions = []
-          group_buy_count = 0
-          last_buy_price = None
-          current_sell_condition = self.sell_condition_technical_bounce
-          sell_date_idx = None
-          total_position = 0
+      # # 매도 신호 확인
+      # if sell_date_idx is not None and buy_date_idx >= sell_date_idx:
+      #   if group_positions:
+      #     # 그룹 전체 청산 (음수로 표시)
+      #     orders.iloc[sell_date_idx] = -total_position
+      #
+      #     # 상태 초기화
+      #     group_positions = []
+      #     group_buy_count = 0
+      #     last_buy_price = None
+      #     current_sell_condition = self.sell_condition_technical_bounce
+      #     sell_date_idx = None
+      #     total_position = 0
 
       should_buy = True
       is_first_buy = len(group_positions) == 0
