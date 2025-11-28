@@ -222,82 +222,39 @@ class GlobalShortTermStrategy:
     result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
 
   def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
-    """전략 시각화 및 HTML 저장 (Plotly 직접 사용으로 anywidget 의존성 제거)"""
+    """vectorbt 내장 기능을 활용한 간단한 시각화"""
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. 서브플롯 생성
-    fig = make_subplots(
+    # 1. 서브플롯 틀 생성 (vectorbt 내장 함수)
+    fig = vbt.make_subplots(
         rows=3, cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.05,
         row_heights=[0.5, 0.25, 0.25],
-        subplot_titles=('Price, MAs & Trades', 'RSI', 'Portfolio Value')
+        subplot_titles=('Price & Trades', 'RSI', 'Equity')
     )
 
-    # --- Row 1: 가격, 이동평균선, 매매 마커 ---
-    # 종가
-    fig.add_trace(
-        go.Scatter(x=self.df.index, y=self.df['Close'], name='Close', line=dict(color='gray', width=1)),
-        row=1, col=1
-    )
+    # 2. 가격 및 이동평균선 그리기 (.vbt.plot 사용)
+    self.df['Close'].vbt.plot(fig=fig, row=1, col=1, trace_kwargs=dict(name='Close', line=dict(color='gray')))
 
-    # 이동평균선
     if 'MA_10' in self.df.columns:
-      fig.add_trace(
-          go.Scatter(x=self.df.index, y=self.df['MA_10'], name='MA 10', line=dict(color='orange', width=1)),
-          row=1, col=1
-      )
+      self.df['MA_10'].vbt.plot(fig=fig, row=1, col=1, trace_kwargs=dict(name='MA 10', line=dict(color='orange')))
     if 'MA_20' in self.df.columns:
-      fig.add_trace(
-          go.Scatter(x=self.df.index, y=self.df['MA_20'], name='MA 20', line=dict(color='blue', width=1)),
-          row=1, col=1
-      )
+      self.df['MA_20'].vbt.plot(fig=fig, row=1, col=1, trace_kwargs=dict(name='MA 20', line=dict(color='blue')))
 
-    # 매수/매도 마커
-    buy_signals = portfolio.entry_trades.records_readable
-    if not buy_signals.empty:
-      fig.add_trace(
-          go.Scatter(
-              x=buy_signals['Entry Timestamp'],
-              y=buy_signals['Avg Entry Price'],
-              mode='markers',
-              marker=dict(symbol='triangle-up', color='red', size=8),
-              name='Buy'
-          ),
-          row=1, col=1
-      )
+    # 3. 매매 마커 추가 (가장 강력한 기능: 한 줄로 매수/매도 표시)
+    portfolio.plot_trades(fig=fig, row=1, col=1)
 
-    sell_signals = portfolio.exit_trades.records_readable
-    if not sell_signals.empty:
-      fig.add_trace(
-          go.Scatter(
-              x=sell_signals['Exit Timestamp'],
-              y=sell_signals['Avg Exit Price'],
-              mode='markers',
-              marker=dict(symbol='triangle-down', color='green', size=8),
-              name='Sell'
-          ),
-          row=1, col=1
-      )
-
-    # --- Row 2: RSI ---
+    # 4. RSI 그리기
     if 'RSI' in self.df.columns:
-      fig.add_trace(
-          go.Scatter(x=self.df.index, y=self.df['RSI'], name='RSI', line=dict(color='purple')),
-          row=2, col=1
-      )
+      self.df['RSI'].vbt.plot(fig=fig, row=2, col=1, trace_kwargs=dict(name='RSI', line=dict(color='purple')))
+      # 기준선 추가 (참고: hline은 plotly 명령어를 사용해야 함)
       fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
       fig.add_hline(y=DEFAULT_RSI_THRESHOLD, line_dash="dot", line_color="red", row=2, col=1)
 
-    # --- Row 3: 포트폴리오 가치 ---
-    equity = portfolio.value()
-    fig.add_trace(
-        go.Scatter(x=equity.index, y=equity.values, name='Equity', line=dict(color='black')),
-        row=3, col=1
-    )
+    # 5. 포트폴리오 가치 그리기
+    portfolio.value().vbt.plot(fig=fig, row=3, col=1, trace_kwargs=dict(name='Equity', line=dict(color='black')))
 
-    # 레이아웃 조정 및 저장
-    fig.update_layout(title_text=f"{self.ticker} Strategy Analysis", height=1000, template='plotly_white')
+    # 6. 저장
     output_path = os.path.join(output_dir, f'{self.ticker}_analysis.html')
     fig.write_html(output_path)
     print(f"  [Plot Saved] {output_path}")
