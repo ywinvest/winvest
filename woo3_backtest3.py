@@ -125,7 +125,7 @@ class GlobalShortTermStrategy:
     portfolio = vbt.Portfolio.from_orders(
         close=self.df['Close'],
         size=orders,
-        size_type='value',
+        size_type='amount',
         direction='longonly',
         init_cash=init_cash,
         fees=fees,
@@ -150,33 +150,11 @@ class GlobalShortTermStrategy:
       }
 
     # 수익률 계산
-    if 'Return' in trades.columns:
-      returns = trades['Return'].values
-    elif 'PnL' in trades.columns:
-      returns = trades['PnL'].values / portfolio.init_cash
-    else:
-      returns = (trades['Exit Price'] - trades['Entry Price']) / trades['Entry Price']
-      returns = returns.values
+    returns = trades['Return'].values
 
     avg_return = returns.mean() if len(returns) > 0 else 0
 
-    # 보유 기간 계산
-    exit_col = None
-    entry_col = None
-
-    for col in trades.columns:
-      if 'exit' in col.lower() and 'date' in col.lower():
-        exit_col = col
-      if 'entry' in col.lower() and 'date' in col.lower():
-        entry_col = col
-
-    if exit_col and entry_col:
-      holding_periods = (trades[exit_col] - trades[entry_col]).dt.days
-    elif 'Duration' in trades.columns:
-      holding_periods = trades['Duration']
-    else:
-      holding_periods = pd.Series([0] * len(trades))
-
+    holding_periods = (trades['Exit Timestamp'] - trades['Entry Timestamp']).dt.days
     avg_holding_period = holding_periods.mean() if len(holding_periods) > 0 else 0
 
     # 기타 통계
