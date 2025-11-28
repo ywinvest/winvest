@@ -140,7 +140,7 @@ class GlobalShortTermStrategy:
 
     return orders
 
-  def run_backtest(self, init_cash=10000000, fees=0, max_positions=10):
+  def run_backtest(self, init_cash=10000000, fees=0, max_positions=20):
     """vectorbt를 사용한 백테스트 실행 (from_orders 사용)
 
     Args:
