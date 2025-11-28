@@ -117,7 +117,7 @@ class GlobalShortTermStrategy:
 
     return orders
 
-  def run_backtest(self, init_cash=10000, fees=0):
+  def run_backtest(self, init_cash=10000000, fees=0):
     """vectorbt를 사용한 백테스트 실행 (from_orders 사용)"""
     orders = self.generate_orders()
 
@@ -125,7 +125,7 @@ class GlobalShortTermStrategy:
     portfolio = vbt.Portfolio.from_orders(
         close=self.df['Close'],
         size=orders,
-        size_type='percent',
+        size_type='amount',
         direction='longonly',
         init_cash=init_cash,
         fees=fees,
