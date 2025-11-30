@@ -217,10 +217,12 @@ class GlobalShortTermStrategy:
 
     # 상세 데이터프레임 저장 (주문 포함)
     # orders = self.generate_orders(init_cash=10000000, max_positions=20)
-    result_df = self.df.copy()
+    # result_df = self.df.copy()
     orders = portfolio.orders.records_readable
-    result_df['Orders'] = orders
-    result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
+    orders.to_csv(os.path.join(output_dir, f'{self.ticker}_orders.csv'))
+
+    # result_df['Orders'] = orders
+    # result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
 
   def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
     """vectorbt 내장 기능을 활용한 간단한 시각화"""
