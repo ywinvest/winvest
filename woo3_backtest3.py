@@ -216,8 +216,9 @@ class GlobalShortTermStrategy:
     portfolio_value.to_csv(os.path.join(output_dir, f'{self.ticker}_portfolio_value.csv'))
 
     # 상세 데이터프레임 저장 (주문 포함)
-    orders = self.generate_orders(init_cash=10000000, max_positions=20)
+    # orders = self.generate_orders(init_cash=10000000, max_positions=20)
     result_df = self.df.copy()
+    orders = portfolio.orders.records_readable
     result_df['Orders'] = orders
     result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
 
