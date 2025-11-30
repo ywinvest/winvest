@@ -124,7 +124,7 @@ class GlobalShortTermStrategy:
       next_buy_date = buy_candidates.index[i + 1] if i + 1 < len(buy_candidates.index) else None
 
       # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
-      if sell_date is not None and (next_buy_date is None or df.index[sell_date_idx] <= next_buy_date):
+      if sell_date is not None and (next_buy_date is None or sell_date <= next_buy_date):
         if group_positions:
           # sell_price = df.iloc[sell_date_idx]['Close']
           orders.loc[sell_date] = -total_position
@@ -134,7 +134,7 @@ class GlobalShortTermStrategy:
           group_buy_count = 0
           last_buy_price = None
           current_sell_condition = self.sell_condition_technical_bounce
-          sell_date_idx = None
+          # sell_date_idx = None
           total_position = 0
 
     return orders
