@@ -5,8 +5,6 @@ from datetime import datetime, timedelta
 import FinanceDataReader as fdr
 import pandas as pd
 import vectorbt as vbt
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 import indicators
 
@@ -53,7 +51,8 @@ class GlobalShortTermStrategy:
     group_positions = []
     group_buy_count = 0
     last_buy_price = None
-    sell_date_idx = None
+    sell_date = None
+    # sell_date_idx = None
     current_sell_condition = self.sell_condition_technical_bounce  # 현재 매도 조건 함수
     total_position = 0  # 현재 보유 포지션 총량
 
@@ -119,16 +118,16 @@ class GlobalShortTermStrategy:
 
         if sell_mask.any():
           sell_date = sell_mask.idxmax()
-          sell_date_idx = df.index.get_loc(sell_date)
+          # sell_date_idx = df.index.get_loc(sell_date)
 
       # 매도 신호가 다음 매수 전에 발생하는지 확인
       next_buy_date = buy_candidates.index[i + 1] if i + 1 < len(buy_candidates.index) else None
 
       # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
-      if sell_date_idx is not None and (next_buy_date is None or df.index[sell_date_idx] <= next_buy_date):
+      if sell_date is not None and (next_buy_date is None or df.index[sell_date_idx] <= next_buy_date):
         if group_positions:
-          sell_price = df.iloc[sell_date_idx]['Close']
-          orders.iloc[sell_date_idx] = -total_position
+          # sell_price = df.iloc[sell_date_idx]['Close']
+          orders.loc[sell_date] = -total_position
 
           # 상태 초기화
           group_positions = []
