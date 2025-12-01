@@ -48,12 +48,11 @@ class GlobalShortTermStrategy:
     buy_candidates = df[buy_candidates_mask]
 
     # 상태 변수
-    # group_positions = []
     group_buy_count = 0
+    group_position_size = 0  # 현재 보유 포지션 총량
     last_buy_price = None
     sell_date = None
     current_sell_condition = self.sell_condition_technical_bounce  # 현재 매도 조건 함수
-    total_position = 0  # 현재 보유 포지션 총량
 
     # 각 매수 시 투자할 기본 금액 계산 (초기 자본을 최대 포지션 수로 분할)
     base_investment = init_cash / max_positions
@@ -101,9 +100,8 @@ class GlobalShortTermStrategy:
 
         # 매수 실행
         orders.loc[buy_date] = position_size
-        total_position += position_size
+        group_position_size += position_size
 
-        # group_positions.append((buy_date, buy_price, position_size))
         group_buy_count += 1
         last_buy_price = buy_price
 
@@ -123,15 +121,14 @@ class GlobalShortTermStrategy:
 
       # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
       if sell_date is not None and (next_buy_date is None or sell_date <= next_buy_date):
-        if total_position > 0:
-          orders.loc[sell_date] = -total_position
+        if group_position_size > 0:
+          orders.loc[sell_date] = -group_position_size
 
           # 상태 초기화
-          # group_positions = []
           group_buy_count = 0
+          group_position_size = 0
           last_buy_price = None
           current_sell_condition = self.sell_condition_technical_bounce
-          total_position = 0
 
     return orders
 
