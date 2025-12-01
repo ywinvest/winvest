@@ -179,6 +179,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_index_adx = None
       buy_index_di = None
 
+      buy_kospi_ma5_up = None
+      buy_kospi_ma20_up = None
+      buy_kospi_adx = None
+      buy_kospi_di = None
+
       sell_index_ma5_up = None
       sell_index_ma20_up = None
       sell_index_adx = None
@@ -242,16 +247,16 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # else:
         #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
         if source_df is not None and buy_date in source_df.index:
-          rsi_val = source_df.loc[buy_date, 'RSI']
-          buy_index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-          ma5_up_val = source_df.loc[buy_date, 'MA5_Up']
-          buy_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
-          ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
-          buy_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-          adx_val = source_df.loc[buy_date, 'ADX']
-          buy_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-          di_val = source_df.loc[buy_date, 'DI']
-          buy_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+          buy_index_rsi = source_df.loc[buy_date, 'RSI']
+          buy_index_ma5_up = source_df.loc[buy_date, 'MA5_Up']
+          buy_index_ma20_up = source_df.loc[buy_date, 'MA20_Up']
+          buy_index_adx = source_df.loc[buy_date, 'ADX']
+          buy_index_di = source_df.loc[buy_date, 'DI']
+
+          buy_kospi_ma5_up = kospi_df.loc[buy_date, 'MA5_Up']
+          buy_kospi_ma20_up = kospi_df.loc[buy_date, 'MA20_Up']
+          buy_kospi_adx = kospi_df.loc[buy_date, 'ADX']
+          buy_kospi_di = kospi_df.loc[buy_date, 'DI']
 
         if source_df is not None and sell_date in source_df.index:
           ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
@@ -300,7 +305,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Date': buy_date,
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
-        'Buy_Index_RSI': buy_index_rsi,
+        'Buy_Kospi_ADX': buy_kospi_adx,
+        # 'Buy_Index_RSI': buy_index_rsi,
         'Buy_Index_ADX': buy_index_adx,
         'Buy_Index_DI': buy_index_di,
         'Buy_Index_MA5_Up': buy_index_ma5_up,
