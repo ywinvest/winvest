@@ -125,13 +125,14 @@ def buy_condition(df):
   # conditions &= (df['MA120_Uptrend'])
   # conditions &= (df['MA20_Cross'])
   # conditions &= (df['Close'] > df['Pre52WeekHigh'])
-  kospi_or_kosdaq_global = df['Market'].isin(['KOSPI', 'KOSDAQ GLOBAL'])
-  kosdaq = df['Market'] == 'KOSDAQ'
+  # kospi_or_kosdaq_global = df['Market'].isin(['KOSPI', 'KOSDAQ GLOBAL'])
+  # kosdaq = df['Market'] == 'KOSDAQ'
 
-  conditions &= (
-      ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
-      ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
-  )
+  # conditions &= (
+  #     ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
+  #     ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
+  # )
+  conditions &= (df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break'])
   # conditions &= (df['MA20_Uptrend'] == True)
   # conditions &= (df['MA60_Uptrend'] == True)
   # conditions &= (df['MA120_Uptrend'] == True)
