@@ -48,11 +48,10 @@ class GlobalShortTermStrategy:
     buy_candidates = df[buy_candidates_mask]
 
     # 상태 변수
-    group_positions = []
+    # group_positions = []
     group_buy_count = 0
     last_buy_price = None
     sell_date = None
-    # sell_date_idx = None
     current_sell_condition = self.sell_condition_technical_bounce  # 현재 매도 조건 함수
     total_position = 0  # 현재 보유 포지션 총량
 
@@ -61,7 +60,7 @@ class GlobalShortTermStrategy:
 
     for i, buy_date in enumerate(buy_candidates.index):
       should_buy = True
-      is_first_buy = len(group_positions) == 0
+      is_first_buy = group_buy_count == 0
 
       # 첫 매수가 아닌 경우 추가 검증
       if not is_first_buy:
@@ -104,7 +103,7 @@ class GlobalShortTermStrategy:
         orders.loc[buy_date] = position_size
         total_position += position_size
 
-        group_positions.append((buy_date, buy_price, position_size))
+        # group_positions.append((buy_date, buy_price, position_size))
         group_buy_count += 1
         last_buy_price = buy_price
 
@@ -118,23 +117,20 @@ class GlobalShortTermStrategy:
 
         if sell_mask.any():
           sell_date = sell_mask.idxmax()
-          # sell_date_idx = df.index.get_loc(sell_date)
 
       # 매도 신호가 다음 매수 전에 발생하는지 확인
       next_buy_date = buy_candidates.index[i + 1] if i + 1 < len(buy_candidates.index) else None
 
       # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
       if sell_date is not None and (next_buy_date is None or sell_date <= next_buy_date):
-        if group_positions:
-          # sell_price = df.iloc[sell_date_idx]['Close']
+        if total_position > 0:
           orders.loc[sell_date] = -total_position
 
           # 상태 초기화
-          group_positions = []
+          # group_positions = []
           group_buy_count = 0
           last_buy_price = None
           current_sell_condition = self.sell_condition_technical_bounce
-          # sell_date_idx = None
           total_position = 0
 
     return orders
