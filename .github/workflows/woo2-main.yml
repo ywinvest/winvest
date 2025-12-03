@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   schedule:
   # 매주 월~금, 대기열로 인해 발생하는 지연시간을 고려함
-  - cron: "55 5 * * 1-5"  # 오후 2:55 (UTC+9)
+  - cron: "0 6 * * 1-5"  # 오후 3:00 (UTC+9)
   - cron: "5 6 * * 1-5"  # 오후 3:05 (UTC+9)
 
 jobs:
