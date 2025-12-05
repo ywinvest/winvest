@@ -3,8 +3,8 @@ name: woo2 - Backtest
 on:
   workflow_dispatch:
   schedule:
-  # 매주 월~금 오후 4:00 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
-  - cron: "0 7 * * 1-5"  # 오후 4:00 (UTC+9)
+  # 매주 월~금 오후 3:30 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
+  - cron: "30 6 * * 1-5"  # 오후 3:30 (UTC+9)
 
 jobs:
   run-python:
