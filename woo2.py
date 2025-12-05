@@ -140,7 +140,7 @@ def buy_condition(df):
   conditions &= (df['MA60_Slope'] > 0)
   conditions &= (df['MA120_Slope'] > 0)
   conditions &= (df['MA240_Slope'] > 0)
-  conditions &= (df['Change'] < 0.295)
+  conditions &= (df['Change'] < 0.24)
   conditions &= (df['Volume'] > 0)
   conditions &= (df['Volume'].shift(1) > 0)
   # conditions &= (df['MA120_Uptrend_Days'] < 400) # 120일 상승 추세 장기 연속 제외
