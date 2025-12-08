@@ -8,11 +8,26 @@ import pandas as pd
 import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
+from pykrx import stock
 
 import rs
 import woo1
 import woo2
 
+
+def get_investor_data(ticker, start_dt, end_dt):
+  try:
+    start_str = start_dt.strftime("%Y%m%d")
+    end_str = end_dt.strftime("%Y%m%d")
+    inv_df = stock.get_market_trading_volume_by_investor(start_str, end_str, ticker)
+    if inv_df is None or inv_df.empty: return None
+
+    cols_map = {'개인': 'Retail_Net', '외국인': 'Foreign_Net', '기관합계': 'Inst_Net'}
+    existing_cols = [c for c in cols_map.keys() if c in inv_df.columns]
+    inv_df = inv_df[existing_cols].rename(columns=cols_map)
+    return inv_df
+  except:
+    return None
 
 def parallel_process_stocks(all_stocks):
   process_func = partial(process_stock)
@@ -46,6 +61,21 @@ def process_stock(row):
     if df.empty:
       print(f"No data after listing date for {code}")
       return None
+
+    # 2. [성능 중요] 투자자별 순매수 데이터 추가
+    # 전체 기간을 가져오되, fdr 데이터가 존재하는 기간으로 한정
+    start_date = df.index[0]
+    end_date = df.index[-1]
+
+    inv_df = get_investor_data(code, start_date, end_date)
+
+    if inv_df is not None:
+      df = df.join(inv_df, how='left')
+      df[['Retail_Net', 'Foreign_Net', 'Inst_Net']] = df[['Retail_Net', 'Foreign_Net', 'Inst_Net']].fillna(0)
+    else:
+      df['Retail_Net'] = 0
+      df['Foreign_Net'] = 0
+      df['Inst_Net'] = 0
 
     df = woo2.calculate_indicators(df)
 
