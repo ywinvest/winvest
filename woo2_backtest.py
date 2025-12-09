@@ -19,10 +19,10 @@ def get_investor_data(ticker, start_dt, end_dt):
   try:
     start_str = start_dt.strftime("%Y%m%d")
     end_str = end_dt.strftime("%Y%m%d")
-    inv_df = stock.get_market_trading_volume_by_investor(start_str, end_str, ticker)
+    inv_df = stock.get_market_trading_volume_by_date(start_str, end_str, ticker)
     if inv_df is None or inv_df.empty: return None
 
-    cols_map = {'개인': 'Retail_Net', '외국인': 'Foreign_Net', '기관합계': 'Inst_Net'}
+    cols_map = {'개인': 'Retail_Net', '외국인합계': 'Foreign_Net', '기관합계': 'Inst_Net'}
     existing_cols = [c for c in cols_map.keys() if c in inv_df.columns]
     inv_df = inv_df[existing_cols].rename(columns=cols_map)
     return inv_df
