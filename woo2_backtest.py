@@ -84,7 +84,7 @@ def process_stock(row):
       df['Name'] = name
       df['Marcap'] = marcap
       df['Market'] = market
-      print(f"Code: {name}: {marcap}")
+      print(f"Name: {name}: {marcap}")
       return df
     return None
   except Exception as e:
