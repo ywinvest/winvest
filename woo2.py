@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 import rs
 from slack_utils import SlackMessageBuilder, send_slack_message
 
+BASE_RISK = 0.08  # 8% base risk (R value)
+TRADING_FEE = 0.002  # 0.2% trading fee (commission + slippage)
 
 def calculate_indicators(df):
   # df['MA5'] = df['Close'].rolling(window=5).mean()
@@ -211,9 +213,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
       if not trade_data.empty:
         # 익절/손절 가격 정의
-        take_profit_price = buy_price * 1.242
-        stop_loss_price = buy_price * 0.92
-        default_trailing_stop_loss_price = buy_price * 1.082
+        take_profit_price = buy_price * (1 + (BASE_RISK * 3) + TRADING_FEE) # +24.2%
+        stop_loss_price = buy_price * (1 - BASE_RISK) # -8%
+        default_trailing_stop_loss_price = buy_price * (1 + BASE_RISK + TRADING_FEE) # +8.2%
 
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
@@ -270,19 +272,28 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
         if sell_date and not full_sell_date:
           is_market_weak = not sell_index_ma5_up
-          trailing_stop_loss_price = buy_price * 1.162 if is_market_weak else default_trailing_stop_loss_price
+          trailing_stop_loss_price = buy_price * (1 + (BASE_RISK * 2) + TRADING_FEE) if is_market_weak else default_trailing_stop_loss_price # +16.2%
 
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           if not after_partial_sell_data.empty:
-            # 2차 매도 조건: 20일선 하향 돌파 등
-            second_sell_cond = (
+            # 1. 거래량 실린 장대 음봉 (오닐식 청산)
+            volume_spike_drop = (
+                (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) &
+                (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
+                (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+            )
+
+            # 2. 추세 붕괴 확정
+            trend_breakdown_confirm = (
                 (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
                 (after_partial_sell_data['MA20_Slope'] < 0) &
                 (after_partial_sell_data['MA20_Gap'] < -0.05) &
                 (after_partial_sell_data['Bullish'] == False) &
                 (after_partial_sell_data['Change'] < -0.02)
             )
+
+            second_sell_cond = volume_spike_drop | trend_breakdown_confirm
             second_stop_loss_cond = (
               (after_partial_sell_data['Close'] < trailing_stop_loss_price)
             )
