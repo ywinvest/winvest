@@ -382,16 +382,16 @@ def send_sell_to_slack(sell_data):
   builder = SlackMessageBuilder()
 
   try:
-    if sell_data.empty:
-      builder.add_line(f"{today.year}년 {today.month}월 {today.day}일은 매도 후보가 없습니다.")
-      send_slack_message(builder.build(), token, channel)
-      print("No stocks to sell today.")
-      return
-
     builder.add_line(
         f"{today.year}년 {today.month}월 {today.day}일 매도 후보",
         bold=True
     )
+
+    if sell_data.empty:
+      builder.add_line(f"오늘은 매도 후보가 없습니다.")
+      send_slack_message(builder.build(), token, channel)
+      print("No stocks to sell today.")
+      return
 
     sell_data['return_val'] = sell_data.apply(
         lambda row: (row['Full_Sell_Price'] / row['Buy_Price'] - 1) * 100
@@ -448,76 +448,89 @@ def send_to_slack(trades_data, kospi, kosdaq):
 
     builder = SlackMessageBuilder()
 
-    if today_trades.empty:
-      builder.add_line(f"{today.year}년 {today.month}월 {today.day}일은 매수 후보가 없습니다.")
-      send_slack_message(builder.build(), token, channel)
-      print("No stocks match the buying conditions today")
-      return
-
-    today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
-
-    # kospi_rsi = today_kospi['RSI'].iloc[-1] if not today_kospi.empty else None
-    # kosdaq_rsi = today_kosdaq['RSI'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_adx = today_kospi['ADX'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_adx = today_kosdaq['ADX'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_di = today_kospi['DI'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_di = today_kosdaq['DI'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_ma5_up = today_kospi['MA5_Up'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_ma5_up = today_kosdaq['MA5_Up'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_ma20_up = today_kospi['MA20_Up'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_ma20_up = today_kosdaq['MA20_Up'].iloc[-1] if not today_kosdaq.empty else None
-
+    # 헤더 추가
     builder.add_line(
         f"{today.year}년 {today.month}월 {today.day}일 매수 후보",
         bold=True
     )
 
-    for market, group in today_trades.groupby('Market'):
-      if ((kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
-          kospi_di if market == 'KOSPI' else kosdaq_di):
-        ma5_up = kospi_ma5_up if market == 'KOSPI' else kosdaq_ma5_up
-        ma20_up = kospi_ma20_up if market == 'KOSPI' else kosdaq_ma20_up
-        if ma5_up and ma20_up:
-          rsi_emoji = "green_sphere"
-        elif ma20_up:
-          rsi_emoji = "yellow_sphere"
+    # 오늘 날짜의 trades를 Market별로 정렬
+    if not today_trades.empty:
+      today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
+
+    # KOSPI와 KOSDAQ 각각 처리
+    for market_name, market_df in [('KOSPI', today_kospi), ('KOSDAQ', today_kosdaq)]:
+      # 시장 지표 계산
+      if not market_df.empty:
+        market_adx = market_df['ADX'].iloc[-1]
+        market_di = market_df['DI'].iloc[-1]
+        market_ma5_up = market_df['MA5_Up'].iloc[-1]
+        market_ma20_up = market_df['MA20_Up'].iloc[-1]
+
+        # 시장 상태에 따른 이모지 결정
+        if market_adx > 25 and market_di:
+          if market_ma5_up and market_ma20_up:
+            emoji = "green_sphere"
+          elif market_ma20_up:
+            emoji = "yellow_sphere"
+          else:
+            emoji = "red_sphere"
+        else:
+          emoji = "red_sphere"
+
+        # 시장 정보 헤더 추가
+        builder.add_line(
+            f"{market_name} (ADX {market_adx:.2f}, DI {market_di})",
+            emoji=emoji,
+            bold=True,
+            italic=True
+        )
       else:
-        rsi_emoji = "red_sphere"
-      # rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
-      adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
-      di_value = kospi_di if market == 'KOSPI' else kosdaq_di
-      builder.add_line(
-          f" {market} (ADX {adx_value:.2f}, DI {di_value})",
-          emoji=rsi_emoji,
-          bold=True,
-          italic=True
-      )
-      for _, row in group.iterrows():
-        name = row['Name']
-        marcap = row['Marcap']
-        ma20_gap = row['MA20_Gap']
-        rs = row['RS']
-        rs_1m = row['RS_1M']
-        rs_3m = row['RS_3M']
-        rs_6m = row['RS_6M']
+        # 시장 데이터가 없는 경우
+        builder.add_line(
+            f"{market_name} (데이터 없음)",
+            emoji="question",
+            bold=True,
+            italic=True
+        )
 
-        emoji = "question"
-        if rs_1m >= rs_3m and rs_1m >= rs_6m:
-          if 80 <= rs <= 95:
-            emoji = "first_place_medal"
-          elif (75 <= rs <= 79) or (96 <= rs <= 99):
-            emoji = "second_place_medal"
+      # 해당 시장의 매수 후보 필터링
+      market_trades = today_trades[today_trades['Market'].str.startswith(market_name)] if not today_trades.empty else pd.DataFrame()
 
-        with builder.line() as line:
-          line \
-            .emoji(emoji) \
-            .space() \
-            .text(truncate_name(name, 10)) \
-            .text(f"({format_market_cap(marcap)})") \
-            .space() \
-            .text(f"20Gap {ma20_gap * 100:.1f}%,") \
-            .space() \
-            .text(f"RS {rs} ({rs_1m}/{rs_3m}/{rs_6m})") \
+      if market_trades.empty:
+        # 해당 시장에 매수 후보가 없는 경우
+        builder.add_line(f"오늘은 매수 후보가 없습니다.")
+      else:
+        # 매수 후보 종목들 추가
+        for _, row in market_trades.iterrows():
+          name = row['Name']
+          marcap = row['Marcap']
+          change = row['Change']
+          ma20_gap = row['MA20_Gap']
+          rs = row['RS']
+          rs_1m = row['RS_1M']
+          rs_3m = row['RS_3M']
+          rs_6m = row['RS_6M']
+
+          emoji = "question"
+          if rs_1m >= rs_3m and rs_1m >= rs_6m:
+            if 80 <= rs <= 96 and marcap >= 400_000_000_000 and change < 0.24:
+              emoji = "first_place_medal"
+            elif (75 <= rs <= 79) or (97 <= rs <= 99):
+              emoji = "second_place_medal"
+
+          with builder.line() as line:
+            line \
+              .emoji(emoji) \
+              .space() \
+              .text(truncate_name(name, 10)) \
+              .text(f"({format_market_cap(marcap)})") \
+              .space() \
+              .text(f"Change {change * 100:.1f}%,") \
+              .space() \
+              .text(f"20Gap {ma20_gap * 100:.1f}%,") \
+              .space() \
+              .text(f"RS {rs} ({rs_1m}/{rs_3m}/{rs_6m})") \
 
     # Slack 메시지 전송
     send_slack_message(builder.build(), token, channel)
