@@ -186,6 +186,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_kospi_adx = None
       buy_kospi_di = None
 
+      sell_kospi_ma5_up = None
       sell_index_ma5_up = None
       sell_index_ma20_up = None
       sell_index_adx = None
@@ -261,14 +262,16 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_kospi_di = kospi_df.loc[buy_date, 'DI']
 
         if source_df is not None and sell_date in source_df.index:
-          ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
-          sell_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
-          ma20_up_val = source_df.loc[sell_date, 'MA20_Up']
-          sell_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-          adx_val = source_df.loc[sell_date, 'ADX']
-          sell_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-          di_val = source_df.loc[sell_date, 'DI']
-          sell_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+          sell_kospi_ma5_up = kospi_df.loc[sell_date, 'MA5_Up']
+
+          sell_index_ma5_up = source_df.loc[sell_date, 'MA5_Up']
+          # sell_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
+          sell_index_ma20_up = source_df.loc[sell_date, 'MA20_Up']
+          # sell_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
+          sell_index_adx = source_df.loc[sell_date, 'ADX']
+          # sell_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
+          sell_index_di = source_df.loc[sell_date, 'DI']
+          # sell_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
         if sell_date and not full_sell_date:
           is_market_weak = not sell_index_ma5_up
@@ -324,6 +327,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Index_MA20_Up': buy_index_ma20_up,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
+        'Sell_Kospi_MA5_Up': sell_kospi_ma5_up,
         'Sell_Index_ADX': sell_index_adx,
         'Sell_Index_DI': sell_index_di,
         'Sell_Index_MA5_Up': sell_index_ma5_up,
