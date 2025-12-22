@@ -468,13 +468,11 @@ def send_to_slack(trades_data, kospi, kosdaq):
         market_ma20_up = market_df['MA20_Up'].iloc[-1]
 
         # 시장 상태에 따른 이모지 결정
-        if market_adx > 25 and market_di:
-          if market_ma5_up and market_ma20_up:
+        if market_ma20_up and 20 <= market_adx <= 70 and market_di:
+          if 25 <= market_adx <= 70 and market_ma5_up:
             emoji = "green_sphere"
-          elif market_ma20_up:
+          elif 20 <= market_adx < 25 or not market_ma5_up:
             emoji = "yellow_sphere"
-          else:
-            emoji = "red_sphere"
         else:
           emoji = "red_sphere"
 
