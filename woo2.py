@@ -155,7 +155,7 @@ def sell_on_volume_spike_drop(df):
       (df['Volume'] > df['Volume'].shift(1) * 1.2) &
       (df['Change'] < -1 * BASE_RISK) &  # -8%
       (df['Close'] / df['Open'] - 1 < -1 * BASE_RISK) & # -8%
-      ((df['High'] - df[['Open', 'Close']].max(axis=1)) / df['Open']) < 0.04
+      ((df['High'] - df[['Open', 'Close']].max(axis=1)) / df['Open'] < 0.04)
   )
 
 def buy_and_sell(df, kospi_df, kosdaq_df):
