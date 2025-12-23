@@ -150,6 +150,12 @@ def buy_condition(df):
   conditions &= (df['MA20_Gap'] < 0.35)
   return conditions
 
+def sell_on_volume_spike_drop(df):
+  return (
+      (df['Volume'] > df['Volume'].shift(1) * 1.2) &
+      (df['Change'] < -1 * BASE_RISK) &  # -8%
+      (df['Close'] / df['Open'] - 1 < -1 * BASE_RISK)  # -8%
+  )
 
 def buy_and_sell(df, kospi_df, kosdaq_df):
   # 매수 신호가 발생한 모든 거래를 가져옵니다.
@@ -220,16 +226,19 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
         take_profit_high_dates = trade_data[(trade_data['Open'] < take_profit_price) & (trade_data['High'] >= take_profit_price)]
+        volume_spike_drop_dates = trade_data[sell_on_volume_spike_drop(trade_data)]
         stop_loss_dates = trade_data[trade_data['Close'] < stop_loss_price]
 
         # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
         take_profit_open_date = take_profit_open_dates.index[0] if not take_profit_open_dates.empty else None
         take_profit_high_date = take_profit_high_dates.index[0] if not take_profit_high_dates.empty else None
+        volume_spike_drop_date = volume_spike_drop_dates.index[0] if not volume_spike_drop_dates.empty else None
         stop_loss_date = stop_loss_dates.index[0] if not stop_loss_dates.empty else None
 
         # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
         valid_dates = [(d, 'open') for d in [take_profit_open_date] if d is not None] + \
                       [(d, 'high') for d in [take_profit_high_date] if d is not None] + \
+                      [(d, 'volume_spike') for d in [volume_spike_drop_date] if d is not None] + \
                       [(d, 'stop') for d in [stop_loss_date] if d is not None]
 
         if valid_dates:
@@ -241,6 +250,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           elif condition == 'high':
             sell_date = earliest_date
             sell_price = take_profit_price
+          elif condition == 'volume_spike':
+            sell_date = earliest_date
+            sell_price = trade_data.loc[earliest_date, 'Close']
+            full_sell_date = earliest_date
+            full_sell_price = trade_data.loc[earliest_date, 'Close']
           else:  # condition == 'stop'
             sell_date = earliest_date
             sell_price = trade_data.loc[earliest_date, 'Close']
@@ -293,7 +307,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 (after_partial_sell_data['Change'] < -0.02)
             )
 
-            second_sell_cond = volume_spike_drop | trend_breakdown_confirm
+            second_sell_cond = sell_on_volume_spike_drop(after_partial_sell_data) | trend_breakdown_confirm
             second_stop_loss_cond = (
               (after_partial_sell_data['Close'] < trailing_stop_loss_price)
             )
