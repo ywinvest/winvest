@@ -152,7 +152,8 @@ def buy_condition(df):
 
 def sell_on_volume_spike_drop(df):
   return (
-      (df['Volume'] > df['Volume'].shift(1) * 1.5) &
+      (df['Volume'] > df['Volume'].shift(1) * 1.2) &
+      (df['Volume'] > df['Volume'].rolling(20).mean() * 1.2)
       (df['Change'] < -1 * BASE_RISK) &  # -8%
       (df['Close'] / df['Open'] - 1 < -1 * BASE_RISK)  # -8%
   )
