@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 import rs
 from slack_utils import SlackMessageBuilder, send_slack_message
 
+BASE_RISK = 0.08  # 8% base risk (R value)
+TRADING_FEE = 0.002  # 0.2% trading fee (commission + slippage)
 
 def calculate_indicators(df):
   # df['MA5'] = df['Close'].rolling(window=5).mean()
@@ -125,13 +127,14 @@ def buy_condition(df):
   # conditions &= (df['MA120_Uptrend'])
   # conditions &= (df['MA20_Cross'])
   # conditions &= (df['Close'] > df['Pre52WeekHigh'])
-  kospi_or_kosdaq_global = df['Market'].isin(['KOSPI', 'KOSDAQ GLOBAL'])
-  kosdaq = df['Market'] == 'KOSDAQ'
+  # kospi_or_kosdaq_global = df['Market'].isin(['KOSPI', 'KOSDAQ GLOBAL'])
+  # kosdaq = df['Market'] == 'KOSDAQ'
 
-  conditions &= (
-      ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
-      ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
-  )
+  # conditions &= (
+  #     ((kospi_or_kosdaq_global) & df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break']) |
+  #     ((kosdaq) & df['Pre39WeekHigh'].ne(0) & df['First_39WeekHigh_Break'])
+  # )
+  conditions &= (df['Pre52WeekHigh'].ne(0) & df['First_52WeekHigh_Break'])
   # conditions &= (df['MA20_Uptrend'] == True)
   # conditions &= (df['MA60_Uptrend'] == True)
   # conditions &= (df['MA120_Uptrend'] == True)
@@ -178,6 +181,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_index_adx = None
       buy_index_di = None
 
+      buy_kospi_ma5_up = None
+      buy_kospi_ma20_up = None
+      buy_kospi_adx = None
+      buy_kospi_di = None
+
       sell_index_ma5_up = None
       sell_index_ma20_up = None
       sell_index_adx = None
@@ -205,9 +213,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
       if not trade_data.empty:
         # 익절/손절 가격 정의
-        take_profit_price = buy_price * 1.242
-        stop_loss_price = buy_price * 0.92
-        default_trailing_stop_loss_price = buy_price * 1.082
+        take_profit_price = buy_price * (1 + (BASE_RISK * 3) + TRADING_FEE) # +24.2%
+        stop_loss_price = buy_price * (1 - BASE_RISK) # -8%
+        default_trailing_stop_loss_price = buy_price * (1 + BASE_RISK + TRADING_FEE) # +8.2%
 
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
@@ -241,16 +249,16 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # else:
         #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
         if source_df is not None and buy_date in source_df.index:
-          rsi_val = source_df.loc[buy_date, 'RSI']
-          buy_index_rsi = rsi_val.iloc[0] if isinstance(rsi_val, pd.Series) else rsi_val
-          ma5_up_val = source_df.loc[buy_date, 'MA5_Up']
-          buy_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
-          ma20_up_val = source_df.loc[buy_date, 'MA20_Up']
-          buy_index_ma20_up = ma20_up_val.iloc[0] if isinstance(ma20_up_val, pd.Series) else ma20_up_val
-          adx_val = source_df.loc[buy_date, 'ADX']
-          buy_index_adx = adx_val.iloc[0] if isinstance(adx_val, pd.Series) else adx_val
-          di_val = source_df.loc[buy_date, 'DI']
-          buy_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
+          buy_index_rsi = source_df.loc[buy_date, 'RSI']
+          buy_index_ma5_up = source_df.loc[buy_date, 'MA5_Up']
+          buy_index_ma20_up = source_df.loc[buy_date, 'MA20_Up']
+          buy_index_adx = source_df.loc[buy_date, 'ADX']
+          buy_index_di = source_df.loc[buy_date, 'DI']
+
+          buy_kospi_ma5_up = kospi_df.loc[buy_date, 'MA5_Up']
+          buy_kospi_ma20_up = kospi_df.loc[buy_date, 'MA20_Up']
+          buy_kospi_adx = kospi_df.loc[buy_date, 'ADX']
+          buy_kospi_di = kospi_df.loc[buy_date, 'DI']
 
         if source_df is not None and sell_date in source_df.index:
           ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
@@ -264,19 +272,28 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
         if sell_date and not full_sell_date:
           is_market_weak = not sell_index_ma5_up
-          trailing_stop_loss_price = buy_price * 1.162 if is_market_weak else default_trailing_stop_loss_price
+          trailing_stop_loss_price = buy_price * (1 + (BASE_RISK * 2) + TRADING_FEE) if is_market_weak else default_trailing_stop_loss_price # +16.2%
 
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           if not after_partial_sell_data.empty:
-            # 2차 매도 조건: 20일선 하향 돌파 등
-            second_sell_cond = (
+            # 1. 거래량 실린 장대 음봉 (오닐식 청산)
+            volume_spike_drop = (
+                (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) &
+                (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
+                (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+            )
+
+            # 2. 추세 붕괴 확정
+            trend_breakdown_confirm = (
                 (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
                 (after_partial_sell_data['MA20_Slope'] < 0) &
                 (after_partial_sell_data['MA20_Gap'] < -0.05) &
                 (after_partial_sell_data['Bullish'] == False) &
                 (after_partial_sell_data['Change'] < -0.02)
             )
+
+            second_sell_cond = volume_spike_drop | trend_breakdown_confirm
             second_stop_loss_cond = (
               (after_partial_sell_data['Close'] < trailing_stop_loss_price)
             )
@@ -299,7 +316,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Date': buy_date,
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
-        'Buy_Index_RSI': buy_index_rsi,
+        'Buy_Kospi_ADX': buy_kospi_adx,
+        # 'Buy_Index_RSI': buy_index_rsi,
         'Buy_Index_ADX': buy_index_adx,
         'Buy_Index_DI': buy_index_di,
         'Buy_Index_MA5_Up': buy_index_ma5_up,
@@ -364,16 +382,16 @@ def send_sell_to_slack(sell_data):
   builder = SlackMessageBuilder()
 
   try:
-    if sell_data.empty:
-      builder.add_line(f"{today.year}년 {today.month}월 {today.day}일은 매도 후보가 없습니다.")
-      send_slack_message(builder.build(), token, channel)
-      print("No stocks to sell today.")
-      return
-
     builder.add_line(
         f"{today.year}년 {today.month}월 {today.day}일 매도 후보",
         bold=True
     )
+
+    if sell_data.empty:
+      builder.add_line(f"오늘은 매도 후보가 없습니다.")
+      send_slack_message(builder.build(), token, channel)
+      print("No stocks to sell today.")
+      return
 
     sell_data['return_val'] = sell_data.apply(
         lambda row: (row['Full_Sell_Price'] / row['Buy_Price'] - 1) * 100
@@ -430,76 +448,87 @@ def send_to_slack(trades_data, kospi, kosdaq):
 
     builder = SlackMessageBuilder()
 
-    if today_trades.empty:
-      builder.add_line(f"{today.year}년 {today.month}월 {today.day}일은 매수 후보가 없습니다.")
-      send_slack_message(builder.build(), token, channel)
-      print("No stocks match the buying conditions today")
-      return
-
-    today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
-
-    # kospi_rsi = today_kospi['RSI'].iloc[-1] if not today_kospi.empty else None
-    # kosdaq_rsi = today_kosdaq['RSI'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_adx = today_kospi['ADX'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_adx = today_kosdaq['ADX'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_di = today_kospi['DI'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_di = today_kosdaq['DI'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_ma5_up = today_kospi['MA5_Up'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_ma5_up = today_kosdaq['MA5_Up'].iloc[-1] if not today_kosdaq.empty else None
-    kospi_ma20_up = today_kospi['MA20_Up'].iloc[-1] if not today_kospi.empty else None
-    kosdaq_ma20_up = today_kosdaq['MA20_Up'].iloc[-1] if not today_kosdaq.empty else None
-
+    # 헤더 추가
     builder.add_line(
         f"{today.year}년 {today.month}월 {today.day}일 매수 후보",
         bold=True
     )
 
-    for market, group in today_trades.groupby('Market'):
-      if ((kospi_adx if market == 'KOSPI' else kosdaq_adx) > 25) and (
-          kospi_di if market == 'KOSPI' else kosdaq_di):
-        ma5_up = kospi_ma5_up if market == 'KOSPI' else kosdaq_ma5_up
-        ma20_up = kospi_ma20_up if market == 'KOSPI' else kosdaq_ma20_up
-        if ma5_up and ma20_up:
-          rsi_emoji = "green_sphere"
-        elif ma20_up:
-          rsi_emoji = "yellow_sphere"
+    # 오늘 날짜의 trades를 Market별로 정렬
+    if not today_trades.empty:
+      today_trades = today_trades.sort_values(['Market', 'RS'], ascending=[False, False])
+
+    # KOSPI와 KOSDAQ 각각 처리
+    for market_name, market_df in [('KOSPI', today_kospi), ('KOSDAQ', today_kosdaq)]:
+      # 시장 지표 계산
+      if not market_df.empty:
+        market_adx = market_df['ADX'].iloc[-1]
+        market_di = market_df['DI'].iloc[-1]
+        market_ma5_up = market_df['MA5_Up'].iloc[-1]
+        market_ma20_up = market_df['MA20_Up'].iloc[-1]
+
+        # 시장 상태에 따른 이모지 결정
+        if market_ma20_up and 20 <= market_adx <= 70 and market_di:
+          if 25 <= market_adx <= 70 and market_ma5_up:
+            emoji = "green_sphere"
+          elif 20 <= market_adx < 25 or not market_ma5_up:
+            emoji = "yellow_sphere"
+        else:
+          emoji = "red_sphere"
+
+        # 시장 정보 헤더 추가
+        builder.add_line(
+            f"{market_name} (ADX {market_adx:.2f}, DI {market_di})",
+            emoji=emoji,
+            bold=True,
+            italic=True
+        )
       else:
-        rsi_emoji = "red_sphere"
-      # rsi_value = kospi_rsi if market == 'KOSPI' else kosdaq_rsi
-      adx_value = kospi_adx if market == 'KOSPI' else kosdaq_adx
-      di_value = kospi_di if market == 'KOSPI' else kosdaq_di
-      builder.add_line(
-          f" {market} (ADX {adx_value:.2f}, DI {di_value})",
-          emoji=rsi_emoji,
-          bold=True,
-          italic=True
-      )
-      for _, row in group.iterrows():
-        name = row['Name']
-        marcap = row['Marcap']
-        ma20_gap = row['MA20_Gap']
-        rs = row['RS']
-        rs_1m = row['RS_1M']
-        rs_3m = row['RS_3M']
-        rs_6m = row['RS_6M']
+        # 시장 데이터가 없는 경우
+        builder.add_line(
+            f"{market_name} (데이터 없음)",
+            emoji="question",
+            bold=True,
+            italic=True
+        )
 
-        emoji = "question"
-        if rs_1m >= rs_3m and rs_1m >= rs_6m:
-          if 80 <= rs <= 95:
-            emoji = "first_place_medal"
-          elif (75 <= rs <= 79) or (96 <= rs <= 99):
-            emoji = "second_place_medal"
+      # 해당 시장의 매수 후보 필터링
+      market_trades = today_trades[today_trades['Market'].str.startswith(market_name)] if not today_trades.empty else pd.DataFrame()
 
-        with builder.line() as line:
-          line \
-            .emoji(emoji) \
-            .space() \
-            .text(truncate_name(name, 10)) \
-            .text(f"({format_market_cap(marcap)})") \
-            .space() \
-            .text(f"20Gap {ma20_gap * 100:.1f}%,") \
-            .space() \
-            .text(f"RS {rs} ({rs_1m}/{rs_3m}/{rs_6m})") \
+      if market_trades.empty:
+        # 해당 시장에 매수 후보가 없는 경우
+        builder.add_line(f"오늘은 매수 후보가 없습니다.")
+      else:
+        # 매수 후보 종목들 추가
+        for _, row in market_trades.iterrows():
+          name = row['Name']
+          marcap = row['Marcap']
+          change = row['Change']
+          ma20_gap = row['MA20_Gap']
+          rs = row['RS']
+          rs_1m = row['RS_1M']
+          rs_3m = row['RS_3M']
+          rs_6m = row['RS_6M']
+
+          emoji = "question"
+          if rs_1m >= rs_3m and rs_1m >= rs_6m:
+            if 80 <= rs <= 96 and marcap >= 400_000_000_000 and change < 0.24:
+              emoji = "first_place_medal"
+            elif (75 <= rs <= 79) or (97 <= rs <= 99):
+              emoji = "second_place_medal"
+
+          with builder.line() as line:
+            line \
+              .emoji(emoji) \
+              .space() \
+              .text(truncate_name(name, 10)) \
+              .text(f"({format_market_cap(marcap)})") \
+              .space() \
+              .text(f"Change {change * 100:.1f}%,") \
+              .space() \
+              .text(f"20Gap {ma20_gap * 100:.1f}%,") \
+              .space() \
+              .text(f"RS {rs} ({rs_1m}/{rs_3m}/{rs_6m})") \
 
     # Slack 메시지 전송
     send_slack_message(builder.build(), token, channel)
