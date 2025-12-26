@@ -81,15 +81,26 @@ class GlobalShortTermStrategy:
         rsi = df.loc[buy_date, 'RSI']
         change_rate = df.loc[buy_date, 'Change_Rate']
 
-        if rsi <= 20:
-          weight = 3
-        elif rsi <= 30:
-          weight = 2
-        else:
+        if group_buy_count == 1:
           weight = 1
+        else:
+          weight = 2
+          # 두 번째 매수 이후에만 RSI 추가 가중치 적용
+          if rsi <= 20:
+            weight += 1
 
         if change_rate < -5:
           weight += 1
+
+        # if rsi <= 20:
+        #   weight = 3
+        # elif rsi <= 30:
+        #   weight = 2
+        # else:
+        #   weight = 1
+        #
+        # if change_rate < -5:
+        #   weight += 1
 
         # 실제 투자 금액 계산
         investment_amount = base_investment * weight

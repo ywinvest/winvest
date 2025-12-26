@@ -104,15 +104,26 @@ def backtest(data, ticker):
       group_buy_count += 1
       buy_count += 1
 
-      if rsi <= 20:
-        position_size = 3
-      elif rsi <= 30:
-        position_size = 2
-      else:
+      if group_buy_count == 1:
         position_size = 1
+      else:
+        position_size = 2
+        # 두 번째 매수 이후에만 RSI 20 이하 조건 체크
+        if rsi <= 20:
+          position_size += 1
 
       if change_rate < -5:
         position_size += 1
+
+      # if rsi <= 20:
+      #   position_size = 3
+      # elif rsi <= 30:
+      #   position_size = 2
+      # else:
+      #   position_size = 1
+      #
+      # if change_rate < -5:
+      #   position_size += 1
 
       df.loc[buy_date, 'Weight'] = position_size
 
