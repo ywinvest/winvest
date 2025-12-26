@@ -25,11 +25,11 @@ class GlobalShortTermStrategy:
 
   def sell_condition_technical_bounce(self, df):
     """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
-    return df['MA_10_Cross'] & df['Bullish']
+    return df['MA_10_Cross'] & df['Bullish'] & (df['ADX'] > 20) & df['DI']
 
   def sell_condition_snap_back(self, df):
     """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
-    return df['MA_20_Cross'] & df['Bullish']
+    return df['MA_20_Cross'] & df['Bullish'] & (df['ADX'] > 20) & df['DI']
 
   def generate_orders(self, init_cash=10000000, max_positions=10):
     """매수/매도 주문 생성 (그룹 단위 거래 지원)
