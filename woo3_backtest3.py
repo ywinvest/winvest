@@ -29,7 +29,7 @@ class GlobalShortTermStrategy:
 
   def sell_condition_snap_back(self, df):
     """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
-    return df['MA_20_Cross'] & df['Bullish'] & (df['ADX'] > 25) & df['DI']
+    return df['MA_20_Cross'] & (df['ADX'] > 25) & df['DI'] # & df['Bullish']
 
   def generate_orders(self, init_cash=10000000, max_positions=10):
     """매수/매도 주문 생성 (그룹 단위 거래 지원)
