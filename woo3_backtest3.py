@@ -81,7 +81,7 @@ class GlobalShortTermStrategy:
         rsi = df.loc[buy_date, 'RSI']
         change_rate = df.loc[buy_date, 'Change_Rate']
 
-        if group_buy_count == 1:
+        if group_buy_count < 5:
           weight = 1
         else:
           weight = 2

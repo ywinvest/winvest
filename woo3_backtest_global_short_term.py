@@ -104,7 +104,7 @@ def backtest(data, ticker):
       group_buy_count += 1
       buy_count += 1
 
-      if group_buy_count == 1:
+      if group_buy_count < 5:
         position_size = 1
       else:
         position_size = 2
