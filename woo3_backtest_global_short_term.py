@@ -19,7 +19,7 @@ def sell_condition_technical_bounce(df):
 
 def sell_condition_snap_back(df):
   """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
-  return df['MA_20_Cross'] & (df['ADX'] > 25) & df['DI'] # & df['Bullish']
+  return df['MA_20_Cross'] & df['Bullish'] & (df['ADX'] > 25) & df['DI']
 
 def backtest(data, ticker):
   """Backtest with group-level batch selling (all positions sold at once)."""
