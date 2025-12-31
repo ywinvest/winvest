@@ -15,7 +15,7 @@ def buy_condition(df):
 
 def sell_condition_technical_bounce(df):
   """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
-  return (df['Close'] > df['MA_10']) & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
+  return df['MA_10_Cross'] & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
 
 def sell_condition_snap_back(df):
   """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
