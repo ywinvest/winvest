@@ -104,7 +104,7 @@ def backtest(data, ticker):
       group_buy_count += 1
       buy_count += 1
 
-      if group_buy_count < 5:
+      if group_buy_count < 3:
         position_size = 1
       else:
         position_size = 2
@@ -131,7 +131,7 @@ def backtest(data, ticker):
       group_positions.append((buy_date, buy_price, position_size))
 
       # 5회 이상 매수 시 즉시 매도 조건 변경
-      if group_buy_count >= 5:
+      if group_buy_count >= 3:
         current_sell_condition = sell_condition_snap_back
 
       # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)

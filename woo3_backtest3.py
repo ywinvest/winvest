@@ -81,7 +81,7 @@ class GlobalShortTermStrategy:
         rsi = df.loc[buy_date, 'RSI']
         change_rate = df.loc[buy_date, 'Change_Rate']
 
-        if group_buy_count < 5:
+        if group_buy_count < 3:
           weight = 1
         else:
           weight = 2
@@ -116,8 +116,8 @@ class GlobalShortTermStrategy:
         group_buy_count += 1
         last_buy_price = buy_price
 
-        # 5회 이상 매수 시 스냅백 조건으로 전환
-        if group_buy_count >= 5:
+        # 3회 이상 매수 시 스냅백 조건으로 전환
+        if group_buy_count >= 3:
           current_sell_condition = self.sell_condition_snap_back
 
         # 매도 날짜 계산 (current_sell_condition 사용)
