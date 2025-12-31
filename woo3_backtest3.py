@@ -89,9 +89,11 @@ class GlobalShortTermStrategy:
           weight = 1
         else:
           weight = 2
-          # 두 번째 매수 이후에만 RSI 추가 가중치 적용
+          # 4회 이상 매수 시에만 RSI 20 이하 조건 체크
           if rsi <= 20:
             weight += 1
+          # 4회 이상 매수 시 즉시 매도 조건 변경
+          current_sell_condition = self.sell_condition_snap_back
 
         if change_rate < -5:
           weight += 1
@@ -115,10 +117,6 @@ class GlobalShortTermStrategy:
         # 매수 실행
         orders.loc[buy_date] = position_size
         group_position_size += position_size
-
-        # 4회 이상 매수 시 스냅백 조건으로 전환
-        if group_buy_count >= 4:
-          current_sell_condition = self.sell_condition_snap_back
 
         # 매도 날짜 계산 (current_sell_condition 사용)
         subsequent_data = df.loc[buy_date:]

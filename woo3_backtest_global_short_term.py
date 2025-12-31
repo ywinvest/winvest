@@ -15,11 +15,11 @@ def buy_condition(df):
 
 def sell_condition_technical_bounce(df):
   """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
-  return df['MA_10_Cross']  & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
+  return df['MA_10_Cross'] & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
 
 def sell_condition_snap_back(df):
   """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
-  return (df['Close'] > df['MA_20'])  & df['Bullish'] & (df['ADX'] > 25) & df['DI']
+  return (df['Close'] > df['MA_20']) & df['Bullish'] & (df['ADX'] > 25) & df['DI']
 
 def backtest(data, ticker):
   """Backtest with group-level batch selling (all positions sold at once)."""
@@ -108,9 +108,11 @@ def backtest(data, ticker):
         position_size = 1
       else:
         position_size = 2
-        # 두 번째 매수 이후에만 RSI 20 이하 조건 체크
+        # 4회 이상 매수 시에만 RSI 20 이하 조건 체크
         if rsi <= 20:
           position_size += 1
+        # 4회 이상 매수 시 즉시 매도 조건 변경
+        current_sell_condition = sell_condition_snap_back
 
       if change_rate < -5:
         position_size += 1
@@ -129,10 +131,6 @@ def backtest(data, ticker):
 
       # 그룹 포지션에 추가
       group_positions.append((buy_date, buy_price, position_size))
-
-      # 5회 이상 매수 시 즉시 매도 조건 변경
-      if group_buy_count >= 4:
-        current_sell_condition = sell_condition_snap_back
 
       # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)
       subsequent_data = df.loc[buy_date:]

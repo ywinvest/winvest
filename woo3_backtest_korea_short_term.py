@@ -108,9 +108,11 @@ def backtest(data, ticker):
         position_size = 1
       else:
         position_size = 2
-        # 두 번째 매수 이후에만 RSI 20 이하 조건 체크
+        # 4회 이상 매수 시에만 RSI 20 이하 조건 체크
         if rsi <= 20:
           position_size += 1
+        # 4회 이상 매수 시 즉시 매도 조건 변경
+        current_sell_condition = sell_condition_snap_back
 
       if change_rate < -5:
         position_size += 1
@@ -129,10 +131,6 @@ def backtest(data, ticker):
 
       # 그룹 포지션에 추가
       group_positions.append((buy_date, buy_price, position_size))
-
-      # 5회 이상 매수 시 즉시 매도 조건 변경
-      if group_buy_count >= 4:
-        current_sell_condition = sell_condition_snap_back
 
       # 매도 날짜 재계산 (현재 시점부터, 선택된 조건 함수 사용)
       subsequent_data = df.loc[buy_date:]
