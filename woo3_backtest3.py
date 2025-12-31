@@ -79,9 +79,13 @@ class GlobalShortTermStrategy:
       if should_buy:
         # 포지션 사이즈 가중치 계산
         rsi = df.loc[buy_date, 'RSI']
+        buy_price = df.loc[buy_date, 'Close']
         change_rate = df.loc[buy_date, 'Change_Rate']
 
-        if group_buy_count < 3:
+        last_buy_price = buy_price
+        group_buy_count += 1
+
+        if group_buy_count < 4:
           weight = 1
         else:
           weight = 2
@@ -104,7 +108,6 @@ class GlobalShortTermStrategy:
 
         # 실제 투자 금액 계산
         investment_amount = base_investment * weight
-        buy_price = df.loc[buy_date, 'Close']
 
         # 매수할 수량 계산 (금액 / 종가)
         position_size = investment_amount / buy_price
@@ -113,11 +116,8 @@ class GlobalShortTermStrategy:
         orders.loc[buy_date] = position_size
         group_position_size += position_size
 
-        group_buy_count += 1
-        last_buy_price = buy_price
-
-        # 3회 이상 매수 시 스냅백 조건으로 전환
-        if group_buy_count >= 3:
+        # 4회 이상 매수 시 스냅백 조건으로 전환
+        if group_buy_count >= 4:
           current_sell_condition = self.sell_condition_snap_back
 
         # 매도 날짜 계산 (current_sell_condition 사용)
