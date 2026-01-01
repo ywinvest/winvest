@@ -225,6 +225,46 @@ class GlobalShortTermStrategy:
     # result_df['Orders'] = orders
     # result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
 
+    # 2. 통합 Daily Result 생성 (기존 backtest_results.csv 포맷 재현)
+    # 원본 데이터프레임 복사
+    daily_df = self.df.copy()
+
+    # vectorbt 포트폴리오 상태 병합 (인덱스가 날짜로 동일하다고 가정)
+    daily_df['Cash'] = portfolio.cash()          # 현금 잔고
+    daily_df['Holdings'] = portfolio.assets()    # 보유 수량
+    daily_df['Total_Value'] = portfolio.value()  # 총 자산 가치
+
+    # 매수/매도 액션 및 수량 계산
+    # asset_flow: 자산(수량)의 변화량. (+: 매수, -: 매도)
+    asset_flow = portfolio.asset_flow()
+    daily_df['Order_Amt'] = asset_flow
+
+    # Action 컬럼 생성 (Buy/Sell/Wait)
+    daily_df['Action'] = daily_df['Order_Amt'].apply(
+        lambda x: 'Buy' if x > 0 else ('Sell' if x < 0 else '')
+    )
+
+    # 실제 체결 가격 (종가 기준 전략이므로 Close 사용, 거래 없는 날은 NaN 혹은 0)
+    daily_df['Exec_Price'] = daily_df.apply(
+        lambda row: row['Close'] if row['Action'] != '' else None, axis=1
+    )
+
+    # 주요 컬럼 순서 재배치 (가독성을 위해)
+    # 보고 싶은 보조지표들을 앞쪽에 배치
+    cols_order = [
+      'Close', 'Change_Rate', 'RSI', 'Bullish', 'MA_10', 'MA_20', 'ADX', 'DI'# 주요 지표
+      'Action', 'Order_Amt', 'Exec_Price', # 거래 정보
+      'Holdings', 'Cash', 'Total_Value'    # 계좌 정보
+    ]
+
+    # 기존 df에 있지만 위 리스트에 없는 컬럼들도 뒤에 붙여줌
+    remaining_cols = [c for c in daily_df.columns if c not in cols_order]
+    final_df = daily_df[cols_order + remaining_cols]
+
+    # 저장
+    final_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
+    print(f"  [Results Saved] {output_dir}/{self.ticker}_backtest_results.csv")
+
   def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
     """vectorbt 내장 기능을 활용한 간단한 시각화"""
     os.makedirs(output_dir, exist_ok=True)
