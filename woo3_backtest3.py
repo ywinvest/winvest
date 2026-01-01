@@ -252,7 +252,7 @@ class GlobalShortTermStrategy:
     # 주요 컬럼 순서 재배치 (가독성을 위해)
     # 보고 싶은 보조지표들을 앞쪽에 배치
     cols_order = [
-      'Close', 'Change_Rate', 'RSI', 'Bullish', 'MA_10', 'MA_20', 'ADX', 'DI'# 주요 지표
+      'Close', 'Change_Rate', 'RSI', 'Bullish', 'MA_10', 'MA_20', 'ADX', 'DI', # 주요 지표
       'Action', 'Order_Amt', 'Exec_Price', # 거래 정보
       'Holdings', 'Cash', 'Total_Value'    # 계좌 정보
     ]
