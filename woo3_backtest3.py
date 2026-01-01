@@ -115,7 +115,7 @@ class GlobalShortTermStrategy:
         position_size = investment_amount / buy_price
 
         # 매수 실행
-        orders.loc[buy_date] = position_size
+        orders.loc[buy_date] += position_size
         group_position_size += position_size
 
         # 매도 날짜 계산 (current_sell_condition 사용)
@@ -131,7 +131,7 @@ class GlobalShortTermStrategy:
       # 매도 신호가 있고, (다음 매수가 없거나 다음 매수 전에 발생)하면 즉시 그룹 청산
       if sell_date is not None and (next_buy_date is None or sell_date <= next_buy_date):
         if group_position_size > 0:
-          orders.loc[sell_date] = -group_position_size
+          orders.loc[sell_date] += -group_position_size
 
           # 상태 초기화
           group_buy_count = 0
