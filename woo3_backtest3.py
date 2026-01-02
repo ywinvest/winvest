@@ -9,6 +9,8 @@ import pandas as pd
 import vectorbt as vbt
 from numba import njit
 
+from vectorbt.portfolio import enums as pf_enums
+
 import indicators
 
 DEFAULT_RSI_THRESHOLD = 35
@@ -198,12 +200,11 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       last_price_state[col] = 0.0
 
       # 전량 매도 주문
-      return vbt.OrderResult(
+      return pf_enums.OrderResult(
           size=-current_pos,
-          size_type=vbt.SizeType.Amount,
           price=current_price,
           fees=0.0,
-          slippage=0.0
+          side=pf_enums.OrderSide.Sell
       )
 
   # --- 2. 매수 판단 (Buy Logic) ---
@@ -242,15 +243,14 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       last_price_state[col] = current_price
 
       # 수량 계산하여 주문
-      return vbt.OrderResult(
+      return pf_enums.OrderResult(
           size=target_amount / current_price,
-          size_type=vbt.SizeType.Amount,
           price=current_price,
           fees=0.0,
-          slippage=0.0
+          side=pf_enums.OrderSide.Buy
       )
 
-  return vbt.NoOrder
+  return pf_enums.NoOrder
 
 class GlobalShortTermStrategy:
   """vectorbt 기반 글로벌 단기 매매 전략"""
