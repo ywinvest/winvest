@@ -207,9 +207,9 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       return vbt_nb.order_nb(
           size=current_pos,            # 절대값 사용 (Side로 방향 지정)
           price=current_price,
-          size_type=pf_enums.SizeType.Amount,
-          side=pf_enums.OrderSide.Sell,
-          fees=0.0
+          # size_type=pf_enums.SizeType.Amount,
+          # side=pf_enums.OrderSide.Sell,
+          # fees=0.
       )
 
   # --- 2. 매수 판단 (Buy Logic) ---
@@ -259,9 +259,9 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       return vbt_nb.order_nb(
           size=target_amount / current_price,
           price=current_price,
-          size_type=pf_enums.SizeType.Amount,
-          side=pf_enums.OrderSide.Buy,
-          fees=0.0
+          # size_type=pf_enums.SizeType.Amount,
+          # side=pf_enums.OrderSide.Buy,
+          # fees=0.
       )
 
   return vbt_nb.no_order_func_nb()
@@ -432,7 +432,7 @@ class GlobalShortTermStrategy:
         max_positions,
         float(init_cash),
         init_cash=init_cash,
-        fees=fees,
+        # fees=fees,
         freq='1D'
     )
     return portfolio
