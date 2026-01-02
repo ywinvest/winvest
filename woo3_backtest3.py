@@ -440,7 +440,7 @@ class GlobalShortTermStrategy:
         float(init_cash),
         init_cash=init_cash,
         # fees=fees,
-        freq='1D'
+        # freq='1D'
     )
     return portfolio
 
