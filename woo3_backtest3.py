@@ -14,26 +14,77 @@ import indicators
 DEFAULT_RSI_THRESHOLD = 35
 
 # -----------------------------------------------------------------------------
-# 1. 데이터 준비 헬퍼 함수 (Helper Function)
+# 1. 데이터 구조 (Numba 접근용)
 # -----------------------------------------------------------------------------
-def prepare_strategy_data(df):
+StrategyData = namedtuple('StrategyData', [
+  'close', 'rsi', 'bullish', 'change_rate',
+  'ma_10_cross', 'ma_20', 'adx', 'di'
+])
+
+DEFAULT_RSI_THRESHOLD = 35
+
+# -----------------------------------------------------------------------------
+# 2. 지표 계산 및 데이터 패킹 (VectorBT 활용)
+# -----------------------------------------------------------------------------
+def calculate_features(close_s, open_s, high_s, low_s):
   """
-  DataFrame의 모든 컬럼을 유효한 식별자인 소문자 필드명을 가진 NamedTuple로 변환하여 반환합니다.
-  공백이나 특수문자는 '_'로 치환됩니다. (예: 'Adj Close' -> 'adj_close')
+  VectorBT를 사용하여 고속으로 지표를 계산하고,
+  Numba 엔진용 NamedTuple과 리포팅용 Dictionary를 반환합니다.
   """
-  # 1. 컬럼명을 소문자로 변환하고 공백을 언더스코어로 치환
-  field_names = [col.lower().replace(' ', '_').replace('-', '_') for col in df.columns]
+  # 1. VectorBT 지표 계산 (Vectorization)
+  # vbt는 Pandas Series를 입력받아도 내부적으로 NumPy 연산을 수행하므로 매우 빠릅니다.
 
-  # 2. 동적으로 NamedTuple 클래스 정의
-  # rename=True는 파이썬 예약어(def, class 등)나 중복된 이름이 있을 경우 자동으로 이름을 변경해줍니다.
-  # 안전장치로 rename=True를 추가했습니다.
-  StrategyData = namedtuple('StrategyData', field_names, rename=True)
+  # RSI
+  rsi = vbt.RSI.run(close_s, window=14).rsi.to_numpy()
 
-  # 3. 각 컬럼을 vectorbt 호환 2D 배열로 변환
-  data_values = [vbt.to_2d_array(df[col]) for col in df.columns]
+  # MA & Cross
+  ma10_ind = vbt.MA.run(close_s, window=10)
+  ma20_ind = vbt.MA.run(close_s, window=20)
+  ma20 = ma20_ind.ma.to_numpy()
 
-  # 4. NamedTuple 인스턴스 생성 및 반환
-  return StrategyData(*data_values)
+  # vectorbt의 cross 로직 활용
+  ma_10_cross = close_s.vbt.crossed_above(ma10_ind.ma).to_numpy()
+
+  # ADX & DI
+  adx_ind = vbt.ADX.run(high_s, low_s, close_s, window=14)
+  adx = adx_ind.adx.to_numpy()
+  di = (adx_ind.pdi > adx_ind.mdi).to_numpy()
+
+  # Basic Features
+  bullish = (close_s > open_s).to_numpy()
+  change_rate = (close_s.pct_change() * 100).to_numpy()
+  close_arr = close_s.to_numpy()
+
+  # 2. 데이터 형상 변환 (1D -> 2D) 및 패킹
+  def to_2d(arr):
+    return arr.reshape(-1, 1) if arr.ndim == 1 else arr
+
+  # Numba용 데이터 패킹
+  strategy_data = StrategyData(
+      close       = to_2d(close_arr),
+      rsi         = to_2d(rsi),
+      bullish     = to_2d(bullish),
+      change_rate = to_2d(change_rate),
+      ma_10_cross = to_2d(ma_10_cross),
+      ma_20       = to_2d(ma20),
+      adx         = to_2d(adx),
+      di          = to_2d(di)
+  )
+
+  # 리포팅용 데이터 딕셔너리 (나중에 CSV 저장 시 사용)
+  # 시뮬레이션 중에는 사용되지 않으므로 성능에 영향 없음
+  reporting_data = {
+    'RSI': rsi,
+    'MA_10': ma10_ind.ma.to_numpy(),
+    'MA_20': ma20,
+    'MA_10_Cross': ma_10_cross,
+    'ADX': adx,
+    'DI': di,
+    'Bullish': bullish,
+    'Change_Rate': change_rate
+  }
+
+  return strategy_data, reporting_data
 
 
 # -----------------------------------------------------------------------------
@@ -182,7 +233,8 @@ class GlobalShortTermStrategy:
   def __init__(self, data, ticker):
     self.data = data
     self.ticker = ticker
-    self.df = indicators.calculate_indicators(data.copy())
+    self.reporting_data = {} # 결과 저장용 컨테이너
+    # self.df = indicators.calculate_indicators(data.copy())
 
   def buy_condition(self, df):
     """Broad buy condition for global indices (RSI <= 35)."""
@@ -307,30 +359,30 @@ class GlobalShortTermStrategy:
     return orders
 
   def run_backtest(self, init_cash=10000000, fees=0, max_positions=20):
-    # 1. 데이터 준비 (Prepare Data)
-    # DataFrame을 NamedTuple(StrategyData)로 변환
-    market_data = prepare_strategy_data(self.df)
+    # 1. 지표 계산 및 데이터 패킹 (외부 함수 호출로 깔끔하게 정리)
+    strategy_data, report_data = calculate_features(
+        self.data['Close'], self.data['Open'],
+        self.data['High'], self.data['Low']
+    )
 
-    # 2. 상태 관리 배열 초기화 (Initialize State)
-    # market_data 내 임의의 필드(예: close)를 사용하여 shape 확인
-    n_cols = market_data.close.shape[1]
+    # 리포팅 데이터 저장 (CSV 출력용)
+    self.reporting_data = report_data
 
+    # 2. 상태 배열 초기화
+    n_cols = strategy_data.close.shape[1]
     buy_count_state = np.zeros(n_cols, dtype=np.int_)
     last_price_state = np.zeros(n_cols, dtype=np.float_)
 
-    # 3. 백테스트 실행 (Run Simulation)
+    # 3. 백테스트 실행 (Numba)
+    # Numba 엔진에는 오직 '배열'만 전달되어 최고 속도로 실행됩니다.
     portfolio = vbt.Portfolio.from_order_func(
-        self.df['Close'],
-        strategy_nb,                 # 모듈 레벨의 Numba 함수 전달
-
-        # *order_args 전달 (strategy_nb의 인자 순서와 일치해야 함)
-        market_data,      # 1. 데이터 뭉치 (NamedTuple)
-        buy_count_state,             # 2. 상태 변수 1
-        last_price_state,            # 3. 상태 변수 2
-        max_positions,               # 4. 설정값 1
-        float(init_cash),            # 5. 설정값 2
-
-        # **kwargs 설정
+        self.data['Close'],
+        strategy_nb,
+        strategy_data,
+        buy_count_state,
+        last_price_state,
+        max_positions,
+        float(init_cash),
         init_cash=init_cash,
         fees=fees,
         freq='1D'
@@ -385,20 +437,29 @@ class GlobalShortTermStrategy:
 
     # 2. 통합 Daily Result 생성 (기존 backtest_results.csv 포맷 재현)
     # 원본 데이터프레임 복사
-    daily_df = self.df.copy()
+    result_df = self.df.copy()
+
+    # calculate_features에서 계산해둔 지표들을 여기서 합침
+    for name, data in self.reporting_data.items():
+      # 1D array라면 Series로 변환하여 할당
+      if isinstance(data, np.ndarray) and data.ndim == 1:
+        result_df[name] = data
+      elif isinstance(data, np.ndarray) and data.ndim == 2:
+        # 단일 티커라 가정하고 첫 컬럼 사용
+        result_df[name] = data[:, 0]
 
     # vectorbt 포트폴리오 상태 병합 (인덱스가 날짜로 동일하다고 가정)
-    daily_df['Cash'] = portfolio.cash()          # 현금 잔고
-    daily_df['Holdings'] = portfolio.assets()    # 보유 수량
-    daily_df['Total_Value'] = portfolio.value()  # 총 자산 가치
+    result_df['Cash'] = portfolio.cash()          # 현금 잔고
+    result_df['Holdings'] = portfolio.assets()    # 보유 수량
+    result_df['Total_Value'] = portfolio.value()  # 총 자산 가치
 
     # 매수/매도 액션 및 수량 계산
     # asset_flow: 자산(수량)의 변화량. (+: 매수, -: 매도)
     asset_flow = portfolio.asset_flow()
-    daily_df['Order_Amt'] = asset_flow
+    result_df['Order_Amt'] = asset_flow
 
     # Action 컬럼 생성 (Buy/Sell/Wait)
-    daily_df['Action'] = daily_df['Order_Amt'].apply(
+    result_df['Action'] = result_df['Order_Amt'].apply(
         lambda x: 'Buy' if x > 0 else ('Sell' if x < 0 else '')
     )
 
@@ -456,12 +517,12 @@ class GlobalShortTermStrategy:
       daily_group_returns = sells_df.set_index('Timestamp')['Group_Return']
 
       # 5) Daily DF에 병합 (Left Join)
-      daily_df = daily_df.join(daily_returns, how='left')
-      daily_df = daily_df.join(daily_group_returns, how='left')
+      result_df = result_df.join(daily_returns, how='left')
+      result_df = result_df.join(daily_group_returns, how='left')
 
     else:
-      daily_df['Return'] = None
-      daily_df['Group_Return'] = None
+      result_df['Return'] = None
+      result_df['Group_Return'] = None
 
     # # 주요 컬럼 순서 재배치 (가독성을 위해)
     # # 보고 싶은 보조지표들을 앞쪽에 배치
@@ -472,11 +533,11 @@ class GlobalShortTermStrategy:
     # ]
     #
     # # 기존 df에 있지만 위 리스트에 없는 컬럼들도 뒤에 붙여줌
-    # remaining_cols = [c for c in daily_df.columns if c not in cols_order]
-    # final_df = daily_df[cols_order + remaining_cols]
+    # remaining_cols = [c for c in result_df.columns if c not in cols_order]
+    # final_df = result_df[cols_order + remaining_cols]
 
     # 저장
-    daily_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
+    result_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
     print(f"  [Results Saved] {output_dir}/{self.ticker}_backtest_results.csv")
 
   def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
