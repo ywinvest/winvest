@@ -249,20 +249,81 @@ class GlobalShortTermStrategy:
         lambda row: row['Close'] if row['Action'] != '' else None, axis=1
     )
 
-    # 주요 컬럼 순서 재배치 (가독성을 위해)
-    # 보고 싶은 보조지표들을 앞쪽에 배치
-    cols_order = [
-      'Close', 'Change_Rate', 'RSI', 'Bullish', 'MA_10', 'MA_20', 'ADX', 'DI', # 주요 지표
-      'Action', 'Order_Amt', 'Exec_Price', # 거래 정보
-      'Holdings', 'Cash', 'Total_Value'    # 계좌 정보
-    ]
+    if not orders.empty:
+      # 원본 보존을 위해 복사 및 날짜 정규화 (시간 제거, join을 위해)
+      orders_df = orders.copy()
+      orders_df['Timestamp'] = pd.to_datetime(orders_df['Timestamp']).dt.normalize()
 
-    # 기존 df에 있지만 위 리스트에 없는 컬럼들도 뒤에 붙여줌
-    remaining_cols = [c for c in daily_df.columns if c not in cols_order]
-    final_df = daily_df[cols_order + remaining_cols]
+      # 'Type' 컬럼 생성 (Side가 없거나 부정확할 경우를 대비해 Size로 판단)
+      # vectorbt의 기본 Side 컬럼을 우선 사용하되, 없으면 Size로 추론
+      if 'Side' in orders_df.columns:
+        orders_df['Type'] = orders_df['Side'] # 'Buy', 'Sell'
+      else:
+        orders_df['Type'] = orders_df['Size'].apply(lambda x: 'Buy' if x > 0 else 'Sell')
+
+      # 1) 그룹 ID 생성: 매도(Sell)가 발생한 직후 그룹 ID를 변경
+      # 로직: 'Sell' 행은 현재 그룹의 종료이므로, 그 다음 행부터 ID가 증가해야 함
+      # (Shift하여 Sell이었던 곳 다음을 True로 만들고 누적 합)
+      orders_df['Group_ID'] = (orders_df['Type'] == 'Sell').shift(1).fillna(False).cumsum()
+
+      # 2) 그룹별 청산(Exit) 정보 추출
+      # 각 그룹의 'Sell' 행에서 가격(청산가) 추출
+      exit_prices = orders_df[orders_df['Type'] == 'Sell'].set_index('Group_ID')['Price']
+      exit_prices.name = 'Exit_Price'
+
+      # 3) 개별 매수 건 수익률 계산 (Return)
+      # 매수(Buy) 행만 필터링
+      buys_df = orders_df[orders_df['Type'] == 'Buy'].copy()
+
+      # 청산가(Exit_Price)를 Group_ID 기준으로 매핑
+      buys_df = buys_df.join(exit_prices, on='Group_ID')
+
+      # 수익률 계산: (청산가 - 매수가) / 매수가
+      buys_df['Return'] = (buys_df['Exit_Price'] - buys_df['Price']) / buys_df['Price']
+
+      # 날짜별 매핑 (하루에 여러 매수 건이 있을 경우 평균)
+      daily_returns = buys_df.groupby('Timestamp')['Return'].mean()
+
+      # 4) 그룹 전체 수익률 계산 (Group_Return)
+      # 그룹별 평균 진입 단가 계산 (가중 평균)
+      buys_df['Cost_Sum'] = buys_df['Price'] * buys_df['Size']
+      group_stats = buys_df.groupby('Group_ID')[['Cost_Sum', 'Size']].sum()
+      group_avg_price = group_stats['Cost_Sum'] / group_stats['Size']
+
+      # 매도(Sell) 행만 필터링
+      sells_df = orders_df[orders_df['Type'] == 'Sell'].copy()
+
+      # 평균 진입가 매핑
+      sells_df['Avg_Entry_Price'] = sells_df['Group_ID'].map(group_avg_price)
+
+      # 수익률 계산: (매도가 - 평단가) / 평단가
+      sells_df['Group_Return'] = (sells_df['Price'] - sells_df['Avg_Entry_Price']) / sells_df['Avg_Entry_Price']
+
+      # 날짜별 매핑
+      daily_group_returns = sells_df.set_index('Timestamp')['Group_Return']
+
+      # 5) Daily DF에 병합 (Left Join)
+      daily_df = daily_df.join(daily_returns, how='left')
+      daily_df = daily_df.join(daily_group_returns, how='left')
+
+    else:
+      daily_df['Return'] = None
+      daily_df['Group_Return'] = None
+
+    # # 주요 컬럼 순서 재배치 (가독성을 위해)
+    # # 보고 싶은 보조지표들을 앞쪽에 배치
+    # cols_order = [
+    #   'Close', 'Change_Rate', 'RSI', 'Bullish', 'MA_10', 'MA_20', 'ADX', 'DI', # 주요 지표
+    #   'Action', 'Order_Amt', 'Exec_Price', # 거래 정보
+    #   'Holdings', 'Cash', 'Total_Value'    # 계좌 정보
+    # ]
+    #
+    # # 기존 df에 있지만 위 리스트에 없는 컬럼들도 뒤에 붙여줌
+    # remaining_cols = [c for c in daily_df.columns if c not in cols_order]
+    # final_df = daily_df[cols_order + remaining_cols]
 
     # 저장
-    final_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
+    daily_df.to_csv(os.path.join(output_dir, f'{self.ticker}_backtest_results.csv'))
     print(f"  [Results Saved] {output_dir}/{self.ticker}_backtest_results.csv")
 
   def visualize_results(self, portfolio, output_dir='global/buy-and-sell'):
