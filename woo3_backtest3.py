@@ -8,10 +8,7 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from numba import njit
-
 from vectorbt.portfolio import enums as pf_enums
-
-import indicators
 
 DEFAULT_RSI_THRESHOLD = 35
 
@@ -24,8 +21,6 @@ StrategyData = namedtuple('StrategyData', [
   'close', 'rsi', 'bullish', 'change_rate',
   'ma_10_cross', 'ma_20', 'adx', 'di'
 ])
-
-DEFAULT_RSI_THRESHOLD = 35
 
 # -----------------------------------------------------------------------------
 # 2. 지표 계산 및 데이터 패킹 (VectorBT 활용)
@@ -204,7 +199,9 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
           size=-current_pos,
           price=current_price,
           fees=0.0,
-          side=pf_enums.OrderSide.Sell
+          side=pf_enums.OrderSide.Sell,
+          status=pf_enums.OrderStatus.Filled,
+          status_info=pf_enums.OrderStatusInfo.PriceNaN
       )
 
   # --- 2. 매수 판단 (Buy Logic) ---
@@ -247,7 +244,9 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
           size=target_amount / current_price,
           price=current_price,
           fees=0.0,
-          side=pf_enums.OrderSide.Buy
+          side=pf_enums.OrderSide.Buy,
+          status=pf_enums.OrderStatus.Filled,
+          status_info=pf_enums.OrderStatusInfo.PriceNaN
       )
 
   return pf_enums.NoOrder
