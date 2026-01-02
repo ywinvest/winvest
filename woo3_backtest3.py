@@ -303,7 +303,7 @@ class GlobalShortTermStrategy:
         init_cash: 초기 자본금
         max_positions: 최대 동시 보유 포지션 수 (기본값: 10)
     """
-    df = self.df
+    df = self.data
 
     # 주문 배열 초기화 (양수: 매수, 음수: 매도)
     orders = pd.Series(0.0, index=df.index)
@@ -485,7 +485,7 @@ class GlobalShortTermStrategy:
 
     # 2. 통합 Daily Result 생성 (기존 backtest_results.csv 포맷 재현)
     # 원본 데이터프레임 복사
-    result_df = self.df.copy()
+    result_df = self.data.copy()
 
     # calculate_features에서 계산해둔 지표들을 여기서 합침
     for name, data in self.reporting_data.items():
