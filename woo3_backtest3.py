@@ -13,6 +13,8 @@ import indicators
 
 DEFAULT_RSI_THRESHOLD = 35
 
+PTA_ADX = vbt.IndicatorFactory.from_pandas_ta('ADX')
+
 # -----------------------------------------------------------------------------
 # 1. 데이터 구조 (Numba 접근용)
 # -----------------------------------------------------------------------------
@@ -45,10 +47,33 @@ def calculate_features(close_s, open_s, high_s, low_s):
   # vectorbt의 cross 로직 활용
   ma_10_cross = close_s.vbt.crossed_above(ma10_ind.ma).to_numpy()
 
-  # ADX & DI
-  adx_ind = vbt.ADX.run(high_s, low_s, close_s, window=14)
-  adx = adx_ind.adx.to_numpy()
-  di = (adx_ind.pdi > adx_ind.mdi).to_numpy()
+  # ADX & DI (vbt.pandas_ta Wrapper 활용)
+  # vbt로 래핑된 PTA_ADX를 실행합니다.
+  # pandas_ta는 기본적으로 컬럼명에 숫자를 붙입니다 (예: ADX_14, DMP_14)
+  # vectorbt는 이를 속성으로 접근할 수 있게 해줍니다 (대소문자 구분 없이 접근 가능할 수 있으나, 보통 원본 컬럼명 따름)
+
+  adx_ind = PTA_ADX.run(high=high_s, low=low_s, close=close_s, length=14)
+
+  # 속성 접근 (pandas_ta의 출력 컬럼명이 속성이 됨)
+  # ADX_14, DMP_14, DMN_14 형태로 생성됨 -> .to_numpy()로 변환
+  # (속성 이름이 헷갈릴 경우 adx_ind.output_names로 확인 가능)
+
+  # 안전하게 get 메서드나 속성 접근 사용 (보통 소문자로 변환되거나 원본 유지됨)
+  # 여기서는 확실한 접근을 위해 getattr 대신 동적 접근을 시도하거나,
+  # pandas_ta의 기본 네이밍 규칙인 'adx_14' 등을 예상하여 접근합니다.
+
+  # vbt wrapper 결과에서 numpy 배열 추출
+  # (pandas_ta 기본 출력명: ADX_14, DMP_14, DMN_14)
+  adx = adx_ind.adx_14.to_numpy()
+  dmp = adx_ind.dmp_14.to_numpy()
+  dmn = adx_ind.dmn_14.to_numpy()
+
+  # NaN 처리 (0으로)
+  adx = np.nan_to_num(adx)
+  dmp = np.nan_to_num(dmp)
+  dmn = np.nan_to_num(dmn)
+
+  di = (dmp > dmn) # PDI > MDI
 
   # Basic Features
   bullish = (close_s > open_s).to_numpy()
