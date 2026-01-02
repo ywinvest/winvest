@@ -249,7 +249,14 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
           status_info=pf_enums.OrderStatusInfo.PriceNaN
       )
 
-  return pf_enums.NoOrder
+  return pf_enums.OrderResult(
+      size=np.nan,
+      price=np.nan,
+      fees=np.nan,
+      side=-1,
+      status=-1,
+      status_info=-1
+  )
 
 class GlobalShortTermStrategy:
   """vectorbt 기반 글로벌 단기 매매 전략"""
