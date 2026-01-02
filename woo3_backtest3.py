@@ -9,6 +9,7 @@ import pandas as pd
 import vectorbt as vbt
 from numba import njit
 from vectorbt.portfolio import enums as pf_enums
+from vectorbt.portfolio import nb as vbt_nb
 
 DEFAULT_RSI_THRESHOLD = 35
 
@@ -195,13 +196,20 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       last_price_state[col] = 0.0
 
       # 전량 매도 주문
-      return pf_enums.OrderResult(
-          size=-current_pos,
+      # return pf_enums.OrderResult(
+      #     size=-current_pos,
+      #     price=current_price,
+      #     fees=0.0,
+      #     side=pf_enums.OrderSide.Sell,
+      #     status=pf_enums.OrderStatus.Filled,
+      #     status_info=pf_enums.OrderStatusInfo.PriceNaN
+      # )
+      return vbt_nb.order_nb(
+          size=current_pos,            # 절대값 사용 (Side로 방향 지정)
           price=current_price,
-          fees=0.0,
+          size_type=pf_enums.SizeType.Amount,
           side=pf_enums.OrderSide.Sell,
-          status=pf_enums.OrderStatus.Filled,
-          status_info=pf_enums.OrderStatusInfo.PriceNaN
+          fees=0.0
       )
 
   # --- 2. 매수 판단 (Buy Logic) ---
@@ -240,23 +248,32 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       last_price_state[col] = current_price
 
       # 수량 계산하여 주문
-      return pf_enums.OrderResult(
+      # return pf_enums.OrderResult(
+      #     size=target_amount / current_price,
+      #     price=current_price,
+      #     fees=0.0,
+      #     side=pf_enums.OrderSide.Buy,
+      #     status=pf_enums.OrderStatus.Filled,
+      #     status_info=pf_enums.OrderStatusInfo.PriceNaN
+      # )
+      return vbt_nb.order_nb(
           size=target_amount / current_price,
           price=current_price,
-          fees=0.0,
+          size_type=pf_enums.SizeType.Amount,
           side=pf_enums.OrderSide.Buy,
-          status=pf_enums.OrderStatus.Filled,
-          status_info=pf_enums.OrderStatusInfo.PriceNaN
+          fees=0.0
       )
 
-  return pf_enums.OrderResult(
-      size=np.nan,
-      price=np.nan,
-      fees=np.nan,
-      side=-1,
-      status=-1,
-      status_info=-1
-  )
+  return vbt_nb.no_order_nb()
+
+  # return pf_enums.OrderResult(
+  #     size=np.nan,
+  #     price=np.nan,
+  #     fees=np.nan,
+  #     side=-1,
+  #     status=-1,
+  #     status_info=-1
+  # )
 
 class GlobalShortTermStrategy:
   """vectorbt 기반 글로벌 단기 매매 전략"""
