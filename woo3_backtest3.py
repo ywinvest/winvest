@@ -396,7 +396,7 @@ class GlobalShortTermStrategy:
     # 2. 상태 배열 초기화
     n_cols = strategy_data.close.shape[1]
     buy_count_state = np.zeros(n_cols, dtype=np.int_)
-    last_price_state = np.zeros(n_cols, dtype=np.float_)
+    last_price_state = np.zeros(n_cols, dtype=np.float64)
 
     # 3. 백테스트 실행 (Numba)
     # Numba 엔진에는 오직 '배열'만 전달되어 최고 속도로 실행됩니다.
