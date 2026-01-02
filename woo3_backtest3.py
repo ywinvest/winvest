@@ -8,11 +8,11 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from numba import njit
-from vectorbt.portfolio import enums as pf_enums
 from vectorbt.portfolio import nb as vbt_nb
 
 DEFAULT_RSI_THRESHOLD = 35
 
+PTA_RSI = vbt.IndicatorFactory.from_pandas_ta('RSI')
 PTA_ADX = vbt.IndicatorFactory.from_pandas_ta('ADX')
 
 # -----------------------------------------------------------------------------
@@ -35,7 +35,9 @@ def calculate_features(close_s, open_s, high_s, low_s):
   # vbt는 Pandas Series를 입력받아도 내부적으로 NumPy 연산을 수행하므로 매우 빠릅니다.
 
   # RSI
-  rsi = vbt.RSI.run(close_s, window=14).rsi.to_numpy()
+  rsi_ind = PTA_RSI.run(close_s, window=14).rsi.to_numpy()
+
+  rsi = rsi_ind.rsi.to_numpy()
 
   # MA & Cross
   ma10_ind = vbt.MA.run(close_s, window=10)
