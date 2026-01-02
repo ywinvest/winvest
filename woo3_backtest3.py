@@ -1,5 +1,6 @@
 import json
 import os
+from collections import namedtuple
 from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
