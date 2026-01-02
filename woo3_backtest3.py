@@ -264,7 +264,7 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
           fees=0.0
       )
 
-  return vbt_nb.no_order_nb()
+  return vbt_nb.no_order_func_nb()
 
   # return pf_enums.OrderResult(
   #     size=np.nan,
