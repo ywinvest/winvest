@@ -205,7 +205,7 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       #     status_info=pf_enums.OrderStatusInfo.PriceNaN
       # )
       return vbt_nb.order_nb(
-          size=current_pos,            # 절대값 사용 (Side로 방향 지정)
+          size=-current_pos,            # 절대값 사용 (Side로 방향 지정)
           price=current_price,
           # size_type=pf_enums.SizeType.Amount,
           # side=pf_enums.OrderSide.Sell,
