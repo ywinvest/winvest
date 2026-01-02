@@ -631,6 +631,13 @@ def run_backtest_for_ticker(ticker, name, start_date_str, end_date_str):
     print(f"No data found for {ticker}, skipping.")
     return None
 
+  # 타임존 정보 제거 및 시간 정규화
+  # 미국 시간(17일 16시)이 한국 시간(18일 05시)으로 변환되어 날짜가 밀리는 것을 방지
+  if data.index.tz is not None:
+    data.index = data.index.tz_localize(None)
+
+  data.index = pd.to_datetime(data.index).normalize()
+
   # 전략 실행
   strategy = GlobalShortTermStrategy(data, ticker)
   portfolio = strategy.run_backtest()
