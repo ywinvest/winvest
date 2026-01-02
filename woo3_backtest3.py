@@ -18,21 +18,18 @@ DEFAULT_RSI_THRESHOLD = 35
 # -----------------------------------------------------------------------------
 def prepare_strategy_data(df):
   """
-  DataFrame의 모든 컬럼을 소문자 필드명을 가진 NamedTuple로 변환하여 반환합니다.
-  Numba(@njit) 함수인 strategy_nb에 데이터를 한 번에 넘기기 위해 사용됩니다.
-
-  예: df['RSI'] -> data.rsi, df['MA_10_Cross'] -> data.ma_10_cross
+  DataFrame의 모든 컬럼을 유효한 식별자인 소문자 필드명을 가진 NamedTuple로 변환하여 반환합니다.
+  공백이나 특수문자는 '_'로 치환됩니다. (예: 'Adj Close' -> 'adj_close')
   """
-  # 1. 컬럼명을 소문자로 변환 (strategy_nb에서 data.rsi 처럼 접근하기 위함)
-  # 공백이나 특수문자가 있다면 _로 치환하는 등의 처리가 필요할 수 있으나,
-  # 일반적인 지표 이름(영어)이라 가정하고 소문자 변환만 수행합니다.
-  field_names = [col.lower() for col in df.columns]
+  # 1. 컬럼명을 소문자로 변환하고 공백을 언더스코어로 치환
+  field_names = [col.lower().replace(' ', '_').replace('-', '_') for col in df.columns]
 
-  # 2. 동적으로 NamedTuple 클래스 정의 (Type Name: 'StrategyData')
-  StrategyData = namedtuple('StrategyData', field_names)
+  # 2. 동적으로 NamedTuple 클래스 정의
+  # rename=True는 파이썬 예약어(def, class 등)나 중복된 이름이 있을 경우 자동으로 이름을 변경해줍니다.
+  # 안전장치로 rename=True를 추가했습니다.
+  StrategyData = namedtuple('StrategyData', field_names, rename=True)
 
   # 3. 각 컬럼을 vectorbt 호환 2D 배열로 변환
-  # (vbt.to_2d_array는 Series를 (N, 1) 형태의 NumPy 배열로 변환해줍니다)
   data_values = [vbt.to_2d_array(df[col]) for col in df.columns]
 
   # 4. NamedTuple 인스턴스 생성 및 반환
