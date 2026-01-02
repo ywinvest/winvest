@@ -52,7 +52,7 @@ def calculate_features(close_s, open_s, high_s, low_s):
   # pandas_ta는 기본적으로 컬럼명에 숫자를 붙입니다 (예: ADX_14, DMP_14)
   # vectorbt는 이를 속성으로 접근할 수 있게 해줍니다 (대소문자 구분 없이 접근 가능할 수 있으나, 보통 원본 컬럼명 따름)
 
-  adx_ind = PTA_ADX.run(high=high_s, low=low_s, close=close_s, length=14)
+  adx_ind = PTA_ADX.run(high=high_s, low=low_s, close=close_s, length=14, mamode='EMA')
 
   # 속성 접근 (pandas_ta의 출력 컬럼명이 속성이 됨)
   # ADX_14, DMP_14, DMN_14 형태로 생성됨 -> .to_numpy()로 변환
@@ -64,9 +64,9 @@ def calculate_features(close_s, open_s, high_s, low_s):
 
   # vbt wrapper 결과에서 numpy 배열 추출
   # (pandas_ta 기본 출력명: ADX_14, DMP_14, DMN_14)
-  adx = adx_ind.adx_14.to_numpy()
-  dmp = adx_ind.dmp_14.to_numpy()
-  dmn = adx_ind.dmn_14.to_numpy()
+  adx = adx_ind.adx.to_numpy()
+  dmp = adx_ind.dmp.to_numpy()
+  dmn = adx_ind.dmn.to_numpy()
 
   # NaN 처리 (0으로)
   adx = np.nan_to_num(adx)
