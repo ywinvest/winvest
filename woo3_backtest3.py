@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from numba import njit
+from vectorbt.portfolio import enums as vbt_enums
 from vectorbt.portfolio import nb as vbt_nb
 
 DEFAULT_RSI_THRESHOLD = 35
@@ -207,6 +208,7 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       return vbt_nb.order_nb(
           size=-current_pos,
           price=current_price,
+          direction=vbt_enums.Direction.LongOnly,
           fees=0.0,
           slippage=0.0,
           # size_type=pf_enums.SizeType.Amount,
@@ -261,6 +263,7 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
       return vbt_nb.order_nb(
           size=target_amount / current_price,
           price=current_price,
+          direction=vbt_enums.Direction.LongOnly,
           fees=0.0,
           slippage=0.0,
           # size_type=pf_enums.SizeType.Amount,
