@@ -3,13 +3,180 @@ import os
 from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
+import numpy as np
 import pandas as pd
 import vectorbt as vbt
+from numba import njit
 
 import indicators
 
 DEFAULT_RSI_THRESHOLD = 35
 
+# -----------------------------------------------------------------------------
+# 1. 데이터 준비 헬퍼 함수 (Helper Function)
+# -----------------------------------------------------------------------------
+def prepare_strategy_data(df):
+  """
+  DataFrame의 모든 컬럼을 소문자 필드명을 가진 NamedTuple로 변환하여 반환합니다.
+  Numba(@njit) 함수인 strategy_nb에 데이터를 한 번에 넘기기 위해 사용됩니다.
+
+  예: df['RSI'] -> data.rsi, df['MA_10_Cross'] -> data.ma_10_cross
+  """
+  # 1. 컬럼명을 소문자로 변환 (strategy_nb에서 data.rsi 처럼 접근하기 위함)
+  # 공백이나 특수문자가 있다면 _로 치환하는 등의 처리가 필요할 수 있으나,
+  # 일반적인 지표 이름(영어)이라 가정하고 소문자 변환만 수행합니다.
+  field_names = [col.lower() for col in df.columns]
+
+  # 2. 동적으로 NamedTuple 클래스 정의 (Type Name: 'StrategyData')
+  StrategyData = namedtuple('StrategyData', field_names)
+
+  # 3. 각 컬럼을 vectorbt 호환 2D 배열로 변환
+  # (vbt.to_2d_array는 Series를 (N, 1) 형태의 NumPy 배열로 변환해줍니다)
+  data_values = [vbt.to_2d_array(df[col]) for col in df.columns]
+
+  # 4. NamedTuple 인스턴스 생성 및 반환
+  return StrategyData(*data_values)
+
+
+# -----------------------------------------------------------------------------
+# 2. 로직 함수 분리 (Signal Logic) - @njit (Pure Functions)
+# -----------------------------------------------------------------------------
+
+@njit
+def check_sell_signal_nb(i, col, price, data, buy_count):
+  """
+  매도 조건 판단 함수
+  True 반환 시 매도
+  """
+  # 1. 스냅백 매도 조건 (매수 횟수 4회 이상일 때)
+  if buy_count >= 4:
+    # 조건: 20일선 위 & 상승추세 & ADX>25 & DI
+    # data.ma_20 처럼 소문자로 접근 (prepare_strategy_data에서 변환됨)
+    is_snap_back = (price > data.ma_20[i, col]) and \
+                   data.bullish[i, col] and \
+                   (data.adx[i, col] > 25) and \
+                   data.di[i, col]
+    return is_snap_back
+
+  # 2. 기술적 반등 매도 조건 (매수 횟수 적을 때)
+  else:
+    # 조건: 10일선 돌파 & 상승추세
+    is_tech_bounce = data.ma_10_cross[i, col] and data.bullish[i, col]
+    return is_tech_bounce
+
+@njit
+def check_buy_signal_nb(i, col, price, data, buy_count, last_buy_price):
+  """
+  매수 조건 판단 함수
+  True 반환 시 매수 진행
+  """
+  # 기본 조건: RSI 과매도(35이하) & 비추세(Bearish) & 가격 하락
+  base_condition = (data.rsi[i, col] <= DEFAULT_RSI_THRESHOLD) and \
+                   (not data.bullish[i, col]) and \
+                   (data.change_rate[i, col] < 0)
+
+  if not base_condition:
+    return False
+
+  # 신규 진입인 경우 (buy_count == 0)
+  if buy_count == 0:
+    return True
+
+  # 추가 매수(물타기)인 경우
+  else:
+    # 조건 1: 가격이 직전 매수가보다 낮아야 함 (평단 관리)
+    if price >= last_buy_price:
+      return False
+
+    # 조건 2: 물타기 시 RSI 기준 강화
+    # 첫 물타기(2회차, buy_count==1)는 RSI 30 이하, 그 외는 35 이하(base_condition)
+    if buy_count == 1:
+      if data.rsi[i, col] > 30:
+        return False
+
+    return True
+
+# -----------------------------------------------------------------------------
+# 3. 메인 실행 함수 (Execution Logic) - @njit
+# -----------------------------------------------------------------------------
+
+@njit
+def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_cash_val):
+  """
+  vectorbt가 매 스텝마다 호출하는 메인 함수.
+  """
+  i = c.i
+  col = c.col
+
+  current_price = c.val_price_now
+  current_pos = c.position_now
+  cash_now = c.cash_now
+
+  # 상태 변수 로드 (State Loading)
+  buy_count = buy_count_state[col]
+  last_buy_price = last_price_state[col]
+
+  # --- 1. 매도 판단 (Sell Logic) ---
+  if current_pos > 0:
+    if check_sell_signal_nb(i, col, current_price, data, buy_count):
+      # 상태 초기화
+      buy_count_state[col] = 0
+      last_price_state[col] = 0.0
+
+      # 전량 매도 주문
+      return vbt.OrderResult(
+          size=-current_pos,
+          size_type=vbt.SizeType.Amount,
+          price=current_price,
+          fees=0.0,
+          slippage=0.0
+      )
+
+  # --- 2. 매수 판단 (Buy Logic) ---
+  # check_buy_signal_nb 함수를 통해 매수 여부만 먼저 확인
+  if check_buy_signal_nb(i, col, current_price, data, buy_count, last_buy_price):
+
+    # 가중치(Weight) 계산 로직
+    new_buy_count = buy_count + 1
+    weight = 1
+
+    # 4회차 이상 (공격적 물타기 구간)
+    if new_buy_count >= 4:
+      weight = 2
+      if data.rsi[i, col] <= 20:
+        weight += 1
+    # 초기 구간 (< 4회)
+    else:
+      weight = 1
+
+    # 하락폭이 크면(-5% 이상) 가중치 추가 (모든 구간 적용)
+    if data.change_rate[i, col] < -5:
+      weight += 1
+
+    # 투자 금액 계산 (Target Amount)
+    base_investment = init_cash_val / max_positions
+    target_amount = base_investment * weight
+
+    # 가용 현금 내에서만 매수
+    if target_amount > cash_now:
+      target_amount = cash_now
+
+    # 매수 실행
+    if target_amount > 0:
+      # 상태 업데이트
+      buy_count_state[col] = new_buy_count
+      last_price_state[col] = current_price
+
+      # 수량 계산하여 주문
+      return vbt.OrderResult(
+          size=target_amount / current_price,
+          size_type=vbt.SizeType.Amount,
+          price=current_price,
+          fees=0.0,
+          slippage=0.0
+      )
+
+  return vbt.NoOrder
 
 class GlobalShortTermStrategy:
   """vectorbt 기반 글로벌 단기 매매 전략"""
@@ -142,64 +309,57 @@ class GlobalShortTermStrategy:
     return orders
 
   def run_backtest(self, init_cash=10000000, fees=0, max_positions=20):
-    """vectorbt를 사용한 백테스트 실행 (from_orders 사용)
+    # 1. 데이터 준비 (Prepare Data)
+    # DataFrame을 NamedTuple(StrategyData)로 변환
+    market_data = prepare_strategy_data(self.df)
 
-    Args:
-        init_cash: 초기 자본금
-        fees: 거래 수수료 (비율)
-        max_positions: 최대 동시 보유 포지션 수
-    """
-    orders = self.generate_orders(init_cash=init_cash, max_positions=max_positions)
+    # 2. 상태 관리 배열 초기화 (Initialize State)
+    # market_data 내 임의의 필드(예: close)를 사용하여 shape 확인
+    n_cols = market_data.close.shape[1]
 
-    # vectorbt Portfolio 생성 (from_orders 사용)
-    portfolio = vbt.Portfolio.from_orders(
-        close=self.df['Close'],
-        size=orders,
-        size_type='amount',
-        direction='longonly',
+    buy_count_state = np.zeros(n_cols, dtype=np.int_)
+    last_price_state = np.zeros(n_cols, dtype=np.float_)
+
+    # 3. 백테스트 실행 (Run Simulation)
+    portfolio = vbt.Portfolio.from_order_func(
+        self.df['Close'],
+        strategy_nb,                 # 모듈 레벨의 Numba 함수 전달
+
+        # *order_args 전달 (strategy_nb의 인자 순서와 일치해야 함)
+        market_data,      # 1. 데이터 뭉치 (NamedTuple)
+        buy_count_state,             # 2. 상태 변수 1
+        last_price_state,            # 3. 상태 변수 2
+        max_positions,               # 4. 설정값 1
+        float(init_cash),            # 5. 설정값 2
+
+        # **kwargs 설정
         init_cash=init_cash,
         fees=fees,
         freq='1D'
     )
-
     return portfolio
 
   def get_results(self, portfolio):
-    """백테스트 결과 추출"""
+    """결과 지표 계산"""
     trades = portfolio.trades.records_readable
 
     if len(trades) == 0:
       return {
-        'avg_return': 0,
-        'avg_holding_period': 0,
-        'buy_count': 0,
-        'total_return': 0,
-        'win_rate': 0,
-        'max_drawdown': 0,
-        'sharpe_ratio': 0
+        'avg_return': 0, 'avg_holding_period': 0, 'buy_count': 0,
+        'total_return': 0, 'win_rate': 0, 'max_drawdown': 0,
+        'sharpe_ratio': 0, 'trades': pd.DataFrame()
       }
 
-    # 수익률 계산
     returns = trades['Return'].values
-
-    avg_return = returns.mean() if len(returns) > 0 else 0
-
     holding_periods = (trades['Exit Timestamp'] - trades['Entry Timestamp']).dt.days
-    avg_holding_period = holding_periods.mean() if len(holding_periods) > 0 else 0
-
-    # 기타 통계
-    buy_count = len(trades)
-    total_return = portfolio.total_return()
-    win_rate = (returns > 0).sum() / len(returns) if len(returns) > 0 else 0
-    max_drawdown = portfolio.max_drawdown()
 
     return {
-      'avg_return': avg_return * 100,
-      'avg_holding_period': avg_holding_period,
-      'buy_count': buy_count,
-      'total_return': total_return * 100,
-      'win_rate': win_rate * 100,
-      'max_drawdown': max_drawdown * 100,
+      'avg_return': returns.mean() * 100,
+      'avg_holding_period': holding_periods.mean() if len(holding_periods) > 0 else 0,
+      'buy_count': len(trades),
+      'total_return': portfolio.total_return() * 100,
+      'win_rate': (returns > 0).sum() / len(returns) * 100 if len(returns) > 0 else 0,
+      'max_drawdown': portfolio.max_drawdown() * 100,
       'sharpe_ratio': portfolio.sharpe_ratio(),
       'trades': trades
     }
@@ -242,11 +402,6 @@ class GlobalShortTermStrategy:
     # Action 컬럼 생성 (Buy/Sell/Wait)
     daily_df['Action'] = daily_df['Order_Amt'].apply(
         lambda x: 'Buy' if x > 0 else ('Sell' if x < 0 else '')
-    )
-
-    # 실제 체결 가격 (종가 기준 전략이므로 Close 사용, 거래 없는 날은 NaN 혹은 0)
-    daily_df['Exec_Price'] = daily_df.apply(
-        lambda row: row['Close'] if row['Action'] != '' else None, axis=1
     )
 
     if not orders.empty:

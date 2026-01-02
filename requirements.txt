@@ -11,3 +11,4 @@ openpyxl
 backtrader
 vectorbt
 anywidget
+numba
