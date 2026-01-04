@@ -440,7 +440,8 @@ class GlobalShortTermStrategy:
         float(init_cash),
         init_cash=init_cash,
         # fees=fees,
-        # freq='1D'
+        ffill_val_price=False,
+        freq='1D'
     )
     return portfolio
 
@@ -452,7 +453,7 @@ class GlobalShortTermStrategy:
       return {
         'avg_return': 0, 'avg_holding_period': 0, 'buy_count': 0,
         'total_return': 0, 'win_rate': 0, 'max_drawdown': 0,
-        # 'sharpe_ratio': 0, 'trades': pd.DataFrame()
+        'sharpe_ratio': 0, 'trades': pd.DataFrame()
       }
 
     returns = trades['Return'].values
@@ -465,7 +466,7 @@ class GlobalShortTermStrategy:
       'total_return': portfolio.total_return() * 100,
       'win_rate': (returns > 0).sum() / len(returns) * 100 if len(returns) > 0 else 0,
       'max_drawdown': portfolio.max_drawdown() * 100,
-      # 'sharpe_ratio': portfolio.sharpe_ratio(),
+      'sharpe_ratio': portfolio.sharpe_ratio(),
       'trades': trades
     }
 
