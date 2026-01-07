@@ -181,7 +181,8 @@ def strategy_nb(c, data, buy_count_state, last_price_state, max_positions, init_
   i = c.i
   col = c.col
 
-  current_price = c.val_price_now
+  # current_price = c.val_price_now
+  current_price = data.close[i, col]
   current_pos = c.position_now
   cash_now = c.cash_now
 
