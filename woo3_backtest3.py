@@ -442,7 +442,8 @@ class GlobalShortTermStrategy:
         init_cash=init_cash,
         # fees=fees,
         ffill_val_price=False,
-        freq='1D'
+        update_value=True,
+        freq='1D',
     )
     return portfolio
 
