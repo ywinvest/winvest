@@ -22,8 +22,8 @@ def calculate_indicators(df):
   df['MA60'] = df['Close'].rolling(window=60).mean()
   df['MA120'] = df['Close'].rolling(window=120).mean()
   df['MA240'] = df['Close'].rolling(window=240).mean()
-  df['MA20_Cross'] = (df['Close'].gt(df['MA20'], axis=0)) & (df['Close'].shift(1).le(df['MA20'].shift(1), axis=0))
-  df['MA20_Break'] = (df['Close'].lt(df['MA20'], axis=0)) & (df['Close'].shift(1).ge(df['MA20'].shift(1), axis=0))
+  # df['MA20_Cross'] = (df['Close'].gt(df['MA20'], axis=0)) & (df['Close'].shift(1).le(df['MA20'].shift(1), axis=0))
+  # df['MA20_Break'] = (df['Close'].lt(df['MA20'], axis=0)) & (df['Close'].shift(1).ge(df['MA20'].shift(1), axis=0))
   df['Bullish'] = df['Close'] > df['Open']
   df['Volume_Change'] = df['Volume'] / df['Volume'].shift(1) - 1
   # df['High_Change'] = (df['High'] / df['Close'].shift(1) - 1) * 100
@@ -33,12 +33,12 @@ def calculate_indicators(df):
   # df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
   # df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
-  df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
+  # df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
 
   df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
 
   # 39주 신고가 돌파 여부
-  is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
+  # is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
   # 52주 신고가 돌파 여부
   is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
 
@@ -49,7 +49,7 @@ def calculate_indicators(df):
   # df['First_52WeekHigh_Break'] = is_first_break.groupby(breaks).cumsum() == 1
   # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(is_52weekhigh_break, False)
   # 39주 신고가 첫 돌파여부
-  df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
+  # df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
   # 52주 신고가 첫 돌파여부
   df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
   # 첫 돌파 이후 10일 동안 추가 돌파 무시
