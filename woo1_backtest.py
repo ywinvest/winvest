@@ -85,6 +85,38 @@ def process_stock(row):
         partial_sell_date = None
         partial_sell_price = None
 
+        buy_index_rsi = None
+        buy_index_ma5_up = None
+        buy_index_ma20_up = None
+        buy_index_adx = None
+        buy_index_di = None
+
+        buy_kospi_ma5_up = None
+        buy_kospi_ma20_up = None
+        buy_kospi_adx = None
+        buy_kospi_di = None
+
+        # 매수일 KOSPI 지표 저장
+        if buy_date in kospi.index:
+          buy_kospi_ma5_up = kospi.loc[buy_date, 'MA5_Up']
+          buy_kospi_ma20_up = kospi.loc[buy_date, 'MA20_Up']
+          buy_kospi_adx = kospi.loc[buy_date, 'ADX']
+          buy_kospi_di = kospi.loc[buy_date, 'DI']
+
+        # 매수일 시장지수 저장
+        source_df = None
+        if market == 'KOSPI':
+          source_df = kospi
+        elif market in ['KOSDAQ', 'KOSDAQ GLOBAL']:
+          source_df = kosdaq
+
+        if source_df is not None and buy_date in source_df.index:
+          buy_index_rsi = source_df.loc[buy_date, 'RSI']
+          buy_index_ma5_up = source_df.loc[buy_date, 'MA5_Up']
+          buy_index_ma20_up = source_df.loc[buy_date, 'MA20_Up']
+          buy_index_adx = source_df.loc[buy_date, 'ADX']
+          buy_index_di = source_df.loc[buy_date, 'DI']
+
         # 1일차 (T+1)
         if not data_1.empty:
           # 매수 다음 거래일 조건 확인
@@ -167,22 +199,23 @@ def process_stock(row):
         buys.loc[buy_date, 'Full_Sell_Date'] = partial_sell_date
         buys.loc[buy_date, 'Full_Sell_Price'] = partial_sell_price
 
+        # KOSPI 지표 추가
+        buys.loc[buy_date, 'Buy_Kospi_MA5_Up'] = buy_kospi_ma5_up
+        buys.loc[buy_date, 'Buy_Kospi_MA20_Up'] = buy_kospi_ma20_up
+        buys.loc[buy_date, 'Buy_Kospi_ADX'] = buy_kospi_adx
+        buys.loc[buy_date, 'Buy_Kospi_DI'] = buy_kospi_di
+
         # 보유기간 계산 (영업일 기준)
         if partial_sell_date:
           buys.loc[buy_date, 'Partial_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           # 부분매도 수익률 계산 (%)
           buys.loc[buy_date, 'Partial_Return'] = ((partial_sell_price / buy_price) - 1)
-          if market == 'KOSPI':
-            buys.loc[buy_date, 'Index_RSI'] = kospi.loc[partial_sell_date, 'RSI']
-          elif market == 'KOSDAQ':
-            buys.loc[buy_date, 'Index_RSI'] = kosdaq.loc[partial_sell_date, 'RSI']
           buys.loc[buy_date, 'Full_Holding_Days'] = calculate_trading_days(df, buy_date, partial_sell_date)
           # 전량매도 수익률 계산 (%)
           buys.loc[buy_date, 'Full_Return'] = ((partial_sell_price / buy_price) - 1)
         else:
           buys.loc[buy_date, 'Partial_Holding_Days'] = None
           buys.loc[buy_date, 'Partial_Return'] = None
-          buys.loc[buy_date, 'Index_RSI'] = None
           buys.loc[buy_date, 'Full_Holding_Days'] = None
           buys.loc[buy_date, 'Full_Return'] = None
 
@@ -482,11 +515,22 @@ if __name__ == "__main__":
       woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
     ], ignore_index=True)
 
+    # KOSPI, KOSDAQ 지수 데이터 로드 및 지표 계산
     kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
+    adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
+    kospi['ADX'] = adx_data['ADX_14']
+    kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
+    kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
+    adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
+    kosdaq['ADX'] = adx_data['ADX_14']
+    kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+    kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
+    kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
 
     result_file = "woo1_backtest_result.csv"
 
