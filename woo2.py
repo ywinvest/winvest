@@ -16,7 +16,7 @@ BASE_RISK = 0.08  # 8% base risk (R value)
 TRADING_FEE = 0.002  # 0.2% trading fee (commission + slippage)
 
 def calculate_indicators(df):
-  # df['MA5'] = df['Close'].rolling(window=5).mean()
+  df['MA5'] = df['Close'].rolling(window=5).mean()
   # df['MA10'] = df['Close'].rolling(window=10).mean()
   df['MA20'] = df['Close'].rolling(window=20).mean()
   df['MA60'] = df['Close'].rolling(window=60).mean()
@@ -295,7 +295,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
             second_sell_cond = volume_spike_drop | trend_breakdown_confirm
             second_stop_loss_cond = (
-              (after_partial_sell_data['Close'] < trailing_stop_loss_price)
+              (after_partial_sell_data['Close'] < trailing_stop_loss_price) &
+              (after_partial_sell_data['Close'] < after_partial_sell_data['MA5'])
             )
             second_sell_dates = after_partial_sell_data.index[second_sell_cond]
             second_stop_loss_dates = after_partial_sell_data.index[second_stop_loss_cond]
