@@ -217,6 +217,39 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         stop_loss_price = buy_price * (1 - BASE_RISK) # -8%
         default_trailing_stop_loss_price = buy_price * (1 + BASE_RISK + TRADING_FEE) # +8.2%
 
+        # ===== 개선된 손절가 로직: 고가 16.2% 달성 시 손절가를 0.2%로 상향 =====
+        high_threshold_price = buy_price * (1 + (BASE_RISK * 2) + TRADING_FEE)  # 16.2%
+        enhanced_stop_price = buy_price * (1 + TRADING_FEE)  # 0.2%
+
+        # 고가가 16.2%를 달성한 날짜 찾기
+        high_threshold_dates = trade_data[trade_data['High'] >= high_threshold_price]
+        high_threshold_date = high_threshold_dates.index[0] if not high_threshold_dates.empty else None
+
+        # 동적 손절가 설정: 16.2% 달성 후에는 0.2%로 변경
+        if high_threshold_date is not None:
+          # 16.2% 달성 전후로 데이터 분리
+          before_threshold = trade_data.loc[:high_threshold_date].iloc[:-1]  # 달성일 전까지
+          after_threshold = trade_data.loc[high_threshold_date:]  # 달성일부터
+
+          # 달성 전 손절 조건 (기존 -8%)
+          stop_loss_before = before_threshold[before_threshold['Close'] < stop_loss_price]
+          stop_loss_before_date = stop_loss_before.index[0] if not stop_loss_before.empty else None
+
+          # 달성 후 손절 조건 (0.2%로 상향)
+          stop_loss_after = after_threshold[after_threshold['Close'] < enhanced_stop_price]
+          stop_loss_after_date = stop_loss_after.index[0] if not stop_loss_after.empty else None
+
+          # 최종 손절일 결정
+          if stop_loss_before_date:
+            stop_loss_date = stop_loss_before_date
+          else:
+            stop_loss_date = stop_loss_after_date
+        else:
+          # 16.2%를 달성하지 못한 경우 기존 손절가 적용
+          stop_loss_dates = trade_data[trade_data['Close'] < stop_loss_price]
+          stop_loss_date = stop_loss_dates.index[0] if not stop_loss_dates.empty else None
+        # ===== 개선 로직 끝 =====
+
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
         take_profit_high_dates = trade_data[(trade_data['Open'] < take_profit_price) & (trade_data['High'] >= take_profit_price)]
@@ -225,7 +258,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
         take_profit_open_date = take_profit_open_dates.index[0] if not take_profit_open_dates.empty else None
         take_profit_high_date = take_profit_high_dates.index[0] if not take_profit_high_dates.empty else None
-        stop_loss_date = stop_loss_dates.index[0] if not stop_loss_dates.empty else None
+        # stop_loss_date = stop_loss_dates.index[0] if not stop_loss_dates.empty else None
 
         # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
         valid_dates = [(d, 'open') for d in [take_profit_open_date] if d is not None] + \
