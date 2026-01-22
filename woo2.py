@@ -289,8 +289,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
                 (after_partial_sell_data['MA20_Slope'] < 0) &
                 (after_partial_sell_data['MA20_Gap'] < -0.05) &
-                (after_partial_sell_data['Bullish'] == False) &
-                (after_partial_sell_data['Change'] < -0.02)
+                (after_partial_sell_data['Change'] < -0.01)
             )
 
             second_sell_cond = volume_spike_drop | trend_breakdown_confirm
