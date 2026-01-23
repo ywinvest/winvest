@@ -90,8 +90,11 @@ def calculate_indicators(df):
 
   down_vol = df['Volume'].where(df['Close'] < df['Close'].shift(1), 0)
 
-  df['Max_Down_Vol_10'] = down_vol.rolling(window=10).max()
-  df['Pocket_Pivot'] = df['Volume'] > df['Max_Down_Vol_10']
+  # df['Max_Down_Vol_10'] = down_vol.rolling(window=10).max()
+  # df['Pocket_Pivot'] = df['Volume'] > df['Max_Down_Vol_10']
+  df['MA20_Vol'] = df['Volume'].rolling(window=20).mean()
+  df['Vol_Ratio'] = df['Volume'] / df['MA20_Vol']
+  df['Recent_Max_Vol_Ratio'] = df['Vol_Ratio'].rolling(window=5).max()
   return df
 
 
