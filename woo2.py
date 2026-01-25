@@ -289,7 +289,10 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           if not after_partial_sell_data.empty:
             # 1. 거래량 실린 장대 음봉 (오닐식 청산)
             volume_spike_drop = (
-                (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) &
+                (
+                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
+                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
+                ) &
                 (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
                 (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
             )
