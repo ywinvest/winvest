@@ -186,6 +186,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_kospi_adx = None
       buy_kospi_di = None
 
+      buy_kosdaq_ma5_up = None
+      buy_kosdaq_ma20_up = None
+      buy_kosdaq_adx = None
+      buy_kosdaq_di = None
+
       sell_index_ma5_up = None
       sell_index_ma20_up = None
       sell_index_adx = None
@@ -260,6 +265,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_kospi_adx = kospi_df.loc[buy_date, 'ADX']
           buy_kospi_di = kospi_df.loc[buy_date, 'DI']
 
+          buy_kosdaq_ma5_up = kosdaq_df.loc[buy_date, 'MA5_Up']
+          buy_kosdaq_ma20_up = kosdaq_df.loc[buy_date, 'MA20_Up']
+          buy_kosdaq_adx = kosdaq_df.loc[buy_date, 'ADX']
+          buy_kosdaq_di = kosdaq_df.loc[buy_date, 'DI']
+
         if source_df is not None and sell_date in source_df.index:
           ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
           sell_index_ma5_up = ma5_up_val.iloc[0] if isinstance(ma5_up_val, pd.Series) else ma5_up_val
@@ -316,7 +326,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
         'Buy_Kospi_ADX': buy_kospi_adx,
-        # 'Buy_Index_RSI': buy_index_rsi,
+        'Buy_Kosdaq_ADX': buy_kosdaq_adx,
         'Buy_Index_ADX': buy_index_adx,
         'Buy_Index_DI': buy_index_di,
         'Buy_Index_MA5_Up': buy_index_ma5_up,
