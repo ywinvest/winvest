@@ -178,6 +178,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_index_rsi = None
       buy_index_ma5_up = None
       buy_index_ma20_up = None
+      buy_index_ma60_up = None
+      buy_index_ma120_up = None
       buy_index_adx = None
       buy_index_di = None
 
@@ -257,6 +259,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_index_rsi = source_df.loc[buy_date, 'RSI']
           buy_index_ma5_up = source_df.loc[buy_date, 'MA5_Up']
           buy_index_ma20_up = source_df.loc[buy_date, 'MA20_Up']
+          buy_index_ma60_up = source_df.loc[buy_date, 'MA60_Up']
+          buy_index_ma120_up = source_df.loc[buy_date, 'MA120_Up']
           buy_index_adx = source_df.loc[buy_date, 'ADX']
           buy_index_di = source_df.loc[buy_date, 'DI']
 
@@ -334,6 +338,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Index_DI': buy_index_di,
         'Buy_Index_MA5_Up': buy_index_ma5_up,
         'Buy_Index_MA20_Up': buy_index_ma20_up,
+        'Buy_Index_MA60_Up': buy_index_ma60_up,
+        'Buy_Index_MA120_Up': buy_index_ma120_up,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Sell_Index_ADX': sell_index_adx,
@@ -608,6 +614,8 @@ if __name__ == "__main__":
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
+    kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
+    kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -616,6 +624,8 @@ if __name__ == "__main__":
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
+    kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
+    kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
