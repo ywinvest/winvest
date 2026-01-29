@@ -124,9 +124,6 @@ if __name__ == "__main__":
   try:
     # delisting = fdr.StockListing('KRX-DELISTING') # 3천+ 종목 - 상장폐지 종목 전체
     # admin = fdr.StockListing('KRX-ADMIN') # 50+ 종목 - KRX 관리종목
-    # 0. 가장 먼저 KRX 로그인을 수행하여 _session에 쿠키를 확보합니다.
-    # (data.krx.co.kr 에 가입된 실제 아이디와 비밀번호로 변경하세요)
-
     krx_id = os.getenv("KRX_ID")
     krx_pw = os.getenv("KRX_PW")
 
@@ -157,10 +154,7 @@ if __name__ == "__main__":
 
     all_stocks = all_stocks.merge(df_listing, on='Code', how='left')
 
-    # 2. woo2.py의 공통 함수를 호출하여 지수 데이터 가져오기 (2003년 1월 1일부터)
-    kospi, kosdaq = woo2.get_index_data("20150615")
-
-    # kospi = fdr.DataReader('KS11')
+    kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
@@ -170,7 +164,7 @@ if __name__ == "__main__":
     kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
     kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
-    # kosdaq = fdr.DataReader('KQ11')
+    kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
@@ -192,14 +186,72 @@ if __name__ == "__main__":
       today_rs_data = result_data[result_data.index == last_trading_day].copy()
       today_rs_data = woo2.filter_common_stocks(today_rs_data)
       today_rs_data['Marcap(억)'] = (today_rs_data['Marcap'] / 100_000_000).round(0).astype(int)
+      # today_rs_data['Date'] = last_trading_day.strftime('%Y%m%d')
       rs_report = today_rs_data.drop(columns=['Marcap'])
       rs_cols = ['Code', 'Name', 'Market', 'Marcap(억)', 'RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M']
-      rs_report = today_rs_data[rs_cols].sort_values(
+      # rs_report = today_rs_data[rs_cols].sort_values(
+      #     by=['RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M'],
+      #     ascending=False
+      # )
+      # rs_cols = ['Code', 'Name', 'Date', 'Market', 'Marcap(억)', 'RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M']
+      # rs_report = today_rs_data[rs_cols].sort_values(by='RS', ascending=False)
+      # filename = f"rs_{last_trading_day.strftime('%Y%m%d')}.xlsx"
+      # rs_report.to_excel(filename, index=False)
+      today_rs_data['Date'] = last_trading_day.strftime('%Y%m%d')
+      # rs_report = today_rs_data.drop(columns=['Marcap'])
+      rs_cols = ['Name', 'RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M', 'Marcap', 'Code', 'Market', 'Date']
+      rs_report = today_rs_data[rs_cols].sort_values(by='RS', ascending=False)
+      # filename = f"rs_{last_trading_day.strftime('%Y%m%d')}.xlsx"
+      # rs_report.to_excel(filename, index=False)
+
+      file_title = f"rs_{last_trading_day.strftime('%Y%m%d')}.csv"
+      rs_report.to_csv(file_title, index=False)
+
+      # 1. 시장 이름 변경 (KOSDAQ GLOBAL -> KOSDAQ)
+      today_rs_data['Market'] = today_rs_data['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
+
+      # 2. 다중 조건 정렬 및 순위 부여
+      today_rs_data = today_rs_data.sort_values(
           by=['RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M'],
           ascending=False
       )
-      filename = f"rs_{last_trading_day.strftime('%Y%m%d')}.xlsx"
-      rs_report.to_excel(filename, index=False)
+      today_rs_data['Rank'] = range(1, len(today_rs_data) + 1)
+
+      # 3. 시가총액 텍스트 포맷 적용 (새로운 '시가총액' 컬럼 생성)
+      today_rs_data['시가총액'] = today_rs_data['Marcap'].apply(woo2.format_market_cap)
+
+      # 4. 컬럼명을 숫자 접두어를 포함한 이름으로 일괄 변경
+      today_rs_data = today_rs_data.rename(columns={
+        'Rank': '순위',
+        'Name': '종목명',
+        'RS': 'RS',
+        'RS_1M': 'RS_1M',
+        'RS_3M': 'RS_3M',
+        'RS_6M': 'RS_6M',
+        'RS_12M': 'RS_12M',
+        'Market': '시장',
+        '시가총액': '시가총액',
+        'Marcap': '시가총액(원)',
+        'Code': '종목코드'
+      })
+
+      # 5. 파일 저장용 최종 컬럼 리스트 (번호 순서대로)
+      export_cols = [
+        '순위', '종목명', 'RS', 'RS_1M', 'RS_3M',
+        'RS_6M', 'RS_12M', '시장', '시가총액', '시가총액(원)', '종목코드'
+      ]
+
+      # -------------------------------------------------------------------
+      # CSV 파일 저장 (노션 연동용: 1위가 상단에 오도록 순위 역순 정렬)
+      # -------------------------------------------------------------------
+      # rs_report_csv = today_rs_data[export_cols]
+      today_rs_data.to_csv(f"rs_{last_trading_day.strftime('%Y%m%d')}.csv", index=False)
+
+      # -------------------------------------------------------------------
+      # Excel 파일 저장 (직접 확인용: 1위부터 보이도록 순위 정순 정렬)
+      # -------------------------------------------------------------------
+      # rs_report_excel = today_rs_data[export_cols].sort_values(by='순위', ascending=True)
+      # rs_report_excel.to_excel(f"rs_{last_trading_day.strftime('%Y%m%d')}.xlsx", index=False)
 
     result_data = woo2.buy_and_sell(filtered_data, kospi, kosdaq)
     # final_data = result_data[buy_condition(result_data)]

@@ -58,3 +58,45 @@ jobs:
       with:
         name: rs
         path: ./rs_*.xlsx
+    - name: Run python script
+#      env:
+#        RELEASE_API_URL: ${{ vars.RELEASE_API_URL }}
+#        RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      run: |
+        python woo2_backtest.py
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: woo2_backtest_results
+        path: ./woo2_backtest_results.csv
+
+#    - name: Upload Artifact
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: rs
+#        path: ./rs_*.xlsx
+
+    - name: Install csv2notion
+      run: pip install csv2notion-neo
+
+    - name: Create Notion DB
+      id: create_db
+      env:
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        PARENT_PAGE_ID: "2f73336c6c0380da87e0cc5ef9e9a10d"
+      run: |
+        python create_notion_db.py
+
+    - name : Upload CSV to Notion
+      env:
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      run: |
+        # ID 앞에 'https://www.notion.so/'를 붙여서 URL 형식을 만들어줍니다.
+        # (워크스페이스 이름은 없어도 ID만 있으면 작동합니다)
+        TARGET_URL="https://www.notion.so/${{ env.CREATED_DB_ID }}"
+
+        echo "Target URL: $TARGET_URL"
+        FILE_NAME=$(ls rs*.csv)
+        csv2notion_neo "$FILE_NAME" --token $NOTION_TOKEN --workspace "테크트레이더" --url "$TARGET_URL"
+#        csv2notion "$FILE_NAME" --merge --token $NOTION_TOKEN --url "https://www.notion.so/gotechtrader/RS-2f73336c6c03806fbdccf391b7259d62"
