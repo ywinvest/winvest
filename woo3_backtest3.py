@@ -666,7 +666,8 @@ if __name__ == "__main__":
   start_date = end_date - timedelta(days=30 * 365)
 
   end_date_str = end_date.strftime('%Y-%m-%d')
-  start_date_str = start_date.strftime('%Y-%m-%d')
+  # start_date_str = start_date.strftime('%Y-%m-%d')
+  start_date_str = None
 
   for ticker, name in tickers.items():
     result = run_backtest_for_ticker(ticker, name, start_date_str, end_date_str)
