@@ -125,7 +125,10 @@ if __name__ == "__main__":
       today_rs_data['Marcap(억)'] = (today_rs_data['Marcap'] / 100_000_000).round(0).astype(int)
       rs_report = today_rs_data.drop(columns=['Marcap'])
       rs_cols = ['Code', 'Name', 'Market', 'Marcap(억)', 'RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M']
-      rs_report = today_rs_data[rs_cols].sort_values(by='RS', ascending=False)
+      rs_report = today_rs_data[rs_cols].sort_values(
+          by=['RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M'],
+          ascending=False
+      )
       filename = f"rs_{last_trading_day.strftime('%Y%m%d')}.xlsx"
       rs_report.to_excel(filename, index=False)
 
