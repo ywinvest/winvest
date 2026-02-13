@@ -208,8 +208,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       current_price = stock_group['Close'].iloc[-1]
       estimated_marcap = buy_row['Marcap'] * (buy_price / current_price)
 
-      if estimated_marcap < 2e+11:
-        continue
+      # if estimated_marcap < 2e+11:
+      #   continue
 
       # 매수일 이후의 데이터만 사용합니다.
       trade_data = stock_group.loc[buy_date:].iloc[1:]
@@ -361,7 +361,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       else: # 매도가 일어나지 않았다면 이 종목은 더 이상 거래하지 않음
         prev_sell_date = pd.Timestamp.max
 
-  return pd.DataFrame(trades)
+  trades_df = pd.DataFrame(trades)
+  if not trades_df.empty:
+    trades_df = trades_df[trades_df['Estimated_Marcap'] >= 2e+11].copy()
+
+  return trades_df
 
 
 def format_market_cap(marcap):
