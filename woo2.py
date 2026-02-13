@@ -529,11 +529,13 @@ def send_to_slack(trades_data, kospi, kosdaq):
           rs_6m = row['RS_6M']
 
           emoji = "question"
-          if rs_1m >= rs_3m and rs_1m >= rs_6m:
-            if 80 <= rs <= 96 and marcap >= 400_000_000_000 and change < 0.24:
+          if rs_1m >= rs_3m and rs_1m >= rs_6m and marcap >= 400_000_000_000 and change < 0.20:
+            if 80 <= rs <= 97:
               emoji = "first_place_medal"
-            elif (75 <= rs <= 79) or (97 <= rs <= 99):
+            elif (75 <= rs <= 79) or rs == 98:
               emoji = "second_place_medal"
+            elif rs == 99:
+              emoji = "third_place_medal"
 
           with builder.line() as line:
             line \
