@@ -147,7 +147,7 @@ def buy_condition(df):
   conditions &= (df['Volume'].shift(1) > 0)
   # conditions &= (df['MA120_Uptrend_Days'] < 400) # 120일 상승 추세 장기 연속 제외
   # conditions &= ((df['Close'] - df['Open'])/df['Close'] > -0.05) # 긴 음봉 제외
-  conditions &= (df['MA20_Gap'] < 0.35)
+  # conditions &= (df['MA20_Gap'] < 0.35)
   return conditions
 
 
@@ -363,7 +363,10 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
   trades_df = pd.DataFrame(trades)
   if not trades_df.empty:
-    trades_df = trades_df[trades_df['Estimated_Marcap'] >= 2e+11].copy()
+    trades_df = trades_df[
+      (trades_df['Estimated_Marcap'] >= 2e+11) &
+      (trades_df['MA20_Gap'] < 0.35)
+      ].copy()
 
   return trades_df
 
