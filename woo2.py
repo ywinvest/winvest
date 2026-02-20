@@ -364,8 +364,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
   trades_df = pd.DataFrame(trades)
   if not trades_df.empty:
     trades_df = trades_df[
-      (trades_df['Estimated_Marcap'] >= 2e+11) &
-      (trades_df['MA20_Gap'] < 0.35)
+      (trades_df['Estimated_Marcap'] >= 2e+11)
+      # (trades_df['MA20_Gap'] < 0.35)
       ].copy()
 
   return trades_df
