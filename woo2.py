@@ -285,8 +285,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           sell_index_di = di_val.iloc[0] if isinstance(di_val, pd.Series) else di_val
 
         if sell_date and not full_sell_date:
-          is_market_weak = not sell_index_ma5_up
-          trailing_stop_loss_price = buy_price * (1 + (BASE_RISK * 2) + TRADING_FEE) if is_market_weak else default_trailing_stop_loss_price # +16.2%
+          # is_market_weak = not sell_index_ma5_up
+          # trailing_stop_loss_price = buy_price * (1 + (BASE_RISK * 2) + TRADING_FEE) if is_market_weak else default_trailing_stop_loss_price # +16.2%
+          trailing_stop_loss_price = default_trailing_stop_loss_price # +8.2%
 
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
