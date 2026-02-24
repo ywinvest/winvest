@@ -224,10 +224,20 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         stop_loss_price = buy_price * (1 - BASE_RISK) # -8%
         default_trailing_stop_loss_price = buy_price * (1 + BASE_RISK + TRADING_FEE) # +8.2%
 
+        # --- 추가된 60거래일 스탑로스 상향 로직 (벡터화 연산) ---
+        # 기본 스탑로스(-8%)로 trade_data와 동일한 길이의 Series 생성
+        dynamic_stop_loss = pd.Series(stop_loss_price, index=trade_data.index)
+
+        # 보유 거래일이 60일(인덱스 59) 이상인 경우, 60일차부터 스탑로스를 +0.2%로 상향
+        if len(dynamic_stop_loss) >= 60:
+          dynamic_stop_loss.iloc[59:] = buy_price * (1 + TRADING_FEE)
+        # --------------------------------------------------------
+
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
         take_profit_high_dates = trade_data[(trade_data['Open'] < take_profit_price) & (trade_data['High'] >= take_profit_price)]
-        stop_loss_dates = trade_data[trade_data['Close'] < stop_loss_price]
+        # stop_loss_dates = trade_data[trade_data['Close'] < stop_loss_price]
+        stop_loss_dates = trade_data[trade_data['Close'] < dynamic_stop_loss]
 
         # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
         take_profit_open_date = take_profit_open_dates.index[0] if not take_profit_open_dates.empty else None
