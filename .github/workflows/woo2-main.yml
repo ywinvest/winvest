@@ -51,5 +51,7 @@ jobs:
       env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
+        KRX_ID: ${{ secrets.KRX_ID }}
+        KRX_PW: ${{ secrets.KRX_PW }}
       run: |
         python woo2.py
