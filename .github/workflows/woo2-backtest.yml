@@ -41,6 +41,9 @@ jobs:
 #      env:
 #        RELEASE_API_URL: ${{ vars.RELEASE_API_URL }}
 #        RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      env:
+        KRX_ID: ${{ secrets.KRX_ID }}
+        KRX_PW: ${{ secrets.KRX_PW }}
       run: |
         python woo2_backtest.py
 
