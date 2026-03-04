@@ -154,7 +154,10 @@ if __name__ == "__main__":
 
     all_stocks = all_stocks.merge(df_listing, on='Code', how='left')
 
-    kospi = fdr.DataReader('KS11')
+    # 2. woo2.py의 공통 함수를 호출하여 지수 데이터 가져오기 (2003년 1월 1일부터)
+    kospi, kosdaq = woo2.get_index_data("20150615")
+
+    # kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
@@ -164,7 +167,7 @@ if __name__ == "__main__":
     kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
     kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
-    kosdaq = fdr.DataReader('KQ11')
+    # kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
