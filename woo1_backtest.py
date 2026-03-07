@@ -10,6 +10,7 @@ import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
 
+import krx_auth
 import woo1
 
 PARTIAL_TARGET_RETURN = 1.082
@@ -515,8 +516,24 @@ if __name__ == "__main__":
       woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
     ], ignore_index=True)
 
+    krx_id = os.getenv("KRX_ID")
+    krx_pw = os.getenv("KRX_PW")
+
+    print("0. KRX 정보데이터시스템 로그인 진행 중...")
+    if not krx_auth.login_krx(krx_id, krx_pw):
+      print("❌ KRX 로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요.")
+      exit()
+    print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
+
+    # 1. woo2.py의 공통 함수를 호출하여 전 종목 기본 정보 및 시가총액 가져오기
+    all_stocks = woo1.get_all_stocks()
+    print(f"\n✅ 종목 정보 수집 완료! 총 {len(all_stocks)}개 종목")
+
+    # 2. woo2.py의 공통 함수를 호출하여 지수 데이터 가져오기 (2003년 1월 1일부터)
+    kospi, kosdaq = woo1.get_index_data("20150615")
+
     # KOSPI, KOSDAQ 지수 데이터 로드 및 지표 계산
-    kospi = fdr.DataReader('KS11')
+    # kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
@@ -524,7 +541,7 @@ if __name__ == "__main__":
     kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
 
-    kosdaq = fdr.DataReader('KQ11')
+    # kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
