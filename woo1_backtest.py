@@ -530,7 +530,7 @@ if __name__ == "__main__":
     print(f"\n✅ 종목 정보 수집 완료! 총 {len(all_stocks)}개 종목")
 
     # 2. woo2.py의 공통 함수를 호출하여 지수 데이터 가져오기 (2003년 1월 1일부터)
-    kospi, kosdaq = woo1.get_index_data("20150615")
+    kospi, kosdaq = woo1.get_index_data("20140101")
 
     # KOSPI, KOSDAQ 지수 데이터 로드 및 지표 계산
     # kospi = fdr.DataReader('KS11')
