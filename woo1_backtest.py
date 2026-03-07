@@ -159,7 +159,7 @@ def process_stock(row):
             # 각 조건이 처음 발생하는 날짜 찾기
             target_open_sell = data_2_22[data_2_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
             target_high_sell = data_2_22[(data_2_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_2_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
-            stop_loss0 = data_2_22[(data_2_22['Low'] <= buy_price * 0.92)]
+            stop_loss0 = data_2_22[(data_2_22['Low'] <= buy_price * 0.84)]
             stop_loss1 = data_2_22[(data_2_22['Close'] < df.loc[buy_date, 'Open']) & (data_2_22['Close'] < data_2_22['MA20']) & ~data_2_22['Bullish']]
             stop_loss2 = data_2_22[(data_2_22['Close'] <= buy_price * 0.92) & ((data_2_22['Close'] < df.loc[buy_date, 'Open']) | (data_2_22['Close'] < data_2_22['MA20'])) & ~data_2_22['Bullish']]
 
