@@ -2,6 +2,12 @@ name: woo2 - Backtest
 
 on:
   workflow_dispatch:
+    inputs:
+      upload_to_notion:
+        description: 'Enable Notion Upload'
+        required: true
+        type: boolean
+        default: true
   schedule:
   # 매주 월~금 오후 3:30 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
   - cron: "30 6 * * 1-5"  # 오후 3:30 (UTC+9)
@@ -53,8 +59,35 @@ jobs:
         name: woo2_backtest_results
         path: ./woo2_backtest_results.csv
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: rs
-        path: ./rs_*.xlsx
+#    - name: Upload Artifact
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: rs
+#        path: ./rs_*.xlsx
+
+    - name: Create Notion DB
+      id: create_db
+      if: |
+        github.event_name == 'schedule' || 
+        (github.event_name == 'workflow_dispatch' && inputs.upload_to_notion == true)
+      env:
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        PARENT_PAGE_ID: "2f73336c6c0380da87e0cc5ef9e9a10d"
+      run: |
+        python create_notion_db.py
+
+    - name : Upload CSV to Notion
+      if: |
+        github.event_name == 'schedule' || 
+        (github.event_name == 'workflow_dispatch' && inputs.upload_to_notion == true)
+      env:
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      run: |
+        # ID 앞에 'https://www.notion.so/'를 붙여서 URL 형식을 만들어줍니다.
+        # (워크스페이스 이름은 없어도 ID만 있으면 작동합니다)
+        TARGET_URL="https://www.notion.so/${{ env.CREATED_DB_ID }}"
+
+        echo "Target URL: $TARGET_URL"
+        FILE_NAME=$(ls rs*.csv)
+        csv2notion_neo "$FILE_NAME" --token $NOTION_TOKEN --workspace "테크트레이더" --url "$TARGET_URL"
+#        csv2notion "$FILE_NAME" --merge --token $NOTION_TOKEN --url "https://www.notion.so/gotechtrader/RS-2f73336c6c03806fbdccf391b7259d62"
