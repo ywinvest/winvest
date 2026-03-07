@@ -98,12 +98,24 @@ def process_stock(row):
         buy_kospi_adx = None
         buy_kospi_di = None
 
+        buy_kosdaq_ma5_up = None
+        buy_kosdaq_ma20_up = None
+        buy_kosdaq_adx = None
+        buy_kosdaq_di = None
+
         # 매수일 KOSPI 지표 저장
         if buy_date in kospi.index:
           buy_kospi_ma5_up = kospi.loc[buy_date, 'MA5_Up']
           buy_kospi_ma20_up = kospi.loc[buy_date, 'MA20_Up']
           buy_kospi_adx = kospi.loc[buy_date, 'ADX']
           buy_kospi_di = kospi.loc[buy_date, 'DI']
+
+        # 매수일 KOSPI 지표 저장
+        if buy_date in kosdaq.index:
+          buy_kosdaq_ma5_up = kosdaq.loc[buy_date, 'MA5_Up']
+          buy_kosdaq_ma20_up = kosdaq.loc[buy_date, 'MA20_Up']
+          buy_kosdaq_adx = kosdaq.loc[buy_date, 'ADX']
+          buy_kosdaq_di = kosdaq.loc[buy_date, 'DI']
 
         # 매수일 시장지수 저장
         source_df = None
@@ -218,6 +230,12 @@ def process_stock(row):
         buys.loc[buy_date, 'Buy_Kospi_MA20_Up'] = buy_kospi_ma20_up
         buys.loc[buy_date, 'Buy_Kospi_ADX'] = buy_kospi_adx
         buys.loc[buy_date, 'Buy_Kospi_DI'] = buy_kospi_di
+
+        # KOSDAQ 지표 추가
+        buys.loc[buy_date, 'Buy_Kosdaq_MA5_Up'] = buy_kosdaq_ma5_up
+        buys.loc[buy_date, 'Buy_Kosdaq_MA20_Up'] = buy_kosdaq_ma20_up
+        buys.loc[buy_date, 'Buy_Kosdaq_ADX'] = buy_kosdaq_adx
+        buys.loc[buy_date, 'Buy_Kosdaq_DI'] = buy_kosdaq_di
 
         # 보유기간 계산 (영업일 기준)
         if partial_sell_date:
