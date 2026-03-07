@@ -159,20 +159,19 @@ def process_stock(row):
             # 각 조건이 처음 발생하는 날짜 찾기
             target_open_sell = data_2_22[data_2_22['Open'] >= buy_price * PARTIAL_TARGET_RETURN]
             target_high_sell = data_2_22[(data_2_22['Open'] < buy_price * PARTIAL_TARGET_RETURN) & (data_2_22['High'] >= buy_price * PARTIAL_TARGET_RETURN)]
-            stop_loss0 = data_2_22[(data_2_22['Low'] <= buy_price * 0.84)]
+            # stop_loss0 = data_2_22[(data_2_22['Low'] <= buy_price * 0.84)]
             stop_loss1 = data_2_22[(data_2_22['Close'] < df.loc[buy_date, 'Open']) & (data_2_22['Close'] < data_2_22['MA20']) & ~data_2_22['Bullish']]
             stop_loss2 = data_2_22[(data_2_22['Close'] <= buy_price * 0.92) & ((data_2_22['Close'] < df.loc[buy_date, 'Open']) | (data_2_22['Close'] < data_2_22['MA20'])) & ~data_2_22['Bullish']]
 
             # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
             open_sell_date = target_open_sell.index[0] if not target_open_sell.empty else None
             high_sell_date = target_high_sell.index[0] if not target_high_sell.empty else None
-            stop_loss0_date = stop_loss0.index[0] if not stop_loss0.empty else None
+            # stop_loss0_date = stop_loss0.index[0] if not stop_loss0.empty else None
             stop_loss1_date = stop_loss1.index[0] if not stop_loss1.empty else None
             stop_loss2_date = stop_loss2.index[0] if not stop_loss2.empty else None
 
             # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
             valid_dates = [(d, 'open') for d in [open_sell_date] if d is not None] + \
-                          [(d, 'stop0') for d in [stop_loss0_date] if d is not None] + \
                           [(d, 'high') for d in [high_sell_date] if d is not None] + \
                           [(d, 'stop2') for d in [stop_loss2_date] if d is not None] + \
                           [(d, 'stop1') for d in [stop_loss1_date] if d is not None]
@@ -184,10 +183,10 @@ def process_stock(row):
                 partial_sell_date = earliest_date
                 partial_sell_price = data_2_22.loc[earliest_date, 'Open']
                 partial_sell_reason = 'open'
-              elif condition == 'stop0':
-                partial_sell_date = earliest_date
-                partial_sell_price = buy_price * 0.84
-                partial_sell_reason = 'stop0'
+              # elif condition == 'stop0':
+              #   partial_sell_date = earliest_date
+              #   partial_sell_price = buy_price * 0.84
+              #   partial_sell_reason = 'stop0'
               elif condition == 'high':
                 partial_sell_date = earliest_date
                 partial_sell_price = buy_price * PARTIAL_TARGET_RETURN
