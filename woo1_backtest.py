@@ -511,10 +511,10 @@ if __name__ == "__main__":
     # admin = fdr.StockListing('KRX-ADMIN') # 50+ 종목 - KRX 관리종목
 
     # 종목 리스트 가져오기 및 필터링
-    all_stocks = pd.concat([
-      woo1.filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
-      woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
-    ], ignore_index=True)
+    # all_stocks = pd.concat([
+    #   woo1.filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
+    #   woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
+    # ], ignore_index=True)
 
     krx_id = os.getenv("KRX_ID")
     krx_pw = os.getenv("KRX_PW")
