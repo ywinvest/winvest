@@ -2,6 +2,12 @@ name: woo2 - Backtest
 
 on:
   workflow_dispatch:
+    inputs:
+      upload_to_notion:
+        description: '노션 DB 생성 및 업로드 실행 여부'
+        required: true
+        type: boolean
+        default: true
   schedule:
   # 매주 월~금 오후 3:30 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
   - cron: "30 6 * * 1-5"  # 오후 3:30 (UTC+9)
@@ -59,11 +65,11 @@ jobs:
 #        name: rs
 #        path: ./rs_*.xlsx
 
-    - name: Install csv2notion
-      run: pip install csv2notion-neo
-
     - name: Create Notion DB
       id: create_db
+      if: |
+        github.event_name == 'schedule' || 
+        (github.event_name == 'workflow_dispatch' && inputs.upload_to_notion == true)
       env:
         NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         PARENT_PAGE_ID: "2f73336c6c0380da87e0cc5ef9e9a10d"
@@ -71,6 +77,9 @@ jobs:
         python create_notion_db.py
 
     - name : Upload CSV to Notion
+      if: |
+        github.event_name == 'schedule' || 
+        (github.event_name == 'workflow_dispatch' && inputs.upload_to_notion == true)
       env:
         NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
       run: |
