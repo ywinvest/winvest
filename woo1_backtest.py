@@ -186,7 +186,7 @@ def process_stock(row):
                 partial_sell_reason = 'open'
               elif condition == 'stop0':
                 partial_sell_date = earliest_date
-                partial_sell_price = buy_price * 0.92
+                partial_sell_price = buy_price * 0.84
                 partial_sell_reason = 'stop0'
               elif condition == 'high':
                 partial_sell_date = earliest_date
