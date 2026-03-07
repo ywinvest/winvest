@@ -158,7 +158,7 @@ if __name__ == "__main__":
     all_stocks = all_stocks.merge(df_listing, on='Code', how='left')
 
     # 2. woo2.py의 공통 함수를 호출하여 지수 데이터 가져오기 (2003년 1월 1일부터)
-    kospi, kosdaq = woo2.get_index_data("20150615")
+    kospi, kosdaq = woo2.get_index_data("20140101")
 
     # kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
