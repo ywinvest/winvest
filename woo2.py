@@ -7,48 +7,12 @@ from functools import partial
 import FinanceDataReader as fdr
 import pandas as pd
 import pandas_ta as ta
-import requests
 from dotenv import load_dotenv
 from pykrx import stock
-from pykrx.website.comm import webio
 
+import krx_auth
 import rs
 from slack_utils import SlackMessageBuilder, send_slack_message
-
-# 1. 공유 세션 생성 및 pykrx에 주입
-_session = requests.Session()
-
-def _session_post_read(self, **params):
-  return _session.post(self.url, headers=self.headers, data=params)
-
-def _session_get_read(self, **params):
-  return _session.get(self.url, headers=self.headers, params=params)
-
-webio.Post.read = _session_post_read
-webio.Get.read = _session_get_read
-
-def login_krx(login_id: str, login_pw: str) -> bool:
-  """KRX 정보데이터시스템 로그인 후 세션 쿠키를 갱신합니다."""
-  _LOGIN_PAGE = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001.cmd"
-  _LOGIN_JSP  = "https://data.krx.co.kr/contents/MDC/COMS/client/view/login.jsp?site=mdc"
-  _LOGIN_URL  = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
-  _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-
-  _session.get(_LOGIN_PAGE, headers={"User-Agent": _UA}, timeout=15)
-  _session.get(_LOGIN_JSP, headers={"User-Agent": _UA, "Referer": _LOGIN_PAGE}, timeout=15)
-
-  payload = {"mbrNm": "", "telNo": "", "di": "", "certType": "", "mbrId": login_id, "pw": login_pw}
-  headers = {"User-Agent": _UA, "Referer": _LOGIN_PAGE}
-
-  resp = _session.post(_LOGIN_URL, data=payload, headers=headers, timeout=15)
-  error_code = resp.json().get("_error_code", "")
-
-  if error_code == "CD011":
-    payload["skipDup"] = "Y"
-    resp = _session.post(_LOGIN_URL, data=payload, headers=headers, timeout=15)
-    error_code = resp.json().get("_error_code", "")
-
-  return error_code == "CD001"
 
 BASE_RISK = 0.08  # 8% base risk (R value)
 TRADING_FEE = 0.002  # 0.2% trading fee (commission + slippage)
@@ -254,7 +218,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
       # 매도 조건 초기화
       sell_date, sell_price = None, None
-      full_sell_date, full_sell_price = None, None
+      full_sell_date, full_sell_price, full_sell_reason = None, None, None
 
       if not trade_data.empty:
         # 익절/손절 가격 정의
@@ -347,22 +311,51 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 (after_partial_sell_data['Change'] < -0.01)
             )
 
-            second_sell_cond = volume_spike_drop | trend_breakdown_confirm
-            second_stop_loss_cond = (
-              (after_partial_sell_data['Close'] < trailing_stop_loss_price)
-            )
-            second_sell_dates = after_partial_sell_data.index[second_sell_cond]
-            second_stop_loss_dates = after_partial_sell_data.index[second_stop_loss_cond]
+            # second_sell_cond = volume_spike_drop | trend_breakdown_confirm
+            # second_stop_loss_cond = (
+            #   (after_partial_sell_data['Close'] < trailing_stop_loss_price)
+            # )
+            volume_spike_drop_sell_dates = after_partial_sell_data[volume_spike_drop]
+            trend_breakdown_confirm_sell_dates = after_partial_sell_data[trend_breakdown_confirm]
+            trailing_stop_sell_dates = after_partial_sell_data[after_partial_sell_data['Close'] < trailing_stop_loss_price]
 
-            final_sell_date = second_sell_dates[0] if not second_sell_dates.empty else None
-            final_stop_loss_date = second_stop_loss_dates[0] if not second_stop_loss_dates.empty else None
+            volume_spike_drop_sell_date = volume_spike_drop_sell_dates.index[0] if not volume_spike_drop_sell_dates.empty else None
+            trend_breakdown_confirm_sell_date = trend_breakdown_confirm_sell_dates.index[0] if not trend_breakdown_confirm_sell_dates.empty else None
+            trailing_stop_sell_date = trailing_stop_sell_dates.index[0] if not trailing_stop_sell_dates.empty else None
 
-            if final_stop_loss_date and (final_sell_date is None or final_stop_loss_date < final_sell_date):
-              full_sell_date = final_stop_loss_date
-              full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
-            elif final_sell_date:
-              full_sell_date = final_sell_date
-              full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
+            # second_sell_dates = after_partial_sell_data.index[second_sell_cond]
+            # second_stop_loss_dates = after_partial_sell_data.index[second_stop_loss_cond]
+            #
+            # final_sell_date = second_sell_dates[0] if not second_sell_dates.empty else None
+            # final_stop_loss_date = second_stop_loss_dates[0] if not second_stop_loss_dates.empty else None
+
+            # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
+            valid_dates = [(d, 'volume') for d in [volume_spike_drop_sell_date] if d is not None] + \
+                          [(d, 'trend_break') for d in [trend_breakdown_confirm_sell_date] if d is not None] + \
+                          [(d, 'trailing') for d in [trailing_stop_sell_date] if d is not None]
+
+            if valid_dates:
+              earliest_date, condition = min(valid_dates, key=lambda x: x[0])
+
+              if condition == 'trailing':
+                full_sell_date = earliest_date
+                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
+                full_sell_reason = 'trailing stop'
+              elif condition == 'volume':
+                full_sell_date = earliest_date
+                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
+                full_sell_reason = 'volume spike drop'
+              elif condition == 'trend_break':
+                full_sell_date = earliest_date
+                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
+                full_sell_reason = 'trend breakdown'
+
+            # if final_stop_loss_date and (final_sell_date is None or final_stop_loss_date < final_sell_date):
+            #   full_sell_date = final_stop_loss_date
+            #   full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
+            # elif final_sell_date:
+            #   full_sell_date = final_sell_date
+            #   full_sell_price = after_partial_sell_data.loc[full_sell_date, 'Close']
 
       # 최종 거래 결과 기록
       trade_info = buy_row.to_dict()
@@ -386,6 +379,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Sell_Index_MA20_Up': sell_index_ma20_up,
         'Full_Sell_Date': full_sell_date,
         'Full_Sell_Price': full_sell_price,
+        'Full_Sell_Reason': full_sell_reason,
         'Return': (sell_price / buy_price - 1) if sell_price else (current_price / buy_price - 1),
         'Full_Return': (full_sell_price / buy_price - 1) if full_sell_price else ((current_price / buy_price - 1) if sell_date else None),
         'Holding_Days': calculate_trading_days(stock_group, buy_date, sell_date),
@@ -702,7 +696,7 @@ if __name__ == "__main__":
     krx_pw = os.getenv("KRX_PW")
 
     print("0. KRX 정보데이터시스템 로그인 진행 중...")
-    if not login_krx(krx_id, krx_pw):
+    if not krx_auth.login_krx(krx_id, krx_pw):
       print("❌ KRX 로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요.")
       exit()
     print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
