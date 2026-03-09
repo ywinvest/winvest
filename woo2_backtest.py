@@ -1,5 +1,5 @@
 import concurrent.futures
-import io
+import os
 import time
 from functools import partial
 
@@ -8,10 +8,65 @@ import pandas as pd
 import pandas_ta as ta
 import requests
 from dotenv import load_dotenv
+from pykrx.website.comm import webio
 
 import rs
 import woo1
 import woo2
+
+# 1. 공유 세션 생성 및 pykrx에 주입
+_session = requests.Session()
+
+def _session_post_read(self, **params):
+  return _session.post(self.url, headers=self.headers, data=params)
+
+def _session_get_read(self, **params):
+  return _session.get(self.url, headers=self.headers, params=params)
+
+webio.Post.read = _session_post_read
+webio.Get.read = _session_get_read
+
+def login_krx(login_id: str, login_pw: str) -> bool:
+  """
+  KRX data.krx.co.kr 로그인 후 세션 쿠키(JSESSIONID)를 갱신합니다.
+
+  로그인 흐름:
+    1. GET MDCCOMS001.cmd  → 초기 JSESSIONID 발급
+    2. GET login.jsp       → iframe 세션 초기화
+    3. POST MDCCOMS001D1.cmd → 실제 로그인
+    4. CD011(중복 로그인) → skipDup=Y 추가 후 재전송
+  """
+  _LOGIN_PAGE = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001.cmd"
+  _LOGIN_JSP  = "https://data.krx.co.kr/contents/MDC/COMS/client/view/login.jsp?site=mdc"
+  _LOGIN_URL  = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
+  _UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+  )
+
+  # 초기 세션 발급
+  _session.get(_LOGIN_PAGE, headers={"User-Agent": _UA}, timeout=15)
+  _session.get(_LOGIN_JSP, headers={"User-Agent": _UA, "Referer": _LOGIN_PAGE}, timeout=15)
+
+  payload = {
+    "mbrNm": "", "telNo": "", "di": "", "certType": "",
+    "mbrId": login_id, "pw": login_pw,
+  }
+  headers = {"User-Agent": _UA, "Referer": _LOGIN_PAGE}
+
+  # 로그인 POST
+  resp = _session.post(_LOGIN_URL, data=payload, headers=headers, timeout=15)
+  data = resp.json()
+  error_code = data.get("_error_code", "")
+
+  # CD011 중복 로그인 처리
+  if error_code == "CD011":
+    payload["skipDup"] = "Y"
+    resp = _session.post(_LOGIN_URL, data=payload, headers=headers, timeout=15)
+    data = resp.json()
+    error_code = data.get("_error_code", "")
+
+  return error_code == "CD001"  # CD001 = 정상
 
 
 def parallel_process_stocks(all_stocks):
@@ -69,43 +124,61 @@ if __name__ == "__main__":
   try:
     # delisting = fdr.StockListing('KRX-DELISTING') # 3천+ 종목 - 상장폐지 종목 전체
     # admin = fdr.StockListing('KRX-ADMIN') # 50+ 종목 - KRX 관리종목
+    # 0. 가장 먼저 KRX 로그인을 수행하여 _session에 쿠키를 확보합니다.
+    # (data.krx.co.kr 에 가입된 실제 아이디와 비밀번호로 변경하세요)
 
-    kospi = fdr.StockListing('KOSPI')
-    kosdaq = fdr.StockListing('KOSDAQ')
-    all_stocks = pd.concat([kospi, kosdaq], ignore_index=True)
+    krx_id = os.getenv("KRX_ID")
+    krx_pw = os.getenv("KRX_PW")
+
+    print("0. KRX 정보데이터시스템 로그인 진행 중...")
+    if not login_krx(krx_id, krx_pw):
+      print("❌ KRX 로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요.")
+      exit()
+    print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
+
+    # 1. woo2.py의 공통 함수를 호출하여 전 종목 기본 정보 및 시가총액 가져오기
+    all_stocks = woo2.get_all_stocks()
+    print(f"\n✅ 종목 정보 수집 완료! 총 {len(all_stocks)}개 종목")
 
     # 상장일 정보 가져오기
-    # krx_desc = fdr.StockListing('KRX-DESC', "2014")[['Code', 'ListingDate']]
-    url = 'http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
-    headers = {
-      'User-Agent': 'Chrome/78.0.3904.87 Safari/537.36',
-      'Referer': 'http://data.krx.co.kr/'
-    }
-    r = requests.get(url, headers)
-    dfs = pd.read_html(io.StringIO(r.text), header=0)
-    df_listing = dfs[0]
-    cols_ren = {'종목코드': 'Code', '상장일': 'ListingDate'}
-    df_listing = df_listing.rename(columns = cols_ren)
-    df_listing['Code'] = df_listing['Code'].apply(lambda x: x.zfill(6))
-    df_listing['ListingDate'] = pd.to_datetime(df_listing['ListingDate'])
+    df_listing = fdr.StockListing('KRX-DESC', "2014")[['Code', 'ListingDate']]
+    # url = 'http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
+    # headers = {
+    #   'User-Agent': 'Chrome/78.0.3904.87 Safari/537.36',
+    #   'Referer': 'http://data.krx.co.kr/'
+    # }
+    # r = requests.get(url, headers)
+    # dfs = pd.read_html(io.StringIO(r.text), header=0)
+    # df_listing = dfs[0]
+    # cols_ren = {'종목코드': 'Code', '상장일': 'ListingDate'}
+    # df_listing = df_listing.rename(columns = cols_ren)
+    # df_listing['Code'] = df_listing['Code'].apply(lambda x: x.zfill(6))
+    # df_listing['ListingDate'] = pd.to_datetime(df_listing['ListingDate'])
 
     all_stocks = all_stocks.merge(df_listing, on='Code', how='left')
 
-    kospi = fdr.DataReader('KS11')
+    # 2. woo2.py의 공통 함수를 호출하여 지수 데이터 가져오기 (2003년 1월 1일부터)
+    kospi, kosdaq = woo2.get_index_data("20140101")
+
+    # kospi = fdr.DataReader('KS11')
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
+    kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
+    kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
-    kosdaq = fdr.DataReader('KQ11')
+    # kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
+    kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
+    kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
 
     result_file = "woo2_backtest_results.csv"
 
@@ -121,7 +194,10 @@ if __name__ == "__main__":
       today_rs_data['Marcap(억)'] = (today_rs_data['Marcap'] / 100_000_000).round(0).astype(int)
       rs_report = today_rs_data.drop(columns=['Marcap'])
       rs_cols = ['Code', 'Name', 'Market', 'Marcap(억)', 'RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M']
-      rs_report = today_rs_data[rs_cols].sort_values(by='RS', ascending=False)
+      rs_report = today_rs_data[rs_cols].sort_values(
+          by=['RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M'],
+          ascending=False
+      )
       filename = f"rs_{last_trading_day.strftime('%Y%m%d')}.xlsx"
       rs_report.to_excel(filename, index=False)
 

@@ -1,6 +1,6 @@
 yfinance
 pandas_ta
-setuptools>=65.0.0
+setuptools<82.0.0
 pykrx
 finance-datareader
 plotly

@@ -7,10 +7,48 @@ from functools import partial
 import FinanceDataReader as fdr
 import pandas as pd
 import pandas_ta as ta
+import requests
 from dotenv import load_dotenv
+from pykrx import stock
+from pykrx.website.comm import webio
 
 import rs
 from slack_utils import SlackMessageBuilder, send_slack_message
+
+# 1. 공유 세션 생성 및 pykrx에 주입
+_session = requests.Session()
+
+def _session_post_read(self, **params):
+  return _session.post(self.url, headers=self.headers, data=params)
+
+def _session_get_read(self, **params):
+  return _session.get(self.url, headers=self.headers, params=params)
+
+webio.Post.read = _session_post_read
+webio.Get.read = _session_get_read
+
+def login_krx(login_id: str, login_pw: str) -> bool:
+  """KRX 정보데이터시스템 로그인 후 세션 쿠키를 갱신합니다."""
+  _LOGIN_PAGE = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001.cmd"
+  _LOGIN_JSP  = "https://data.krx.co.kr/contents/MDC/COMS/client/view/login.jsp?site=mdc"
+  _LOGIN_URL  = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
+  _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+  _session.get(_LOGIN_PAGE, headers={"User-Agent": _UA}, timeout=15)
+  _session.get(_LOGIN_JSP, headers={"User-Agent": _UA, "Referer": _LOGIN_PAGE}, timeout=15)
+
+  payload = {"mbrNm": "", "telNo": "", "di": "", "certType": "", "mbrId": login_id, "pw": login_pw}
+  headers = {"User-Agent": _UA, "Referer": _LOGIN_PAGE}
+
+  resp = _session.post(_LOGIN_URL, data=payload, headers=headers, timeout=15)
+  error_code = resp.json().get("_error_code", "")
+
+  if error_code == "CD011":
+    payload["skipDup"] = "Y"
+    resp = _session.post(_LOGIN_URL, data=payload, headers=headers, timeout=15)
+    error_code = resp.json().get("_error_code", "")
+
+  return error_code == "CD001"
 
 BASE_RISK = 0.08  # 8% base risk (R value)
 TRADING_FEE = 0.002  # 0.2% trading fee (commission + slippage)
@@ -22,8 +60,8 @@ def calculate_indicators(df):
   df['MA60'] = df['Close'].rolling(window=60).mean()
   df['MA120'] = df['Close'].rolling(window=120).mean()
   df['MA240'] = df['Close'].rolling(window=240).mean()
-  df['MA20_Cross'] = (df['Close'].gt(df['MA20'], axis=0)) & (df['Close'].shift(1).le(df['MA20'].shift(1), axis=0))
-  df['MA20_Break'] = (df['Close'].lt(df['MA20'], axis=0)) & (df['Close'].shift(1).ge(df['MA20'].shift(1), axis=0))
+  # df['MA20_Cross'] = (df['Close'].gt(df['MA20'], axis=0)) & (df['Close'].shift(1).le(df['MA20'].shift(1), axis=0))
+  # df['MA20_Break'] = (df['Close'].lt(df['MA20'], axis=0)) & (df['Close'].shift(1).ge(df['MA20'].shift(1), axis=0))
   df['Bullish'] = df['Close'] > df['Open']
   df['Volume_Change'] = df['Volume'] / df['Volume'].shift(1) - 1
   # df['High_Change'] = (df['High'] / df['Close'].shift(1) - 1) * 100
@@ -33,12 +71,12 @@ def calculate_indicators(df):
   # df['Pre_Volume_Change'] = df['Volume'].shift(1) / df['Volume'].shift(2)
   # df['Crossover'] = (df['MA5'] > df['MA20']) & (df['MA5'].shift(1) <= df['MA20'].shift(1))
   # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
-  df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
+  # df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
 
   df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
 
   # 39주 신고가 돌파 여부
-  is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
+  # is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
   # 52주 신고가 돌파 여부
   is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
 
@@ -49,7 +87,7 @@ def calculate_indicators(df):
   # df['First_52WeekHigh_Break'] = is_first_break.groupby(breaks).cumsum() == 1
   # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(is_52weekhigh_break, False)
   # 39주 신고가 첫 돌파여부
-  df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
+  # df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
   # 52주 신고가 첫 돌파여부
   df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
   # 첫 돌파 이후 10일 동안 추가 돌파 무시
@@ -178,6 +216,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_index_rsi = None
       buy_index_ma5_up = None
       buy_index_ma20_up = None
+      buy_index_ma60_up = None
+      buy_index_ma120_up = None
       buy_index_adx = None
       buy_index_di = None
 
@@ -185,6 +225,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_kospi_ma20_up = None
       buy_kospi_adx = None
       buy_kospi_di = None
+
+      buy_kosdaq_ma5_up = None
+      buy_kosdaq_ma20_up = None
+      buy_kosdaq_adx = None
+      buy_kosdaq_di = None
 
       sell_index_ma5_up = None
       sell_index_ma20_up = None
@@ -252,6 +297,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_index_rsi = source_df.loc[buy_date, 'RSI']
           buy_index_ma5_up = source_df.loc[buy_date, 'MA5_Up']
           buy_index_ma20_up = source_df.loc[buy_date, 'MA20_Up']
+          buy_index_ma60_up = source_df.loc[buy_date, 'MA60_Up']
+          buy_index_ma120_up = source_df.loc[buy_date, 'MA120_Up']
           buy_index_adx = source_df.loc[buy_date, 'ADX']
           buy_index_di = source_df.loc[buy_date, 'DI']
 
@@ -259,6 +306,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_kospi_ma20_up = kospi_df.loc[buy_date, 'MA20_Up']
           buy_kospi_adx = kospi_df.loc[buy_date, 'ADX']
           buy_kospi_di = kospi_df.loc[buy_date, 'DI']
+
+          buy_kosdaq_ma5_up = kosdaq_df.loc[buy_date, 'MA5_Up']
+          buy_kosdaq_ma20_up = kosdaq_df.loc[buy_date, 'MA20_Up']
+          buy_kosdaq_adx = kosdaq_df.loc[buy_date, 'ADX']
+          buy_kosdaq_di = kosdaq_df.loc[buy_date, 'DI']
 
         if source_df is not None and sell_date in source_df.index:
           ma5_up_val = source_df.loc[sell_date, 'MA5_Up']
@@ -279,7 +331,10 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           if not after_partial_sell_data.empty:
             # 1. 거래량 실린 장대 음봉 (오닐식 청산)
             volume_spike_drop = (
-                (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) &
+                (
+                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
+                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
+                ) &
                 (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
                 (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
             )
@@ -289,8 +344,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
                 (after_partial_sell_data['MA20_Slope'] < 0) &
                 (after_partial_sell_data['MA20_Gap'] < -0.05) &
-                (after_partial_sell_data['Bullish'] == False) &
-                (after_partial_sell_data['Change'] < -0.02)
+                (after_partial_sell_data['Change'] < -0.01)
             )
 
             second_sell_cond = volume_spike_drop | trend_breakdown_confirm
@@ -317,11 +371,13 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Price': buy_price,
         'Estimated_Marcap': estimated_marcap,
         'Buy_Kospi_ADX': buy_kospi_adx,
-        # 'Buy_Index_RSI': buy_index_rsi,
+        'Buy_Kosdaq_ADX': buy_kosdaq_adx,
         'Buy_Index_ADX': buy_index_adx,
         'Buy_Index_DI': buy_index_di,
         'Buy_Index_MA5_Up': buy_index_ma5_up,
         'Buy_Index_MA20_Up': buy_index_ma20_up,
+        'Buy_Index_MA60_Up': buy_index_ma60_up,
+        'Buy_Index_MA120_Up': buy_index_ma120_up,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Sell_Index_ADX': sell_index_adx,
@@ -511,11 +567,13 @@ def send_to_slack(trades_data, kospi, kosdaq):
           rs_6m = row['RS_6M']
 
           emoji = "question"
-          if rs_1m >= rs_3m and rs_1m >= rs_6m:
-            if 80 <= rs <= 96 and marcap >= 400_000_000_000 and change < 0.24:
+          if rs_1m >= rs_3m and rs_1m >= rs_6m and marcap >= 400_000_000_000 and change < 0.20:
+            if 80 <= rs <= 97:
               emoji = "first_place_medal"
-            elif (75 <= rs <= 79) or (97 <= rs <= 99):
+            elif (75 <= rs <= 79) or rs == 98:
               emoji = "second_place_medal"
+            elif rs == 99:
+              emoji = "third_place_medal"
 
           with builder.line() as line:
             line \
@@ -572,6 +630,57 @@ def parallel_process_stocks(all_stocks, two_years_ago):
 
   return pd.concat(results) if results else pd.DataFrame()
 
+def get_all_stocks():
+  """pykrx를 활용하여 KOSPI/KOSDAQ 전 종목의 기본 정보와 시가총액을 반환합니다."""
+  print("1. pykrx를 활용하여 전 종목 기본 데이터 및 시가총액 수집 중...")
+
+  today_str = datetime.today().strftime("%Y%m%d")
+
+  # 1. 가장 최근 영업일 확인 (세션 패치가 적용된 상태에서 실행됨)
+  latest_b_day = stock.get_nearest_business_day_in_a_week(today_str)
+
+  # 2. KOSPI, KOSDAQ 시가총액 데이터를 가져오면서 티커(Code) 확보
+  df_kospi = stock.get_market_cap(latest_b_day, market="KOSPI").reset_index()
+  df_kospi['Market'] = 'KOSPI'
+
+  df_kosdaq = stock.get_market_cap(latest_b_day, market="KOSDAQ").reset_index()
+  df_kosdaq['Market'] = 'KOSDAQ'
+
+  # 3. 두 시장 데이터 병합
+  all_stocks = pd.concat([df_kospi, df_kosdaq], ignore_index=True)
+
+  # 4. pykrx 내장 함수를 사용하여 티커를 종목명(Name)으로 변환
+  # (내부적으로 캐싱된 마스터 데이터를 사용하므로 수천 개를 변환해도 1초 이내에 완료됨)
+  all_stocks['Name'] = all_stocks['티커'].apply(stock.get_market_ticker_name)
+
+  # 5. 필요한 컬럼만 추출하고 이름 변경 ('티커' -> 'Code', '시가총액' -> 'Marcap')
+  all_stocks = all_stocks[['티커', 'Name', 'Market', '시가총액']].rename(
+      columns={'티커': 'Code', '시가총액': 'Marcap'}
+  )
+
+  # 결측치(NaN) 처리: 시가총액이 없는 종목은 0으로 처리
+  all_stocks['Marcap'] = all_stocks['Marcap'].fillna(0).astype(int)
+
+  return all_stocks
+
+
+def get_index_data(start_str, end_str=None):
+  """pykrx를 활용하여 KOSPI와 KOSDAQ의 지수 OHLCV 데이터를 반환합니다."""
+  if end_str is None:
+    end_str = datetime.today().strftime("%Y%m%d")
+
+  print(f"지수 데이터(KOSPI, KOSDAQ) 수집 중... ({start_str} ~ {end_str})")
+
+  # KOSPI (1001)
+  kospi = stock.get_index_ohlcv(start_str, end_str, "1001")
+  kospi = kospi.rename(columns={'시가': 'Open', '고가': 'High', '저가': 'Low', '종가': 'Close', '거래량': 'Volume'})
+
+  # KOSDAQ (2001)
+  kosdaq = stock.get_index_ohlcv(start_str, end_str, "2001")
+  kosdaq = kosdaq.rename(columns={'시가': 'Open', '고가': 'High', '저가': 'Low', '종가': 'Close', '거래량': 'Volume'})
+
+  return kospi, kosdaq
+
 
 if __name__ == "__main__":
   start_time = time.time()
@@ -580,30 +689,58 @@ if __name__ == "__main__":
   load_dotenv()
 
   try:
-    all_stocks = pd.concat([
-      fdr.StockListing('KOSPI'),
-      fdr.StockListing('KOSDAQ')
-    ], ignore_index=True)
-
-    # 날짜 설정
+    # all_stocks = pd.concat([
+    #   fdr.StockListing('KOSPI'),
+    #   fdr.StockListing('KOSDAQ')
+    # ], ignore_index=True)
+    #
+    # # 날짜 설정
     today = datetime.today()
-    two_years_ago = today.year - 2
+    # two_years_ago = today.year - 2
 
-    kospi = fdr.DataReader('KS11', two_years_ago)
+    krx_id = os.getenv("KRX_ID")
+    krx_pw = os.getenv("KRX_PW")
+
+    print("0. KRX 정보데이터시스템 로그인 진행 중...")
+    if not login_krx(krx_id, krx_pw):
+      print("❌ KRX 로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요.")
+      exit()
+    print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
+
+    # 1. 전 종목 기본 정보 및 시가총액 가져오기
+    all_stocks = get_all_stocks()
+    print(f"\n✅ 종목 정보 수집 완료! 총 {len(all_stocks)}개 종목")
+
+    # 윤달(2월 29일) 방어 로직 포함
+    try:
+      two_years_ago = today.replace(year=today.year - 2)
+    except ValueError:
+      two_years_ago = today.replace(year=today.year - 2, day=28)
+
+    start_str = two_years_ago.strftime("%Y%m%d")
+
+    # 2. woo2.py의 공통 함수를 호출하여 지수 데이터 가져오기 (2003년 1월 1일부터)
+    kospi, kosdaq = get_index_data(start_str)
+
+    # kospi = fdr.DataReader('KS11', two_years_ago)
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
+    kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
+    kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
-    kosdaq = fdr.DataReader('KQ11', two_years_ago)
+    # kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
+    kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
+    kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
