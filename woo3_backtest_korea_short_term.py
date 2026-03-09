@@ -61,7 +61,7 @@ def backtest(data, ticker):
   # 그룹 내 누적 데이터
   group_positions = []  # [(buy_date, buy_price, position_size), ...]
   group_buy_count = 0
-  group_base_size = 1
+  group_max_size = 1
   last_buy_price = None
 
   # 현재 그룹의 매도 조건 함수
@@ -132,29 +132,27 @@ def backtest(data, ticker):
       group_buy_count += 1
       buy_count += 1
 
-      # 이전 매수에서 결정된 기준값을 이번 매수의 시작 사이즈로 설정
-      position_size = group_base_size
-
-      # 4회 이상 매수 시 로직
-      if group_buy_count >= 4:
-        # 4회 이상이면 최소 기준을 2로 보장 (이미 2 이상이면 기존 값 유지)
-        if position_size < 2:
-          position_size = 2
-
+      # 1. 현재 조건에 따른 '순수 포지션 사이즈' 계산 (기존 원본 로직 방식)
+      if group_buy_count < 4:
+        calculated_size = 1
+      else:
+        calculated_size = 2
         # 4회 이상 매수 시에만 RSI 20 이하 조건 체크
         if rsi <= 20:
-          position_size += 1
+          calculated_size += 1
         # 4회 이상 매수 시 즉시 매도 조건 변경
         current_sell_condition = sell_condition_snap_back
 
-      # 하락폭 조건에 따른 추가 포지션
       if change_rate < -8:
-        position_size += 2
+        calculated_size += 2
       elif change_rate < -5:
-        position_size += 1
+        calculated_size += 1
 
-      # 다음 매수를 위해 현재 결정된 사이즈를 기준값으로 갱신
-      group_base_size = position_size
+      # 2. 이전 최대 사이즈와 현재 계산된 사이즈 중 큰 값을 최종 사이즈로 결정
+      position_size = max(group_max_size, calculated_size)
+
+      # 3. 다음 매수를 위해 최대 사이즈 갱신
+      group_max_size = position_size
 
       # if rsi <= 20:
       #   position_size = 3
@@ -186,7 +184,7 @@ def backtest(data, ticker):
       last_buy_price = None
       group_buy_count = 0
       # 매도 후 다음 그룹 매수를 위해 기준값 초기화
-      group_base_size = 1
+      group_max_size = 1
       group_positions = []
       current_sell_condition = sell_condition_technical_bounce
 
