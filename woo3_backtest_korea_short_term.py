@@ -185,6 +185,8 @@ def backtest(data, ticker):
       execute_group_sell(sell_date, sell_price)
       last_buy_price = None
       group_buy_count = 0
+      # 매도 후 다음 그룹 매수를 위해 기준값 초기화
+      group_base_size = 1
       group_positions = []
       current_sell_condition = sell_condition_technical_bounce
 
