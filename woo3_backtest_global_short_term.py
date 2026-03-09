@@ -12,7 +12,7 @@ DEFAULT_RSI_THRESHOLD = 35
 def buy_condition(df):
   """Broad buy condition for global indices (RSI <= 35)."""
   return ((df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Change_Rate'] < 0)) | \
-         ((df['Change_Rate'] < -5) & (~df['Bullish']))
+         ((df['Change_Rate'] < -7) & (~df['Bullish']))
 
 def sell_condition_technical_bounce(df):
   """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
@@ -121,9 +121,9 @@ def backtest(data, ticker):
         # 4회 이상 매수 시 즉시 매도 조건 변경
         current_sell_condition = sell_condition_snap_back
 
-      if change_rate < -8:
+      if change_rate < -13:
         calculated_size += 2
-      elif change_rate < -5:
+      elif change_rate < -7:
         calculated_size += 1
 
       # 2. 이전 최대 사이즈와 현재 계산된 사이즈 중 큰 값을 최종 사이즈로 결정
