@@ -101,6 +101,7 @@ def backtest(data, ticker):
   for i, buy_date in enumerate(buys.index):
     is_first_buy = len(group_positions) == 0
     rsi = df.loc[buy_date, 'RSI']
+    change_rate = df.loc[buy_date, 'Change_Rate']
 
     should_buy = True
 
@@ -112,15 +113,15 @@ def backtest(data, ticker):
 
     # [조건 2] RSI 조건이 안 맞으면 매수 스킵
     if should_buy and not is_first_buy:
-      rsi = df.loc[buy_date, 'RSI']
+      # rsi = df.loc[buy_date, 'RSI']
       rsi_threshold = 30 if group_buy_count == 1 else DEFAULT_RSI_THRESHOLD
-      if rsi > rsi_threshold:
+      if rsi > rsi_threshold and change_rate >= -5:
         should_buy = False
 
     if should_buy:
       # --- 매수 실행 ---
       buy_price = df.loc[buy_date, 'Close']
-      change_rate = df.loc[buy_date, 'Change_Rate']
+      # change_rate = df.loc[buy_date, 'Change_Rate']
 
       df.loc[buy_date, 'Action'] = 'Buy'
       last_buy_price = buy_price
