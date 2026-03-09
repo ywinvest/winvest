@@ -34,11 +34,11 @@ jobs:
         KRX_ID: ${{ secrets.KRX_ID }}
         KRX_PW: ${{ secrets.KRX_PW }}
       run: |
-#        python woo3_backtest_global.py
-#        python woo3_backtest_global_short_term.py
-         python woo3_backtest_korea_short_term.py
-#        python woo3_backtest_korea_inverse.py
-#        python woo3_backtest3.py
+        # python woo3_backtest_global.py
+        # python woo3_backtest_global_short_term.py
+        python woo3_backtest_korea_short_term.py
+        # python woo3_backtest_korea_inverse.py
+        # python woo3_backtest3.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
