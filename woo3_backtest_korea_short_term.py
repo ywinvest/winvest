@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import FinanceDataReader as fdr
 
 import indicators
+import krx_auth
 
 DEFAULT_RSI_THRESHOLD = 30
 
@@ -175,6 +176,15 @@ if __name__ == "__main__":
 
   end_date_str = end_date.strftime('%Y-%m-%d')
   start_date_str = start_date.strftime('%Y-%m-%d')
+
+  krx_id = os.getenv("KRX_ID")
+  krx_pw = os.getenv("KRX_PW")
+
+  print("0. KRX 정보데이터시스템 로그인 진행 중...")
+  if not krx_auth.login_krx(krx_id, krx_pw):
+    print("❌ KRX 로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요.")
+    exit()
+  print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
 
   for ticker, name in tickers.items():
     print(f"Processing {ticker} ({name})...")
