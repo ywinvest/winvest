@@ -138,7 +138,7 @@ def backtest(data, ticker):
         # 4회 이상 매수 시 즉시 매도 조건 변경
         current_sell_condition = sell_condition_snap_back
 
-      if change_rate < -10:
+      if change_rate < -8:
         position_size += 2
       elif change_rate < -5:
         position_size += 1
