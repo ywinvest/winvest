@@ -73,28 +73,31 @@ def backtest(data, ticker):
     if not group_positions:
       return
 
-    total_weighted_return = 0
-    total_weight = 0
+    total_group_weighted_return = 0
+    total_group_weight = 0
 
     for buy_date, buy_price, position_size in group_positions:
-      trade_return = (sell_price / buy_price - 1) * position_size
+      # 1. 비중을 고려하지 않은 단순 수익률 계산
+      simple_return = (sell_price / buy_price) - 1
 
-      df.loc[buy_date, 'Return'] = trade_return
+      df.loc[buy_date, 'Return'] = simple_return
       df.loc[buy_date, 'Sell Price'] = sell_price
       df.loc[buy_date, 'Sell Date'] = sell_date
 
-      returns.append(trade_return)
+      # 2. 전체 백테스트 가중 평균 계산을 위해 수익률과 비중을 함께 기록 (수정된 부분)
+      returns.append((simple_return, position_size))
       holding_periods.append((sell_date - buy_date).days)
 
-      total_weighted_return += trade_return
-      total_weight += position_size
+      # 3. 그룹 가중 평균 계산을 위한 누적
+      total_group_weighted_return += simple_return * position_size
+      total_group_weight += position_size
 
-      # Weight 누적
+      # 매도 시점의 총 청산 Weight 기록
       df.loc[sell_date, 'Weight'] += position_size
 
-    # 그룹 평균 수익률 계산 및 기록
-    group_avg_return = total_weighted_return / len(group_positions) if group_positions else 0
-    df.loc[sell_date, 'Group Return'] = group_avg_return
+    # 4. 그룹 평균 수익률 계산
+    group_avg_return = total_group_weighted_return / total_group_weight if total_group_weight > 0 else 0
+    df.loc[sell_date, 'Group_Return'] = group_avg_return
     df.loc[sell_date, 'Group Buys'] = group_buy_count
     df.loc[sell_date, 'Action'] = 'Sell'
 
@@ -175,7 +178,11 @@ def backtest(data, ticker):
       group_positions = []
       current_sell_condition = sell_condition_technical_bounce
 
-  avg_return = sum(returns) / len(returns) if returns else 0
+  # 수정된 전체 평균 수익률 계산 (가중 평균)
+  total_strategy_weighted_return = sum(ret * weight for ret, weight in returns)
+  total_strategy_weight = sum(weight for ret, weight in returns)
+
+  avg_return = total_strategy_weighted_return / total_strategy_weight if total_strategy_weight > 0 else 0
   avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
 
   output_dir = 'korea/buy-and-sell'
