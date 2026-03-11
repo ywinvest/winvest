@@ -94,11 +94,15 @@ def process_stock(row):
 
         buy_kospi_ma5_up = None
         buy_kospi_ma20_up = None
+        buy_kospi_ma60_up = None
+        buy_kospi_ma120_up = None
         buy_kospi_adx = None
         buy_kospi_di = None
 
         buy_kosdaq_ma5_up = None
         buy_kosdaq_ma20_up = None
+        buy_kosdaq_ma60_up = None
+        buy_kosdaq_ma120_up = None
         buy_kosdaq_adx = None
         buy_kosdaq_di = None
 
@@ -106,6 +110,8 @@ def process_stock(row):
         if buy_date in kospi.index:
           buy_kospi_ma5_up = kospi.loc[buy_date, 'MA5_Up']
           buy_kospi_ma20_up = kospi.loc[buy_date, 'MA20_Up']
+          buy_kospi_ma60_up = kospi.loc[buy_date, 'MA60_Up']
+          buy_kospi_ma120_up = kospi.loc[buy_date, 'MA120_Up']
           buy_kospi_adx = kospi.loc[buy_date, 'ADX']
           buy_kospi_di = kospi.loc[buy_date, 'DI']
 
@@ -113,6 +119,8 @@ def process_stock(row):
         if buy_date in kosdaq.index:
           buy_kosdaq_ma5_up = kosdaq.loc[buy_date, 'MA5_Up']
           buy_kosdaq_ma20_up = kosdaq.loc[buy_date, 'MA20_Up']
+          buy_kosdaq_ma60_up = kosdaq.loc[buy_date, 'MA60_Up']
+          buy_kosdaq_ma120_up = kosdaq.loc[buy_date, 'MA120_Up']
           buy_kosdaq_adx = kosdaq.loc[buy_date, 'ADX']
           buy_kosdaq_di = kosdaq.loc[buy_date, 'DI']
 
@@ -215,12 +223,16 @@ def process_stock(row):
         # KOSPI 지표 추가
         buys.loc[buy_date, 'Buy_Kospi_MA5_Up'] = buy_kospi_ma5_up
         buys.loc[buy_date, 'Buy_Kospi_MA20_Up'] = buy_kospi_ma20_up
+        buys.loc[buy_date, 'Buy_Kospi_MA60_Up'] = buy_kospi_ma60_up
+        buys.loc[buy_date, 'Buy_Kospi_MA120_Up'] = buy_kospi_ma120_up
         buys.loc[buy_date, 'Buy_Kospi_ADX'] = buy_kospi_adx
         buys.loc[buy_date, 'Buy_Kospi_DI'] = buy_kospi_di
 
         # KOSDAQ 지표 추가
         buys.loc[buy_date, 'Buy_Kosdaq_MA5_Up'] = buy_kosdaq_ma5_up
         buys.loc[buy_date, 'Buy_Kosdaq_MA20_Up'] = buy_kosdaq_ma20_up
+        buys.loc[buy_date, 'Buy_Kosdaq_MA60_Up'] = buy_kosdaq_ma60_up
+        buys.loc[buy_date, 'Buy_Kosdaq_MA120_Up'] = buy_kosdaq_ma120_up
         buys.loc[buy_date, 'Buy_Kosdaq_ADX'] = buy_kosdaq_adx
         buys.loc[buy_date, 'Buy_Kosdaq_DI'] = buy_kosdaq_di
 
@@ -558,6 +570,8 @@ if __name__ == "__main__":
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
+    kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
+    kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
     # kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -566,6 +580,8 @@ if __name__ == "__main__":
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
+    kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
+    kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
 
     result_file = "woo1_backtest_result.csv"
 
