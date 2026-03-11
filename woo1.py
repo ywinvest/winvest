@@ -94,15 +94,18 @@ def send_to_slack(result_data):
         open = row['Open']
         close = row['Close']
         high = row['High']
-        diff_high_close = high_change / 100 - change
+        diff_high_close = (high - close) / close
         diff_close_open = (close - open) / open
 
-        message = f"{name}({format_market_cap(marcap)}) 고 {high_change:.2f}%, 고-종 {diff_high_close * 100:.2f}%, 종-시 {diff_close_open * 100:.2f}%, 거래량 {volume_change * 100:.2f}%"
+        message = f"{name}({format_market_cap(marcap)}) 고 {high_change:.2f}%, 고-종 {diff_high_close * 100:.2f}%, 거래량 {volume_change * 100:.2f}%"
 
-        if high_change >= 10 and volume_change > 5 and diff_high_close >= 0 and diff_high_close <= 0.025:
-          builder.add_line(f" {message}", emoji="first_place_medal")
-        elif high_change >= 10 and volume_change > 5 and diff_high_close > 0.1 and diff_close_open >= 0.01:
-          builder.add_line(f" {message}", emoji="second_place_medal")
+        if high_change >= 10 and volume_change > 5:
+          # 위꼬리 짧을 때 (0~2%)
+          if diff_high_close >= 0 and diff_high_close <= 0.02:
+            builder.add_line(f" {message}", emoji="first_place_medal")
+          # 위꼬리 길 때 (10% 초과)
+          elif diff_high_close > 0.1: #and diff_close_open >= 0.01:
+            builder.add_line(f" {message}", emoji="second_place_medal")
         else:
           builder.add_line(f" {message}", emoji="question")
 
