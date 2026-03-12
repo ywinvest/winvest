@@ -305,7 +305,12 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             # )
             # 1. 당일 고점 대비 ATR 14의 3배 하락 종가 이탈 (오닐식 클라이맥스 청산)
             volume_spike_drop = (
-                after_partial_sell_data['Close'] < (after_partial_sell_data['High'] - after_partial_sell_data['ATR_14'] * 2.5)
+                (
+                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
+                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
+                ) &
+                (after_partial_sell_data['Close'] < (after_partial_sell_data['High'] - after_partial_sell_data['ATR_14'] * 2.5)) &
+                (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
             )
 
             # 2. 추세 붕괴 확정
