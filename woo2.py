@@ -87,6 +87,8 @@ def calculate_indicators(df):
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
+  df['ATR_14'] = ta.atr(high=df['High'], low=df['Low'], close=df['Close'], length=14)
+
   rs.calculate_indicators(df)
   return df
 
@@ -292,14 +294,18 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           if not after_partial_sell_data.empty:
-            # 1. 거래량 실린 장대 음봉 (오닐식 청산)
+            # # 1. 거래량 실린 장대 음봉 (오닐식 청산)
+            # volume_spike_drop = (
+            #     (
+            #         (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
+            #         (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
+            #     ) &
+            #     (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
+            #     (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+            # )
+            # 1. 당일 고점 대비 ATR 14의 3배 하락 종가 이탈 (오닐식 클라이맥스 청산)
             volume_spike_drop = (
-                (
-                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
-                    (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
-                ) &
-                (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
-                (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+                after_partial_sell_data['Close'] < (after_partial_sell_data['High'] - after_partial_sell_data['ATR_14'] * 3)
             )
 
             # 2. 추세 붕괴 확정
