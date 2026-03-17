@@ -329,9 +329,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             # final_stop_loss_date = second_stop_loss_dates[0] if not second_stop_loss_dates.empty else None
 
             # 발생한 날짜들 중 가장 빠른 날짜와 해당 조건 찾기
-            valid_dates = [(d, 'volume') for d in [volume_spike_drop_sell_date] if d is not None] + \
+            valid_dates = [(d, 'trailing') for d in [trailing_stop_sell_date] if d is not None] + \
                           [(d, 'trend_break') for d in [trend_breakdown_confirm_sell_date] if d is not None] + \
-                          [(d, 'trailing') for d in [trailing_stop_sell_date] if d is not None]
+                          [(d, 'volume') for d in [volume_spike_drop_sell_date] if d is not None]
 
             if valid_dates:
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
@@ -340,14 +340,14 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 full_sell_date = earliest_date
                 full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
                 full_sell_reason = 'trailing stop'
-              elif condition == 'volume':
-                full_sell_date = earliest_date
-                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
-                full_sell_reason = 'volume spike drop'
               elif condition == 'trend_break':
                 full_sell_date = earliest_date
                 full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
                 full_sell_reason = 'trend breakdown'
+              elif condition == 'volume':
+                full_sell_date = earliest_date
+                full_sell_price = after_partial_sell_data.loc[earliest_date, 'Close']
+                full_sell_reason = 'volume spike drop'
 
             # if final_stop_loss_date and (final_sell_date is None or final_stop_loss_date < final_sell_date):
             #   full_sell_date = final_stop_loss_date
