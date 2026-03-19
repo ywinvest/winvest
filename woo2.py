@@ -87,6 +87,9 @@ def calculate_indicators(df):
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
+  df['ATR_22'] = ta.atr(high=df['High'], low=df['Low'], close=df['Close'], length=22)
+  df['Highest_22'] = df['High'].rolling(window=22).max()
+
   rs.calculate_indicators(df)
   return df
 
@@ -306,8 +309,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             trend_breakdown_confirm = (
                 (after_partial_sell_data['Close'] < after_partial_sell_data['MA20']) &
                 (after_partial_sell_data['MA20_Slope'] < 0) &
-                (after_partial_sell_data['MA20_Gap'] < -0.05) &
-                (after_partial_sell_data['Change'] < -0.01)
+                (after_partial_sell_data['Close'] < (after_partial_sell_data['Highest_22'] - after_partial_sell_data['ATR_22'] * 3))
+                # (after_partial_sell_data['MA20_Gap'] < -0.05) &
+                # (after_partial_sell_data['Change'] < -0.01)
             )
 
             # second_sell_cond = volume_spike_drop | trend_breakdown_confirm
