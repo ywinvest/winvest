@@ -87,6 +87,9 @@ def calculate_indicators(df):
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
+  df['ATR_5'] = ta.atr(high=df['High'], low=df['Low'], close=df['Close'], length=5)
+  df['Highest_5'] = df['High'].rolling(window=5).max()
+
   df['ATR_22'] = ta.atr(high=df['High'], low=df['Low'], close=df['Close'], length=22)
   df['Highest_22'] = df['High'].rolling(window=22).max()
 
@@ -301,8 +304,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                     (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
                     (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
                 ) &
-                (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
-                (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+                (after_partial_sell_data['Close'] < (after_partial_sell_data['Highest_5'] - after_partial_sell_data['ATR_5'] * 3))
+                # (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
+                # (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
             )
 
             # 2. 추세 붕괴 확정
