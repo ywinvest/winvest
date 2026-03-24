@@ -306,31 +306,31 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             #     # (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
             # )
 
-            # --- 오닐의 장대음봉 엑시트 (ATR 기반 동적 수치 적용) ---
-            # multiplier_drop: 평소 변동성(ATR) 대비 몇 배의 파괴력을 가진 음봉을 분산일로 볼 것인가?
-            # 1.5배는 통상적으로 '명백히 비정상적인 매도세'로 간주되는 퀀트 표준 수치입니다. (테스트 후 조절 가능)
+            # --- 윗꼬리 음봉 기반 클라이맥스 엑시트 (Intraday Rejection) ---
             multiplier_drop = 1.5
 
-            # 1. 거래량 폭증 (세력 이탈의 증거 - 기존 유지)
+            # 1. 거래량 폭증 (세력 이탈의 증거)
             volume_condition = (
                 (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
                 (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
             )
 
-            # 2. 전일 대비 가격 급락 (고정 %가 아닌 ATR 배수 하락)
-            # 당일 종가가 어제 종가에서 'ATR * 1.5' 이상 훅 빠졌는가?
-            price_drop_cond = (
-                after_partial_sell_data['Close'] < (after_partial_sell_data['Close'].shift(1) - after_partial_sell_data['ATR_22'] * multiplier_drop)
+            # 2. 당일 음봉 확인 (시가가 종가보다 높음)
+            bearish_candle = after_partial_sell_data['Open'] > after_partial_sell_data['Close']
+
+            # 3. 장중 거대한 매도세 (고점에서 종가까지 밀려난 폭이 ATR 22의 1.5배 이상)
+            # 어제 종가와 무관하게, 오늘 고점에서 얼마나 끔찍하게 쏟아졌는지만 평가합니다.
+            intraday_rejection = (
+                (after_partial_sell_data['High'] - after_partial_sell_data['Close']) > (after_partial_sell_data['ATR_22'] * multiplier_drop)
             )
 
-            # 3. 캔들 몸통(Body)의 거대함 (장중 흔들기가 아닌 꽉 찬 장대음봉 확인)
-            # 시가에서 종가까지 밀린 폭(몸통)이 'ATR * 1.5' 이상인가?
-            body_drop_cond = (
-                after_partial_sell_data['Close'] < (after_partial_sell_data['Open'] - after_partial_sell_data['ATR_22'] * multiplier_drop)
+            # 4. 명확한 윗꼬리 특성 (윗꼬리가 음봉 몸통보다 긺)
+            long_upper_shadow = (
+                (after_partial_sell_data['High'] - after_partial_sell_data['Open']) > (after_partial_sell_data['Open'] - after_partial_sell_data['Close'])
             )
 
-            # 최종 조건 결합
-            volume_spike_drop = volume_condition & price_drop_cond & body_drop_cond
+            # 최종 조건 결합: 거래량 폭발 + 음봉 + ATR 1.5배 이상의 고점 대비 폭락 + 긴 윗꼬리
+            volume_spike_drop = volume_condition & bearish_candle & intraday_rejection & long_upper_shadow
 
             # 2. 추세 붕괴 확정
             trend_breakdown_confirm = (
