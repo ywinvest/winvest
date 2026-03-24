@@ -87,9 +87,6 @@ def calculate_indicators(df):
 
   df['MA20_Gap'] = df['Close'] / df['MA20'] - 1
 
-  df['ATR_5'] = ta.atr(high=df['High'], low=df['Low'], close=df['Close'], length=5)
-  df['Highest_5'] = df['High'].rolling(window=5).max()
-
   df['ATR_22'] = ta.atr(high=df['High'], low=df['Low'], close=df['Close'], length=22)
   df['Highest_22'] = df['High'].rolling(window=22).max()
 
