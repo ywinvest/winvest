@@ -293,7 +293,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           trailing_stop_loss_price = buy_price * (1 + (BASE_RISK * 2) + TRADING_FEE) if is_market_weak else default_trailing_stop_loss_price # +16.2%
 
           # 2차 매도 (남은 물량) 조건 탐색
-          after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
+          # after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
+          after_partial_sell_data = trade_data.loc[sell_date:]
           if not after_partial_sell_data.empty:
             # --- 지수 등락률(Index_Change) 데이터 매핑 ---
             if source_df is not None and 'Change' in source_df.columns:
