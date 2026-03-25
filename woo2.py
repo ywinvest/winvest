@@ -307,13 +307,30 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           runner_data = trade_data.loc[sell_date:].copy()
           if len(runner_data) > 1:
             # 1. 거래량 실린 장대 음봉 (오닐식 청산)
-            volume_spike_drop = (
-                (
-                    (runner_data['Volume'] > runner_data['Volume'].shift(1) * 1.2) |
-                    (runner_data['Volume'] > runner_data['Volume'].rolling(window=20).mean() * 1.5)
-                ) &
-                (runner_data['Change'] < -1 * BASE_RISK) & # -8%
-                (runner_data['Close'] / runner_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+            # volume_spike_drop = (
+            #     (
+            #         (runner_data['Volume'] > runner_data['Volume'].shift(1) * 1.2) |
+            #         (runner_data['Volume'] > runner_data['Volume'].rolling(window=20).mean() * 1.5)
+            #     ) &
+            #     (runner_data['Change'] < -1 * BASE_RISK) & # -8%
+            #     (runner_data['Close'] / runner_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+            # )
+            # --- 1. 클라이맥스 분산일 엑시트 (Feature 2-A) ---
+            volatility_multiple = 1.5
+
+            institutional_distribution_volume = (
+                (runner_data['Volume'] > runner_data['Volume'].shift(1) * 1.2) |
+                (runner_data['Volume'] > runner_data['Volume'].rolling(window=20).mean() * 1.5)
+            )
+
+            atr_price_violation = (runner_data['Close'] < (runner_data['Close'].shift(1) - runner_data['ATR_22'] * volatility_multiple))
+            wide_spread_down_bar = (runner_data['Close'] < (runner_data['Open'] - runner_data['ATR_22'] * volatility_multiple))
+
+            # (현재는 상대 강도 필터가 없으므로 3개 조건만 결합)
+            climax_distribution_exit = (
+                institutional_distribution_volume &
+                atr_price_violation &
+                wide_spread_down_bar
             )
 
             # 2. 추세 붕괴 확정
@@ -327,7 +344,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
             valid_dates_mask = runner_data.index > sell_date
 
-            volume_spike_drop_sell_dates = runner_data[volume_spike_drop & valid_dates_mask]
+            volume_spike_drop_sell_dates = runner_data[climax_distribution_exit & valid_dates_mask]
             trend_breakdown_confirm_sell_dates = runner_data[trend_breakdown_confirm & valid_dates_mask]
             trailing_stop_sell_dates = runner_data[(runner_data['Close'] < trailing_stop_loss_price) & valid_dates_mask]
 
