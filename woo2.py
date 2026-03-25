@@ -295,7 +295,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           # 2차 매도 (남은 물량) 조건 탐색
           # after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           after_partial_sell_data = trade_data.loc[sell_date:]
-          if not after_partial_sell_data.empty:
+          if not after_partial_sell_data.empty and len(after_partial_sell_data) > 1:
             # --- 지수 등락률(Index_Change) 데이터 매핑 ---
             if source_df is not None and 'Change' in source_df.columns:
               after_partial_sell_data['Index_Change'] = source_df['Change'].reindex(after_partial_sell_data.index)
