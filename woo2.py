@@ -352,9 +352,12 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             # second_stop_loss_cond = (
             #   (after_partial_sell_data['Close'] < trailing_stop_loss_price)
             # )
-            volume_spike_drop_sell_dates = after_partial_sell_data[climax_distribution_exit]
-            trend_breakdown_confirm_sell_dates = after_partial_sell_data[trend_breakdown_confirm]
-            trailing_stop_sell_dates = after_partial_sell_data[after_partial_sell_data['Close'] < trailing_stop_loss_price]
+            # 추출 시점의 인덱스(날짜)가 무조건 sell_date 보다 '이후'인 경우만 유효한 시그널로 인정
+            valid_dates_mask = after_partial_sell_data.index > sell_date
+
+            volume_spike_drop_sell_dates = after_partial_sell_data[climax_distribution_exit & valid_dates_mask]
+            trend_breakdown_confirm_sell_dates = after_partial_sell_data[trend_breakdown_confirm & valid_dates_mask]
+            trailing_stop_sell_dates = after_partial_sell_data[(after_partial_sell_data['Close'] < trailing_stop_loss_price) & valid_dates_mask]
 
             volume_spike_drop_sell_date = volume_spike_drop_sell_dates.index[0] if not volume_spike_drop_sell_dates.empty else None
             trend_breakdown_confirm_sell_date = trend_breakdown_confirm_sell_dates.index[0] if not trend_breakdown_confirm_sell_dates.empty else None
