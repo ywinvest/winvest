@@ -309,28 +309,26 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             # --- 윗꼬리 음봉 기반 클라이맥스 엑시트 (Intraday Rejection) ---
             multiplier_drop = 1.5
 
-            # 1. 거래량 폭증 (세력 이탈의 증거)
+            # 1. 거래량 폭증 (세력 이탈의 필수 증거)
             volume_condition = (
                 (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
                 (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
             )
 
-            # 2. 당일 음봉 확인 (시가가 종가보다 높음)
-            bearish_candle = after_partial_sell_data['Open'] > after_partial_sell_data['Close']
-
-            # 3. 장중 거대한 매도세 (고점에서 종가까지 밀려난 폭이 ATR 22의 1.5배 이상)
-            # 어제 종가와 무관하게, 오늘 고점에서 얼마나 끔찍하게 쏟아졌는지만 평가합니다.
-            intraday_rejection = (
-                (after_partial_sell_data['High'] - after_partial_sell_data['Close']) > (after_partial_sell_data['ATR_22'] * multiplier_drop)
+            # 2. 음봉 몸통 조건 (시가 대비 종가 하락폭이 ATR_22의 1.5배 이상)
+            # 자연스럽게 Open > Close 인 음봉 상태를 내포합니다.
+            massive_body = (
+                (after_partial_sell_data['Open'] - after_partial_sell_data['Close']) >= (after_partial_sell_data['ATR_22'] * 1.5)
             )
 
-            # 4. 명확한 윗꼬리 특성 (윗꼬리가 음봉 몸통보다 긺)
-            long_upper_shadow = (
-                (after_partial_sell_data['High'] - after_partial_sell_data['Open']) > (after_partial_sell_data['Open'] - after_partial_sell_data['Close'])
+            # 3. 고점 대비 종가 하락 조건 (장중 최고점 대비 종가 하락폭이 ATR_22의 2.0배 이상)
+            # 윗꼬리가 길게 달리거나, 몸통 자체가 2.0배 이상인 극단적 매도세를 잡아냅니다.
+            intraday_total_rejection = (
+                (after_partial_sell_data['High'] - after_partial_sell_data['Close']) >= (after_partial_sell_data['ATR_22'] * 2.0)
             )
 
-            # 최종 조건 결합: 거래량 폭발 + 음봉 + ATR 1.5배 이상의 고점 대비 폭락 + 긴 윗꼬리
-            volume_spike_drop = volume_condition & bearish_candle & intraday_rejection & long_upper_shadow
+            # 최종 클라이맥스 시그널
+            volume_spike_drop = volume_condition & massive_body & intraday_total_rejection
 
             # 2. 추세 붕괴 확정
             trend_breakdown_confirm = (
