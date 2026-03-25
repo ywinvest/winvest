@@ -321,12 +321,12 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
             # 3. 매크로 조건: 산 정상에서의 하락 (최근 22일 고점 대비 ATR 3배수 이탈)
             # 단순한 박스권 장대음봉이 아니라, 진짜 '클라이맥스 탑'을 찍고 무너지는 자리인지 공간적 위치를 확인합니다.
-            macro_trend_broken = (
-                after_partial_sell_data['Close'] < (after_partial_sell_data['Highest_22'] - after_partial_sell_data['ATR_22'] * 3)
-            )
+            # macro_trend_broken = (
+            #     after_partial_sell_data['Close'] < (after_partial_sell_data['Highest_22'] - after_partial_sell_data['ATR_22'] * 3)
+            # )
 
             # 최종 클라이맥스 시그널: 4가지 조건이 동시에 만족하는 '퍼펙트 스톰' 하락일
-            climax_exit_drop = volume_condition & price_drop_cond & body_drop_cond & macro_trend_broken
+            climax_exit_drop = volume_condition & price_drop_cond & body_drop_cond #& macro_trend_broken
 
             # 2. 추세 붕괴 확정
             trend_breakdown_confirm = (
