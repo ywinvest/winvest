@@ -295,38 +295,48 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           # 2차 매도 (남은 물량) 조건 탐색
           after_partial_sell_data = trade_data.loc[sell_date:].iloc[1:]
           if not after_partial_sell_data.empty:
-            # 1. 거래량 실린 장대 음봉 (오닐식 청산)
-            # volume_spike_drop = (
-            #     (
-            #         (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
-            #         (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
-            #     ) &
-            #     (after_partial_sell_data['Close'] < (after_partial_sell_data['Highest_5'] - after_partial_sell_data['ATR_5'] * 3))
-            #     # (after_partial_sell_data['Change'] < -1 * BASE_RISK) & # -8%
-            #     # (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
-            # )
+            # --- 지수 등락률(Index_Change) 데이터 매핑 ---
+            if source_df is not None and 'Change' in source_df.columns:
+              after_partial_sell_data['Index_Change'] = source_df['Change'].reindex(after_partial_sell_data.index)
+            else:
+              after_partial_sell_data['Index_Change'] = 0.0
 
-            # --- 매크로 & 마이크로 결합 클라이맥스 엑시트 ---
-            multiplier_drop = 1.5
+            # --- 매크로 & 마이크로 결합 클라이맥스 엑시트 (상대 강도 필터 포함) ---
+            volatility_multiple = 1.5
 
-            # 1. 거래량 폭증 (세력 이탈의 필수 증거)
-            volume_condition = (
+            # 1. 기관의 대량 매도 (Institutional Distribution Volume)
+            institutional_distribution_volume = (
                 (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].shift(1) * 1.2) |
                 (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
             )
 
-            # 2. 마이크로 조건: 당일 완벽한 장대음봉 (전일 대비 1.5 ATR 하락 & 꽉 찬 몸통)
-            price_drop_cond = (after_partial_sell_data['Close'] < (after_partial_sell_data['Close'].shift(1) - after_partial_sell_data['ATR_22'] * multiplier_drop))
-            body_drop_cond = (after_partial_sell_data['Close'] < (after_partial_sell_data['Open'] - after_partial_sell_data['ATR_22'] * multiplier_drop))
+            # 2. ATR 기반 가격 추세 훼손 (ATR Price Violation)
+            atr_price_violation = (
+                after_partial_sell_data['Close'] < (after_partial_sell_data['Close'].shift(1) - after_partial_sell_data['ATR_22'] * volatility_multiple)
+            )
 
-            # 3. 매크로 조건: 산 정상에서의 하락 (최근 22일 고점 대비 ATR 3배수 이탈)
-            # 단순한 박스권 장대음봉이 아니라, 진짜 '클라이맥스 탑'을 찍고 무너지는 자리인지 공간적 위치를 확인합니다.
-            # macro_trend_broken = (
-            #     after_partial_sell_data['Close'] < (after_partial_sell_data['Highest_22'] - after_partial_sell_data['ATR_22'] * 3)
-            # )
+            # 3. 와이코프 장대음봉 (Wide Spread Down Bar)
+            wide_spread_down_bar = (
+                after_partial_sell_data['Close'] < (after_partial_sell_data['Open'] - after_partial_sell_data['ATR_22'] * volatility_multiple)
+            )
 
-            # 최종 클라이맥스 시그널: 4가지 조건이 동시에 만족하는 '퍼펙트 스톰' 하락일
-            climax_exit_drop = volume_condition & price_drop_cond & body_drop_cond #& macro_trend_broken
+            # 4. 상대 강도 필터 (Relative Strength Filter - 마크 미너비니)
+            # 시장(지수)이 -2% 이상 무너지는 패닉셀 발생 여부 확인
+            market_panic_day = after_partial_sell_data['Index_Change'] < -0.02
+
+            # 개별 종목이 지수보다 더 크게 하락했는가? (개별 악재 및 진짜 세력 이탈 확인)
+            idiosyncratic_weakness = after_partial_sell_data['Change'] < after_partial_sell_data['Index_Change']
+
+            # 지수 폭락일이 아니거나(정상 장세), 지수 폭락일인데 종목이 지수보다 더 끔찍하게 무너진 경우에만 청산 승인
+            relative_strength_confirmed = (~market_panic_day) | (market_panic_day & idiosyncratic_weakness)
+
+            # 5. 최종 클라이맥스 분산일 청산 (Climax Distribution Exit)
+            climax_distribution_exit = (
+                institutional_distribution_volume &
+                atr_price_violation &
+                wide_spread_down_bar &
+                relative_strength_confirmed
+            )
 
             # 2. 추세 붕괴 확정
             trend_breakdown_confirm = (
@@ -341,7 +351,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             # second_stop_loss_cond = (
             #   (after_partial_sell_data['Close'] < trailing_stop_loss_price)
             # )
-            volume_spike_drop_sell_dates = after_partial_sell_data[climax_exit_drop]
+            volume_spike_drop_sell_dates = after_partial_sell_data[climax_distribution_exit]
             trend_breakdown_confirm_sell_dates = after_partial_sell_data[trend_breakdown_confirm]
             trailing_stop_sell_dates = after_partial_sell_data[after_partial_sell_data['Close'] < trailing_stop_loss_price]
 
