@@ -306,7 +306,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             #     # (after_partial_sell_data['Close'] / after_partial_sell_data['Open'] - 1 < -1 * BASE_RISK) # -8%
             # )
 
-            # --- 윗꼬리 음봉 기반 클라이맥스 엑시트 (Intraday Rejection) ---
+            # --- 매크로 & 마이크로 결합 클라이맥스 엑시트 ---
             multiplier_drop = 1.5
 
             # 1. 거래량 폭증 (세력 이탈의 필수 증거)
@@ -315,20 +315,18 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 (after_partial_sell_data['Volume'] > after_partial_sell_data['Volume'].rolling(window=20).mean() * 1.5)
             )
 
-            # 2. 음봉 몸통 조건 (시가 대비 종가 하락폭이 ATR_22의 1.5배 이상)
-            # 자연스럽게 Open > Close 인 음봉 상태를 내포합니다.
-            massive_body = (
-                (after_partial_sell_data['Open'] - after_partial_sell_data['Close']) >= (after_partial_sell_data['ATR_22'] * 1.5)
+            # 2. 마이크로 조건: 당일 완벽한 장대음봉 (전일 대비 1.5 ATR 하락 & 꽉 찬 몸통)
+            price_drop_cond = (after_partial_sell_data['Close'] < (after_partial_sell_data['Close'].shift(1) - after_partial_sell_data['ATR_22'] * multiplier_drop))
+            body_drop_cond = (after_partial_sell_data['Close'] < (after_partial_sell_data['Open'] - after_partial_sell_data['ATR_22'] * multiplier_drop))
+
+            # 3. 매크로 조건: 산 정상에서의 하락 (최근 22일 고점 대비 ATR 3배수 이탈)
+            # 단순한 박스권 장대음봉이 아니라, 진짜 '클라이맥스 탑'을 찍고 무너지는 자리인지 공간적 위치를 확인합니다.
+            macro_trend_broken = (
+                after_partial_sell_data['Close'] < (after_partial_sell_data['Highest_22'] - after_partial_sell_data['ATR_22'] * 3)
             )
 
-            # 3. 고점 대비 종가 하락 조건 (장중 최고점 대비 종가 하락폭이 ATR_22의 2.0배 이상)
-            # 윗꼬리가 길게 달리거나, 몸통 자체가 2.0배 이상인 극단적 매도세를 잡아냅니다.
-            intraday_total_rejection = (
-                (after_partial_sell_data['High'] - after_partial_sell_data['Close']) >= (after_partial_sell_data['ATR_22'] * 2.0)
-            )
-
-            # 최종 클라이맥스 시그널
-            volume_spike_drop = volume_condition & massive_body & intraday_total_rejection
+            # 최종 클라이맥스 시그널: 4가지 조건이 동시에 만족하는 '퍼펙트 스톰' 하락일
+            climax_exit_drop = volume_condition & price_drop_cond & body_drop_cond & macro_trend_broken
 
             # 2. 추세 붕괴 확정
             trend_breakdown_confirm = (
@@ -343,7 +341,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             # second_stop_loss_cond = (
             #   (after_partial_sell_data['Close'] < trailing_stop_loss_price)
             # )
-            volume_spike_drop_sell_dates = after_partial_sell_data[volume_spike_drop]
+            volume_spike_drop_sell_dates = after_partial_sell_data[climax_exit_drop]
             trend_breakdown_confirm_sell_dates = after_partial_sell_data[trend_breakdown_confirm]
             trailing_stop_sell_dates = after_partial_sell_data[after_partial_sell_data['Close'] < trailing_stop_loss_price]
 
