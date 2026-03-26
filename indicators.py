@@ -1,4 +1,5 @@
 import pandas_ta as ta
+import numpy as np
 
 def calculate_indicators(df):
   """Calculate technical indicators."""
@@ -28,6 +29,24 @@ def calculate_indicators(df):
   df['DI'] = df['DMP'] > df['DMN']
   df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).round(2)
   df['ATR_22'] = ta.atr(df['High'], df['Low'], df['Close'], length=22).round(2)
+
+  # --- [추가] Connors RSI (CRSI) 계산 ---
+  # 1. RSI (3)
+  df['RSI_3'] = ta.rsi(df['Close'], length=3)
+
+  # 2. Streak RSI (2)
+  diff = df['Close'].diff()
+  sign = np.sign(diff).fillna(0)
+  streak = sign.groupby((sign != sign.shift()).cumsum()).cumsum()
+  df['Streak_RSI_2'] = ta.rsi(streak, length=2)
+
+  # 3. Percent Rank (100)
+  roc = df['Close'].pct_change()
+  # 최근 100일 동안 현재의 등락률이 하위 몇 %에 위치하는지 계산
+  df['Percent_Rank_100'] = roc.rolling(window=100).apply(lambda x: (x <= x[-1]).mean() * 100, raw=True)
+
+  # 4. 최종 CRSI (3가지 요소의 평균)
+  df['CRSI'] = (df['RSI_3'] + df['Streak_RSI_2'] + df['Percent_Rank_100']) / 3
 
   df.dropna(inplace=True)
   return df
