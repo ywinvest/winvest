@@ -221,6 +221,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       # 매도 조건 초기화
       sell_date, sell_price = None, None
       full_sell_date, full_sell_price, full_sell_reason = None, None, None
+      full_sell_change = None
 
       if not trade_data.empty:
         # 익절/손절 가격 정의
@@ -332,6 +333,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             if valid_dates:
               earliest_date, condition = min(valid_dates, key=lambda x: x[0])
 
+              full_sell_change = runner_data.loc[earliest_date, 'Change']
+
               if condition == 'trailing':
                 full_sell_date = earliest_date
                 full_sell_price = runner_data.loc[earliest_date, 'Close']
@@ -373,6 +376,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Full_Sell_Date': full_sell_date,
         'Full_Sell_Price': full_sell_price,
         'Full_Sell_Reason': full_sell_reason,
+        'Full_Sell_Change': full_sell_change,
         'Full_Sell_Index_Change': full_sell_index_change,
         'Return': (sell_price / buy_price - 1) if sell_price else (current_price / buy_price - 1),
         'Full_Return': (full_sell_price / buy_price - 1) if full_sell_price else ((current_price / buy_price - 1) if sell_date else None),
