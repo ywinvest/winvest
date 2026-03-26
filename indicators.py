@@ -20,7 +20,7 @@ def calculate_indicators(df):
   df['MA_60_Cross'] = (df['Close'].gt(df['MA_60'], axis=0)) & (df['Close'].shift(1).le(df['MA_60'].shift(1), axis=0))
   df['MA_10_Break'] = (df['Close'].lt(df['MA_10'], axis=0)) & (df['Close'].shift(1).ge(df['MA_10'].shift(1), axis=0))
   df['MA_20_Break'] = (df['Close'].lt(df['MA_20'], axis=0)) & (df['Close'].shift(1).ge(df['MA_20'].shift(1), axis=0))
-  df['MA_200_Up'] = df['MA_200'] > df['Close']
+  df['MA_200_Up'] = df['Close'] > df['MA_200']
 
   # df['High_5D'] = df['High'].rolling(window=5, min_periods=1).max()
 
