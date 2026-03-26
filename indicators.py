@@ -7,6 +7,7 @@ def calculate_indicators(df):
   df['MA_10'] = df['Close'].rolling(window=10).mean()
   df['MA_20'] = df['Close'].rolling(window=20).mean()
   df['MA_60'] = df['Close'].rolling(window=60).mean()
+  df['MA_200'] = df['Close'].rolling(window=200).mean()
   df['Bullish'] = df['Close'] > df['Open']
   df['Change_Rate'] = (df['Close'].pct_change(fill_method=None) * 100).round(2)
   df['MA_10_Trend'] = df['MA_10'].diff().gt(0)
@@ -19,6 +20,7 @@ def calculate_indicators(df):
   df['MA_60_Cross'] = (df['Close'].gt(df['MA_60'], axis=0)) & (df['Close'].shift(1).le(df['MA_60'].shift(1), axis=0))
   df['MA_10_Break'] = (df['Close'].lt(df['MA_10'], axis=0)) & (df['Close'].shift(1).ge(df['MA_10'].shift(1), axis=0))
   df['MA_20_Break'] = (df['Close'].lt(df['MA_20'], axis=0)) & (df['Close'].shift(1).ge(df['MA_20'].shift(1), axis=0))
+  df['MA_200_Up'] = df['MA_200'] > df['Close']
 
   # df['High_5D'] = df['High'].rolling(window=5, min_periods=1).max()
 
