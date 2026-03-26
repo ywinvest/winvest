@@ -134,7 +134,7 @@ def backtest(data, ticker):
       buy_count += 1
 
       # 1. 현재 조건에 따른 '순수 포지션 사이즈' 계산 (기존 원본 로직 방식)
-      if group_buy_count < 4:
+      if group_buy_count < 5:
         calculated_size = 1
       else:
         calculated_size = 2
