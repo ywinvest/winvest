@@ -30,23 +30,25 @@ def calculate_indicators(df):
   df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).round(2)
   df['ATR_22'] = ta.atr(df['High'], df['Low'], df['Close'], length=22).round(2)
 
-  # --- [추가] Connors RSI (CRSI) 계산 ---
-  # 1. RSI (3)
-  df['RSI_3'] = ta.rsi(df['Close'], length=3)
+  # --- [추가] ATR 변동성 기반 동적 RSI 임계치 계산 ---
+  # 1. 과거 60일 평균 변동성(장기 기준점) 계산
+  df['ATR_MA_60'] = df['ATR'].rolling(window=60).mean()
 
-  # 2. Streak RSI (2)
-  diff = df['Close'].diff()
-  sign = np.sign(diff).fillna(0)
-  streak = sign.groupby((sign != sign.shift()).cumsum()).cumsum()
-  df['Streak_RSI_2'] = ta.rsi(streak, length=2)
+  # 2. 변동성 비율 (현재 변동성 / 평균 변동성)
+  # 1.0이면 평상시, 1.5면 변동성 50% 증가(위험), 0.5면 변동성 축소
+  df['Volatility_Ratio'] = df['ATR'] / df['ATR_MA_60']
 
-  # 3. Percent Rank (100)
-  roc = df['Close'].pct_change()
-  # 최근 100일 동안 현재의 등락률이 하위 몇 %에 위치하는지 계산
-  df['Percent_Rank_100'] = roc.rolling(window=100).apply(lambda x: (x <= x[-1]).mean() * 100, raw=True)
+  # 3. 동적 임계치 산정
+  # 공식: 기본 임계치(40) - (변동성 비율 * 민감도 가중치(10))
+  # (예시: 비율 1.0 -> RSI 30 / 비율 1.5 -> RSI 25 / 비율 2.0 -> RSI 20)
+  base_threshold = 40
+  volatility_weight = 10
 
-  # 4. 최종 CRSI (3가지 요소의 평균)
-  df['CRSI'] = (df['RSI_3'] + df['Streak_RSI_2'] + df['Percent_Rank_100']) / 3
+  df['Dynamic_RSI_Threshold'] = base_threshold - (df['Volatility_Ratio'] * volatility_weight)
+
+  # 4. 임계치의 비정상적 발산을 막기 위한 상/하한선 클리핑 (최소 15 ~ 최대 40)
+  df['Dynamic_RSI_Threshold'] = df['Dynamic_RSI_Threshold'].clip(lower=15, upper=40).round(1)
+  # -------------------------------------------------
 
   df.dropna(inplace=True)
   return df
