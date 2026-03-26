@@ -12,7 +12,7 @@ def calculate_indicators(df):
   df['MA_10_Trend'] = df['MA_10'].diff().gt(0)
   df['MA_20_Trend'] = df['MA_20'].diff().gt(0)
 
-  df['RSI_Low_Point'] = (df['RSI'] <= 35) & (df['RSI'] < df['RSI'].rolling(window='5D').min().shift(1))
+  # df['RSI_Low_Point'] = (df['RSI'] <= 35) & (df['RSI'] < df['RSI'].rolling(window='5D').min().shift(1))
 
   df['MA_10_Cross'] = (df['Close'].gt(df['MA_10'], axis=0)) & (df['Close'].shift(1).le(df['MA_10'].shift(1), axis=0))
   df['MA_20_Cross'] = (df['Close'].gt(df['MA_20'], axis=0)) & (df['Close'].shift(1).le(df['MA_20'].shift(1), axis=0))
@@ -20,7 +20,7 @@ def calculate_indicators(df):
   df['MA_10_Break'] = (df['Close'].lt(df['MA_10'], axis=0)) & (df['Close'].shift(1).ge(df['MA_10'].shift(1), axis=0))
   df['MA_20_Break'] = (df['Close'].lt(df['MA_20'], axis=0)) & (df['Close'].shift(1).ge(df['MA_20'].shift(1), axis=0))
 
-  df['High_5D'] = df['High'].rolling(window=5, min_periods=1).max()
+  # df['High_5D'] = df['High'].rolling(window=5, min_periods=1).max()
 
   adx_data = ta.adx(high=df['High'], low=df['Low'], close=df['Close'], length=14, mamode='EMA')
   df['ADX'] = adx_data['ADX_14']
@@ -32,11 +32,11 @@ def calculate_indicators(df):
 
   # --- [추가] ATR 변동성 기반 동적 RSI 임계치 계산 ---
   # 1. 과거 60일 평균 변동성(장기 기준점) 계산
-  df['ATR_MA_60'] = df['ATR'].rolling(window=60).mean()
+  df['ATR_MA_100'] = df['ATR'].rolling(window=100).mean()
 
   # 2. 변동성 비율 (현재 변동성 / 평균 변동성)
   # 1.0이면 평상시, 1.5면 변동성 50% 증가(위험), 0.5면 변동성 축소
-  df['Volatility_Ratio'] = df['ATR'] / df['ATR_MA_60']
+  df['Volatility_Ratio'] = df['ATR'] / df['ATR_MA_100']
 
   # 3. 동적 임계치 산정
   # 공식: 기본 임계치(40) - (변동성 비율 * 민감도 가중치(10))
