@@ -32,11 +32,11 @@ def calculate_indicators(df):
 
   # --- [추가] ATR 변동성 기반 동적 RSI 임계치 계산 ---
   # 1. 과거 100일 평균 변동성(장기 기준점) 계산
-  df['ATR_MA_100'] = df['ATR_22'].rolling(window=100).mean()
+  df['ATR_MA_60'] = df['ATR'].rolling(window=60).mean()
 
   # 2. 변동성 비율 (현재 변동성 / 평균 변동성)
   # 1.0이면 평상시, 1.5면 변동성 50% 증가(위험), 0.5면 변동성 축소
-  df['Volatility_Ratio'] = df['ATR'] / df['ATR_MA_100']
+  df['Volatility_Ratio'] = df['ATR'] / df['ATR_MA_60']
 
   # 3. 동적 임계치 산정
   # 공식: 기본 임계치(40) - (변동성 비율 * 민감도 가중치(10))
