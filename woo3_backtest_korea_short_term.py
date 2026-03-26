@@ -33,12 +33,12 @@ DEFAULT_RSI_THRESHOLD = 30
 # 초기 필터링용 조건
 def buy_condition(df):
   """Broad buy condition for global indices (RSI <= 35)."""
-  return ((df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Close'].shift(1) - df['Close'] > df['ATR'].shift(1))) | \
+  return ((df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish'])) | \
          (df['Change_Rate'] < -5)
 
 def sell_condition_technical_bounce(df):
   """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
-  return (df['MA_10_Cross'] | df['MA_20_Cross']) & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
+  return (df['MA_10_Cross'] | df['MA_20_Cross'] | (df['Close'] - df['Close'].shift(1) > df['ATR'].shift(1) * 1.5)) & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
 
 def sell_condition_snap_back(df):
   """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
