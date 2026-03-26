@@ -102,6 +102,7 @@ if __name__ == "__main__":
     all_stocks = all_stocks.merge(df_listing, on='Code', how='left')
 
     kospi = fdr.DataReader('KS11')
+    kospi['Change'] = kospi['Close'].pct_change()
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
@@ -112,6 +113,7 @@ if __name__ == "__main__":
     kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
     kosdaq = fdr.DataReader('KQ11')
+    kosdaq['Change'] = kosdaq['Close'].pct_change()
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']

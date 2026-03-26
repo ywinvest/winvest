@@ -345,6 +345,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
                 full_sell_price = runner_data.loc[earliest_date, 'Close']
                 full_sell_reason = 'volume spike drop'
 
+      full_sell_index_change = None
+      if full_sell_date and source_df is not None and 'Change' in source_df.columns and full_sell_date in source_df.index:
+        change_val = source_df.loc[full_sell_date, 'Change']
+        full_sell_index_change = change_val.iloc[0] if isinstance(change_val, pd.Series) else change_val
+
       # 최종 거래 결과 기록
       trade_info = buy_row.to_dict()
       trade_info.update({
@@ -368,6 +373,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Full_Sell_Date': full_sell_date,
         'Full_Sell_Price': full_sell_price,
         'Full_Sell_Reason': full_sell_reason,
+        'Full_Sell_Index_Change': full_sell_index_change,
         'Return': (sell_price / buy_price - 1) if sell_price else (current_price / buy_price - 1),
         'Full_Return': (full_sell_price / buy_price - 1) if full_sell_price else ((current_price / buy_price - 1) if sell_date else None),
         'Holding_Days': calculate_trading_days(stock_group, buy_date, sell_date),
@@ -645,6 +651,7 @@ if __name__ == "__main__":
       two_years_ago = today.replace(year=today.year - 2, day=28)
 
     kospi = fdr.DataReader('KS11', two_years_ago)
+    kospi['Change'] = kospi['Close'].pct_change()
     kospi['RSI'] = ta.rsi(kospi['Close'], length=14)
     adx_data = ta.adx(high=kospi['High'], low=kospi['Low'], close=kospi['Close'], length=14, mamode='EMA')
     kospi['ADX'] = adx_data['ADX_14']
@@ -655,6 +662,7 @@ if __name__ == "__main__":
     kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
+    kosdaq['Change'] = kosdaq['Close'].pct_change()
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
     adx_data = ta.adx(high=kosdaq['High'], low=kosdaq['Low'], close=kosdaq['Close'], length=14, mamode='EMA')
     kosdaq['ADX'] = adx_data['ADX_14']
