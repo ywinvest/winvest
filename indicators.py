@@ -3,6 +3,7 @@ import pandas_ta as ta
 def calculate_indicators(df):
   """Calculate technical indicators."""
   df['RSI'] = ta.rsi(df['Close'], length=14).round(2)
+  df['RSI_Signal'] = df['RSI'].rolling(window=9).mean()
   df['MA_10'] = df['Close'].rolling(window=10).mean()
   df['MA_20'] = df['Close'].rolling(window=20).mean()
   df['MA_60'] = df['Close'].rolling(window=60).mean()
@@ -13,6 +14,7 @@ def calculate_indicators(df):
 
   df['RSI_Low_Point'] = (df['RSI'] <= 35) & (df['RSI'] < df['RSI'].rolling(window='5D').min().shift(1))
 
+  df['RSI_Cross'] = (df['RSI'].gt(df['RSI_Signal'], axis=0)) & (df['RSI'].shift(1).le(df['RSI_Signal'].shift(1), axis=0))
   df['MA_10_Cross'] = (df['Close'].gt(df['MA_10'], axis=0)) & (df['Close'].shift(1).le(df['MA_10'].shift(1), axis=0))
   df['MA_20_Cross'] = (df['Close'].gt(df['MA_20'], axis=0)) & (df['Close'].shift(1).le(df['MA_20'].shift(1), axis=0))
   df['MA_60_Cross'] = (df['Close'].gt(df['MA_60'], axis=0)) & (df['Close'].shift(1).le(df['MA_60'].shift(1), axis=0))
