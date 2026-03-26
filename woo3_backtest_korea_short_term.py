@@ -33,12 +33,12 @@ DEFAULT_RSI_THRESHOLD = 30
 # 초기 필터링용 조건
 def buy_condition(df):
   """Broad buy condition for global indices (RSI <= 35)."""
-  return ((df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Change_Rate'] < 0)) | \
+  return ((df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Change_Rate'] < -2)) | \
          (df['Change_Rate'] < -5)
 
 def sell_condition_technical_bounce(df):
   """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
-  return (df['MA_10_Cross'] | df['MA_20_Cross'] | df['RSI_Cross']) & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
+  return (df['MA_10_Cross'] | df['MA_20_Cross'] | df['Change_Rate'] > 5) & df['Bullish'] # & (df['ADX'] > 20) & df['DI']
 
 def sell_condition_snap_back(df):
   """스냅백 매도 조건 - 20일선 돌파 (매수 회수가 많을 때)."""
@@ -133,7 +133,7 @@ def backtest(data, ticker):
       buy_count += 1
 
       # 1. 현재 조건에 따른 '순수 포지션 사이즈' 계산 (기존 원본 로직 방식)
-      if group_buy_count < 5:
+      if group_buy_count < 4:
         calculated_size = 1
       else:
         calculated_size = 2
