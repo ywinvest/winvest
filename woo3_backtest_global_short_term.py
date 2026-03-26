@@ -11,7 +11,7 @@ DEFAULT_RSI_THRESHOLD = 35
 # 초기 필터링용 조건
 def buy_condition(df):
   """Broad buy condition for global indices (RSI <= 35)."""
-  return ((df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish'])) | \
+  return ((df['RSI'] <= DEFAULT_RSI_THRESHOLD) & (~df['Bullish']) & (df['Close'].shift(1) - df['Close'] > df['ATR'].shift(1) * 1.5)) | \
          (df['Change_Rate'] < -7)
 
 def sell_condition_technical_bounce(df):
