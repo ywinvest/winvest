@@ -91,8 +91,16 @@ def backtest(data, ticker):
     # [조건 1] 첫 매수가 아닌데 가격이 올랐으면 매수 스킵
     if not is_first_buy:
       current_price = df.loc[buy_date, 'Close']
-      if last_buy_price is None or current_price >= last_buy_price:
-        should_buy = False
+      current_atr = df.loc[buy_date, 'ATR']
+
+      if group_buy_count < 4:
+        # 2~4번째 진입: 직전 매수가 대비 1 ATR 이상 하락 시에만 매수
+        if last_buy_price is None or current_price > (last_buy_price - current_atr):
+          should_buy = False
+      else:
+        # 5번째 이후 진입: 직전 매수가보다 낮으면 매수
+        if last_buy_price is None or current_price >= last_buy_price:
+          should_buy = False
 
     # [조건 2] RSI 조건이 안 맞으면 매수 스킵
     if should_buy and not is_first_buy:
