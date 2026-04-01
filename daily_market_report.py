@@ -22,12 +22,12 @@ def format_market_cap(marcap):
     return f"{marcap/1e8:.0f}억"
 
 def filter_common_stocks(df):
-  """매매 부적합 종목(스팩, 우선주 등) 필터링 (RS 계산 후 실행)"""
-  exclude_pattern = r'스팩|리츠|ETN|ETF'
-  if 'Name' in df.columns:
-    return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
-              & (~df['Code'].str.endswith(("5", "7", "9", "K", "L", "M", "N", "O")))]
-  return df
+  # 스팩 제외
+  exclude_pattern = r'스팩'
+  return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
+            & (~df['Code'].str.endswith(("5", "7", "9", "K", "L", "M", "N", "O"))) # 우선주, 일부 ETN/ETF 등 제외
+            & (df['Marcap'] >= 200_000_000_000)
+            ]
 
 def process_stock(row, start_date):
   """종목별 개별 주가 데이터 수집 및 RS 기초 지표 계산"""
