@@ -47,7 +47,7 @@ def process_stock(row):
       print(f"No data after listing date for {code}")
       return None
 
-    df = woo2.calculate_indicators(df)
+    df = woo4.calculate_indicators(df)
 
     if not df.empty:
       df['Code'] = code
