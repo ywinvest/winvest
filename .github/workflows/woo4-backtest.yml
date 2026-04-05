@@ -1,4 +1,4 @@
-name: woo2 - Backtest
+name: woo4 - Backtest
 
 on:
   workflow_dispatch:
@@ -13,11 +13,11 @@ jobs:
     steps:
     # 레포지토리 클론
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
 
     # Python 설치
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: "3.13"
         cache: "pip"
