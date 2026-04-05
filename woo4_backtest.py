@@ -121,7 +121,7 @@ if __name__ == "__main__":
     kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
     kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
 
-    # result_file = "woo2_backtest_results.csv"
+    result_file = "woo4_backtest_results.csv"
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks)
@@ -144,7 +144,7 @@ if __name__ == "__main__":
 
     result_data = woo4.buy_and_sell(filtered_data, kospi, kosdaq)
     # final_data = result_data[buy_condition(result_data)]
-    # result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
+    result_data.to_csv(result_file, index=False, encoding='utf-8-sig')
   except Exception as e:
     print(f"Error in main execution: {e}")
 

@@ -53,8 +53,8 @@ jobs:
         name: woo4_backtest_results
         path: ./woo4_backtest_results.csv
 
-#    - name: Upload Artifact
-#      uses: actions/upload-artifact@v4
-#      with:
-#        name: rs
-#        path: ./rs_*.xlsx
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rs
+        path: ./rs_*.xlsx
