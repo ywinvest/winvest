@@ -36,12 +36,16 @@ def calculate_indicators(df):
   # df['Crossover_Count'] = df['Crossover'].rolling(window=30, min_periods=1).sum()
   # df['Pre39WeekHigh'] = df['High'].shift(1).rolling(window='273D', min_periods=1).max()
 
-  df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
+  adx_data = ta.adx(high=df['High'], low=df['Low'], close=df['Close'], length=14, mamode='EMA')
+  df['ADX'] = adx_data['ADX_14']
+  df['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
+
+  # df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
 
   # 39주 신고가 돌파 여부
   # is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
   # 52주 신고가 돌파 여부
-  is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
+  # is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
 
   # 연속적인 신고가 돌파를 그룹화하여 첫 돌파만 선택
   # 돌파가 시작되는 지점을 그룹화 기준으로 사용
@@ -52,7 +56,7 @@ def calculate_indicators(df):
   # 39주 신고가 첫 돌파여부
   # df['First_39WeekHigh_Break'] = is_39weekhigh_break & (~is_39weekhigh_break.shift(1, fill_value=False))
   # 52주 신고가 첫 돌파여부
-  df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
+  # df['First_52WeekHigh_Break'] = is_52weekhigh_break & (~is_52weekhigh_break.shift(1, fill_value=False))
   # 첫 돌파 이후 10일 동안 추가 돌파 무시
   # df['First_52WeekHigh_Break'] = df['First_52WeekHigh_Break'].where(
   #     ~df['First_52WeekHigh_Break'].rolling(window=10, min_periods=1).sum().shift(1).fillna(0).astype(bool),
@@ -146,8 +150,9 @@ def buy_condition(df):
   conditions &= (df['MA60_Slope'] > 0)
   conditions &= (df['MA120_Slope'] > 0)
   conditions &= (df['MA240_Slope'] > 0)
-  conditions &= (df['MA10'] > df['Close'])
-  conditions &= (df['MA10'].shift(1) < df['Close'].shift(1))
+  conditions &= (df['Close'] < df['MA10'])
+  conditions &= (df['Close'].shift(1) > df['MA10'].shift(1))
+  conditions &= (df['Close'] > df['MA20'])
   conditions &= (df['Change'] < 0.295)
   conditions &= (df['Volume'] > 0)
   conditions &= (df['Volume'].shift(1) > 0)
