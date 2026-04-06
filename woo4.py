@@ -233,7 +233,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         # 1차 매도 각 조건이 처음 발생하는 날짜 찾기
         take_profit_open_dates = trade_data[trade_data['Open'] >= take_profit_price]
         take_profit_high_dates = trade_data[(trade_data['Open'] < take_profit_price) & (trade_data['High'] >= take_profit_price)]
-        stop_loss_dates = trade_data[trade_data['Close'] < stop_loss_price]
+        stop_loss_dates = trade_data[trade_data['Low'] < stop_loss_price]
 
         # 각 조건의 첫 발생일 저장 (발생하지 않으면 None)
         take_profit_open_date = take_profit_open_dates.index[0] if not take_profit_open_dates.empty else None
@@ -260,9 +260,9 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
             full_sell_price = take_profit_price
           else:  # condition == 'stop'
             sell_date = earliest_date
-            sell_price = trade_data.loc[earliest_date, 'Close']
+            sell_price = stop_loss_price
             full_sell_date = earliest_date
-            full_sell_price = trade_data.loc[earliest_date, 'Close']
+            full_sell_price = stop_loss_price
         # else:
         #   print(f"{name} no sell condition met. {buy_date}, {buy_price}")
         if source_df is not None and buy_date in source_df.index:
