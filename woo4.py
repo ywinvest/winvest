@@ -13,7 +13,7 @@ import krx_auth
 import rs
 from slack_utils import SlackMessageBuilder, send_slack_message
 
-BASE_RISK = 0.08  # 8% base risk (R value)
+BASE_RISK = 0.05  # 5% base risk (R value)
 TRADING_FEE = 0.002  # 0.2% trading fee (commission + slippage)
 
 def calculate_indicators(df):
