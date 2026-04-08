@@ -156,6 +156,17 @@ def buy_condition(df):
 
 
 def buy_and_sell(df, kospi_df, kosdaq_df):
+  # --- 추정 시가총액 및 순위 일괄 계산 ---
+  # 각 종목의 가장 최근(마지막) 종가를 구합니다.
+  last_close = df.groupby('Code')['Close'].transform('last')
+
+  # 모든 과거 시점에 대해 '그 당시의 추정 시가총액'을 계산하여 기존 컬럼을 덮어씁니다.
+  df['Estimated_Marcap'] = df['Marcap'] * (df['Close'] / last_close)
+
+  # 매일(날짜 인덱스=level 0) 기준으로 전체 종목 간의 추정 시가총액 내림차순 순위를 매깁니다.
+  df['Estimated_Marcap_Rank'] = df.groupby(level=0)['Estimated_Marcap'].rank(ascending=False, method='min')
+  # ---------------------------------------
+
   # 매수 신호가 발생한 모든 거래를 가져옵니다.
   buy_signals = df[buy_condition(df)].copy()
   buy_signals = buy_signals[buy_signals.index >= '2015-06-15']
@@ -210,7 +221,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
 
       buy_price = buy_row['Close']
       current_price = stock_group['Close'].iloc[-1]
-      estimated_marcap = buy_row['Marcap'] * (buy_price / current_price)
+      estimated_marcap = buy_row['Estimated_Marcap']
 
       if estimated_marcap < 2e+11:
         continue
@@ -350,7 +361,8 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       trade_info.update({
         'Buy_Date': buy_date,
         'Buy_Price': buy_price,
-        'Estimated_Marcap': estimated_marcap,
+        # 'Estimated_Marcap': estimated_marcap,
+        # 'Estimated_Marcap_Rank': buy_row['Estimated_Marcap_Rank'],
         'Buy_Kospi_ADX': buy_kospi_adx,
         'Buy_Kosdaq_ADX': buy_kosdaq_adx,
         'Buy_Index_ADX': buy_index_adx,
