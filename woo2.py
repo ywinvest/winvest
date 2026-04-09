@@ -38,7 +38,7 @@ def calculate_indicators(df):
   df['Volume_MA5'] = df['Volume'].rolling(window=5).mean()
   df['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
   df['Volume_MA60'] = df['Volume'].rolling(window=60).mean()
-  df['Volume_MA129'] = df['Volume'].rolling(window=120).mean()
+  df['Volume_MA120'] = df['Volume'].rolling(window=120).mean()
 
   df['Pre52WeekHigh'] = df['High'].shift(1).rolling(window='364D', min_periods=1).max()
 
