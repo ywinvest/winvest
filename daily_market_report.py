@@ -11,6 +11,46 @@ from dotenv import load_dotenv
 # 로컬 모듈 임포트
 import rs
 import krx_auth
+import market  # 분리된 시장 분석 모듈
+
+# 시장 신호 매핑 딕셔너리
+SIGNAL_MAP = {
+  "green": "양호🟢",
+  "yellow": "주의🟡",
+  "red": "경고🔴"
+}
+
+def get_market_status(market_code):
+  """시장 지수(종가, 등락률) 및 어제/오늘 신호 전환 여부 파악하여 문자열로 반환"""
+  start_date = (datetime.today() - timedelta(days=100)).strftime('%Y-%m-%d')
+  df = fdr.DataReader(market_code, start_date)
+  df = market.add_indicators(df.dropna())
+
+  # 당일 데이터 추출
+  today_data = df.iloc[-1]
+  today_close = today_data['Close']
+  today_change = today_data['Change']
+
+  # 당일 및 전일 신호 평가 (green, yellow, red 반환)
+  today_signal_raw = market.get_signal(
+      today_data['MA20_Up'], today_data['ADX'], today_data['DI'], today_data['MA5_Up']
+  )
+  yesterday_data = df.iloc[-2]
+  yesterday_signal_raw = market.get_signal(
+      yesterday_data['MA20_Up'], yesterday_data['ADX'], yesterday_data['DI'], yesterday_data['MA5_Up']
+  )
+
+  # UI용 텍스트 변환
+  today_signal = SIGNAL_MAP[today_signal_raw]
+  yesterday_signal = SIGNAL_MAP[yesterday_signal_raw]
+
+  # 신호 유지/전환 메시지 생성
+  if today_signal == yesterday_signal:
+    status_msg = f"{today_signal} 유지"
+  else:
+    status_msg = f"{yesterday_signal} ➡ {today_signal} 전환"
+
+  return f"{today_close:,.2f} ({today_change * 100:+.2f}%), 시스템 신호: {status_msg}", today_change
 
 def format_market_cap(marcap):
   """시가총액을 조 또는 억 단위로 보기 좋게 포맷팅"""
@@ -70,9 +110,15 @@ def main():
   print("KRX 로그인 진행 중...")
   krx_auth.login_krx(krx_id, krx_pw)
 
-  # 시스템 신호 상태 (수동 입력 구간)
-  kospi_status = "경고 유지"
-  kosdaq_status = "경고 유지"
+  print("0. 시장 지수 및 시스템 신호 산출 중...")
+  try:
+    kospi_status, kospi_change = get_market_status('KS11')
+    kosdaq_status, kosdaq_change = get_market_status('KQ11')
+  except Exception as e:
+    kospi_status = f"데이터 수집 실패 ({e})"
+    kospi_change = 0.0
+    kosdaq_status = f"데이터 수집 실패 ({e})"
+    kosdaq_change = 0.0
 
   # ---------------------------------------------------------
   # 1. KOSPI/KOSDAQ 리스팅 (상한가 및 거래대금 추출)
@@ -98,9 +144,16 @@ def main():
   df_etf = fdr.StockListing('ETF/KR')
   filtered_etf = df_etf[(df_etf['Category'] == 2) & (~df_etf['Name'].str.contains('인버스|레버리지', na=False))].copy()
 
-  etf_over_0 = filtered_etf[filtered_etf['ChangeRate'] > 0.0].sort_values(by='ChangeRate', ascending=False)
-  etf_list = [f"- {row['Name']} ({row['ChangeRate']}%)" for _, row in etf_over_0.iterrows()]
-  if not etf_list: etf_list = ["- 0% 이상 상승한 국내 섹터 ETF 없음"]
+  target_rate = max(0.0, kospi_change * 100)
+
+  etf_over_target = filtered_etf[filtered_etf['ChangeRate'] > target_rate].sort_values(by='ChangeRate', ascending=False)
+  etf_list = [f"- {row['Name']} ({row['ChangeRate']}%)" for _, row in etf_over_target.iterrows()]
+  # 조건에 맞는 ETF가 없을 경우의 메시지 분기 처리
+  if not etf_list:
+    if kospi_change > 0:
+      etf_list = [f"- 코스피 수익률({kospi_change * 100:+.2f}%)을 상회한 주도 섹터 ETF 없음"]
+    else:
+      etf_list = ["- 0% 이상 상승한 주도 섹터 ETF 없음"]
 
   # ---------------------------------------------------------
   # 3. RS 스코어 TOP 5 추출
