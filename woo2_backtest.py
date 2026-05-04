@@ -1,3 +1,4 @@
+import argparse
 import concurrent.futures
 import os
 import time
@@ -116,6 +117,10 @@ def process_stock(row):
     return None
 
 if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description="Woo2 Backtest Script")
+  parser.add_argument('--date', type=str, required=False, help="조회할 날짜를 YYYYMMDD 형식으로 입력하세요 (예: 20260501). 미입력 시 최근 영업일로 진행됩니다.")
+  args = parser.parse_args()
+
   start_time = time.time()
 
   # .env 파일 로드
@@ -184,7 +189,24 @@ if __name__ == "__main__":
     result_data = rs.calculate_relative_strength(result_data)
     filtered_data = woo1.filter_common_stocks(result_data)
 
-    last_trading_day = result_data.index.max()
+    if args.date:
+      try:
+        # 20260501 같은 문자열을 datetime 객체로 변환
+        target_date = pd.to_datetime(args.date, format='%Y%m%d')
+      except ValueError:
+        print("❌ 날짜 형식 오류: YYYYMMDD 형식으로 입력해주세요 (예: 20260501)")
+        exit()
+
+      # 입력한 날짜와 같거나 그 이전인 가장 최근 영업일을 찾습니다
+      available_dates = result_data.index[result_data.index <= target_date]
+      if available_dates.empty:
+        print(f"❌ {args.date} 및 그 이전의 데이터가 존재하지 않습니다.")
+        exit()
+      last_trading_day = available_dates.max()
+      print(f"\n📅 입력 날짜: {args.date} -> 적용된 영업일: {last_trading_day.strftime('%Y%m%d')}")
+    else:
+      last_trading_day = result_data.index.max()
+      print(f"\n📅 기준 영업일: {last_trading_day.strftime('%Y%m%d')} (최근 영업일)")
     if last_trading_day:
       today_rs_data = result_data[result_data.index == last_trading_day].copy()
       today_rs_data = woo2.filter_common_stocks(today_rs_data)

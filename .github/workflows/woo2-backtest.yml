@@ -8,6 +8,10 @@ on:
         required: true
         type: boolean
         default: true
+      target_date:
+        description: '실행할 특정 날짜 (YYYYMMDD 형식, 예: 20260501. 비워두면 가장 최근 영업일로 실행)'
+        required: false
+        type: string
   schedule:
   # 매주 월~금 오후 3:30 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
   - cron: "30 6 * * 1-5"  # 오후 3:30 (UTC+9)
@@ -51,7 +55,11 @@ jobs:
         KRX_ID: ${{ secrets.KRX_ID }}
         KRX_PW: ${{ secrets.KRX_PW }}
       run: |
-        python woo2_backtest.py
+        if [ "${{ github.event.inputs.target_date }}" != "" ]; then
+          python woo2_backtest.py --date "${{ github.event.inputs.target_date }}"
+        else
+          python woo2_backtest.py
+        fi
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -74,7 +82,11 @@ jobs:
         NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         PARENT_PAGE_ID: "2f73336c6c0380da87e0cc5ef9e9a10d"
       run: |
-        python create_notion_db.py
+        if [ "${{ github.event.inputs.target_date }}" != "" ]; then
+          python create_notion_db.py --date "${{ github.event.inputs.target_date }}"
+        else
+          python create_notion_db.py
+        fi
 
     - name : Upload CSV to Notion
       if: |

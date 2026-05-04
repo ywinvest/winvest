@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 from datetime import datetime
@@ -8,6 +9,10 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN")
 ROOT_PAGE_ID = os.environ.get("PARENT_PAGE_ID")
 
 def create_notion_db():
+  parser = argparse.ArgumentParser(description="Notion DB Creator")
+  parser.add_argument('--date', type=str, required=False, help="DB 제목으로 사용할 날짜 (YYYYMMDD 형식, 예: 20260501). 미입력 시 오늘 날짜 사용.")
+  args = parser.parse_args()
+
   # 1. 필수 설정 확인
   if not NOTION_TOKEN or not ROOT_PAGE_ID:
     print("❌ Error: 토큰이나 부모 페이지 ID가 설정되지 않았습니다.")
@@ -16,8 +21,11 @@ def create_notion_db():
   client = Client(auth=NOTION_TOKEN)
   now = datetime.now()
 
-  # 2. 일별 DB 제목 정의
-  db_title = now.strftime("%Y%m%d")     # 예: 20260211 (DB)
+  if args.date:
+    db_title = args.date
+  else:
+    now = datetime.now()
+    db_title = now.strftime("%Y%m%d")
 
   print(f"🚀 Notion 일별 DB 생성 시작: Root > {db_title}")
 
