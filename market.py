@@ -15,8 +15,8 @@ def add_indicators(df):
 
 def get_signal(ma20_up, adx, di, ma5_up):
   """공통 시장 상태 평가 로직 (green, yellow, red)"""
-  if ma20_up and 20 <= adx <= 70 and di:
-    if 25 <= adx <= 70 and ma5_up:
+  if ma20_up and 20 <= adx and di:
+    if 25 <= adx and ma5_up:
       return "green"
     elif 20 <= adx < 25 or not ma5_up:
       return "yellow"
