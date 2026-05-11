@@ -110,6 +110,7 @@ if __name__ == "__main__":
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
     kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
     kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
+    kospi = woo2.calculate_ftd(kospi, threshold=0.015)
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -120,6 +121,7 @@ if __name__ == "__main__":
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
     kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
     kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
+    kosdaq = woo2.calculate_ftd(kosdaq, threshold=0.015)
 
     result_file = "woo2_backtest_results.csv"
 

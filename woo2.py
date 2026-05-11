@@ -114,6 +114,26 @@ def calculate_trading_days(df, start_date, end_date):
   trading_days = df.loc[start_date:end_date].index
   return len(trading_days) - 1  # 매수일 제외
 
+def calculate_ftd(df, window=4, threshold=0.015):
+  """
+  최근 4일 저점 경신 여부를 활용한 완전 벡터화된 FTD 계산 로직
+  """
+  # 1. 최근 4일간(당일 포함)의 장중 최저점 계산
+  df['Min_Low_4d'] = df['Low'].rolling(window=window).min()
+
+  # 2. 오늘 저점이 최근 4일 최저점과 같다면? -> "단기 신저가 경신" 지표 (True/False)
+  df['Is_New_Low'] = (df['Low'] <= df['Min_Low_4d'])
+
+  # 3. 핵심 아이디어: "최근 4일 이내에 '저점 경신(Is_New_Low)' 지표가 뜬 적이 있는가?"
+  # rolling.max()를 사용하면 지난 4일 중 단 하루라도 True(1)가 있으면 True가 됩니다.
+  df['Recent_New_Low_Hit'] = df['Is_New_Low'].rolling(window=window).max().fillna(1).astype(bool)
+
+  # 4. 최종 FTD 판단 로직:
+  # 조건 A: 최근 4일 동안 저점을 경신한 적이 없음 (~Recent_New_Low_Hit)
+  # 조건 B: 오늘 지수가 1.5% 이상 강하게 상승함
+  df['FTD'] = (~df['Recent_New_Low_Hit']) & (df['Close'].pct_change() >= threshold)
+
+  return df
 
 def filter_common_stocks(df):
   # 스팩 제외
@@ -198,6 +218,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_index_ma120_up = None
       buy_index_adx = None
       buy_index_di = None
+      buy_index_ftd = None
 
       buy_kospi_ma5_up = None
       buy_kospi_ma20_up = None
@@ -279,6 +300,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_index_ma120_up = source_df.loc[buy_date, 'MA120_Up']
           buy_index_adx = source_df.loc[buy_date, 'ADX']
           buy_index_di = source_df.loc[buy_date, 'DI']
+          buy_index_ftd= source_df.loc[buy_date, 'FTD']
 
           buy_kospi_ma5_up = kospi_df.loc[buy_date, 'MA5_Up']
           buy_kospi_ma20_up = kospi_df.loc[buy_date, 'MA20_Up']
@@ -372,6 +394,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Index_MA20_Up': buy_index_ma20_up,
         'Buy_Index_MA60_Up': buy_index_ma60_up,
         'Buy_Index_MA120_Up': buy_index_ma120_up,
+        'Buy_Index_FTD': buy_index_ftd,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Sell_Index_ADX': sell_index_adx,
@@ -668,6 +691,7 @@ if __name__ == "__main__":
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
     kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
     kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
+    kospi = calculate_ftd(kospi, threshold=0.015)
 
     kosdaq = fdr.DataReader('KQ11', two_years_ago)
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -678,6 +702,7 @@ if __name__ == "__main__":
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
     kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
     kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
+    kosdaq = calculate_ftd(kosdaq, threshold=0.015)
 
     # 병렬 처리로 데이터 분석
     result_data = parallel_process_stocks(all_stocks, two_years_ago)
