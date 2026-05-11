@@ -116,34 +116,34 @@ def calculate_trading_days(df, start_date, end_date):
 
 def calculate_ftd(df, window=4, threshold=0.015):
   """
-  최근 4일 저점 경신 여부를 활용한 완전 벡터화된 FTD 계산 로직
+  [과거 지지선: 장중 저점(Low) / 이탈 여부: 종가(Close)]
+  장중 흔들기(휩쏘)를 완벽하게 무시하고 종가가 무너졌을 때만 리셋하는 완성형 룰
   """
-  # 1. 최근 4일간(당일 포함)의 장중 최저점 계산
-  df['Min_Low_4d'] = df['Low'].rolling(window=window).min()
+  # 1. 기준 지지선: '어제까지' 최근 4일간의 장중 최저점(꼬리 포함 진짜 바닥)
+  df['Prev_Min_Low_4d'] = df['Low'].shift(1).rolling(window=window).min()
 
-  # 2. 오늘 저점이 최근 4일 최저점과 같다면? -> "단기 신저가 경신" 지표 (True/False)
-  df['Is_New_Low'] = (df['Low'] <= df['Min_Low_4d'])
+  # 2. 🚨 회원님 지적 완벽 반영: 당일 '종가(Close)'가 어제까지의 바닥을 깼는가?
+  # 장중에 아무리 꼬리를 길게 빼도 종가가 말아 올리면 False(이탈 안함)로 판정합니다.
+  df['Is_Close_Breakdown'] = (df['Close'] < df['Prev_Min_Low_4d'])
 
-  # 3. 핵심 아이디어: "최근 4일 이내에 '저점 경신(Is_New_Low)' 지표가 뜬 적이 있는가?"
-  # rolling.max()를 사용하면 지난 4일 중 단 하루라도 True(1)가 있으면 True가 됩니다.
-  df['Recent_New_Low_Hit'] = df['Is_New_Low'].rolling(window=window).max().fillna(1).astype(bool)
+  # 3. 카운트다운: 최근 4일 이내에 '종가 이탈'이 한 번이라도 있었는가?
+  df['Recent_Undercut'] = df['Is_Close_Breakdown'].rolling(window=window).max().fillna(1).astype(bool)
 
-  # 당일 FTD 발생 여부 (단발성 시그널)
-  df['FTD'] = (~df['Recent_New_Low_Hit']) & (df['Close'].pct_change() >= threshold)
+  # 5. 최종 FTD 시그널: 최근 4일간 '종가 이탈'이 없었고 & 1.5% 이상 상승
+  df['FTD'] = (~df['Recent_Undercut']) & (df['Close'].pct_change() >= threshold)
 
   # -------------------------------------------------------------
-  # ⭐ 4. FTD 상태(Uptrend Confirmed) 유지 및 해제 로직
+  # ⭐ 6. FTD 상태 유지 및 해제 (스위치 로직도 동일하게 통일)
   # -------------------------------------------------------------
-  # 'FTD_Active'라는 빈 컬럼을 생성
   df['FTD_Active'] = pd.NA
 
-  # [ON 스위치]: FTD 시그널이 뜬 날은 상태를 True로 설정
+  # [ON 스위치]: FTD 시그널 뜬 날
   df.loc[df['FTD'], 'FTD_Active'] = True
 
-  # [OFF 스위치]: 단기 저점을 깨버린 날(Is_New_Low)은 상태를 False로 강제 해제
-  df.loc[df['Is_New_Low'], 'FTD_Active'] = False
+  # [OFF 스위치]: 단기 바닥을 '종가'로 깨버린 날 (로직 일치화)
+  df.loc[df['Is_Close_Breakdown'], 'FTD_Active'] = False
 
-  # [상태 유지]: 값이 비어있는(NA) 구간은 가장 최근의 상태(True or False)로 채워 넣음
+  # 빈칸 채우기
   df['FTD_Active'] = df['FTD_Active'].ffill().fillna(False).astype(bool)
 
   return df
