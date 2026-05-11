@@ -128,10 +128,23 @@ def calculate_ftd(df, window=4, threshold=0.015):
   # rolling.max()를 사용하면 지난 4일 중 단 하루라도 True(1)가 있으면 True가 됩니다.
   df['Recent_New_Low_Hit'] = df['Is_New_Low'].rolling(window=window).max().fillna(1).astype(bool)
 
-  # 4. 최종 FTD 판단 로직:
-  # 조건 A: 최근 4일 동안 저점을 경신한 적이 없음 (~Recent_New_Low_Hit)
-  # 조건 B: 오늘 지수가 1.5% 이상 강하게 상승함
-  df['FTD'] = (~df['Recent_New_Low_Hit']) & (df['Close'].pct_change() >= threshold)
+  # 당일 FTD 발생 여부 (단발성 시그널)
+  df['FTD_Signal'] = (~df['Recent_New_Low_Hit']) & (df['Close'].pct_change() >= threshold)
+
+  # -------------------------------------------------------------
+  # ⭐ 4. FTD 상태(Uptrend Confirmed) 유지 및 해제 로직
+  # -------------------------------------------------------------
+  # 'FTD_Active'라는 빈 컬럼을 생성
+  df['FTD_Active'] = pd.NA
+
+  # [ON 스위치]: FTD 시그널이 뜬 날은 상태를 True로 설정
+  df.loc[df['FTD_Signal'], 'FTD_Active'] = True
+
+  # [OFF 스위치]: 단기 저점을 깨버린 날(Is_New_Low)은 상태를 False로 강제 해제
+  df.loc[df['Is_New_Low'], 'FTD_Active'] = False
+
+  # [상태 유지]: 값이 비어있는(NA) 구간은 가장 최근의 상태(True or False)로 채워 넣음
+  df['FTD_Active'] = df['FTD_Active'].ffill().fillna(False).astype(bool)
 
   return df
 
@@ -219,6 +232,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       buy_index_adx = None
       buy_index_di = None
       buy_index_ftd = None
+      buy_index_ftd_active = None
 
       buy_kospi_ma5_up = None
       buy_kospi_ma20_up = None
@@ -301,6 +315,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_index_adx = source_df.loc[buy_date, 'ADX']
           buy_index_di = source_df.loc[buy_date, 'DI']
           buy_index_ftd= source_df.loc[buy_date, 'FTD']
+          buy_index_ftd= source_df.loc[buy_date, 'FTD_Active']
 
           buy_kospi_ma5_up = kospi_df.loc[buy_date, 'MA5_Up']
           buy_kospi_ma20_up = kospi_df.loc[buy_date, 'MA20_Up']
@@ -395,6 +410,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Index_MA60_Up': buy_index_ma60_up,
         'Buy_Index_MA120_Up': buy_index_ma120_up,
         'Buy_Index_FTD': buy_index_ftd,
+        'Buy_Index_FTD_Active': buy_index_ftd,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Sell_Index_ADX': sell_index_adx,
