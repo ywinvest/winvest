@@ -129,7 +129,7 @@ def calculate_ftd(df, window=4, threshold=0.015):
   df['Recent_New_Low_Hit'] = df['Is_New_Low'].rolling(window=window).max().fillna(1).astype(bool)
 
   # 당일 FTD 발생 여부 (단발성 시그널)
-  df['FTD_Signal'] = (~df['Recent_New_Low_Hit']) & (df['Close'].pct_change() >= threshold)
+  df['FTD'] = (~df['Recent_New_Low_Hit']) & (df['Close'].pct_change() >= threshold)
 
   # -------------------------------------------------------------
   # ⭐ 4. FTD 상태(Uptrend Confirmed) 유지 및 해제 로직
