@@ -315,7 +315,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           buy_index_adx = source_df.loc[buy_date, 'ADX']
           buy_index_di = source_df.loc[buy_date, 'DI']
           buy_index_ftd= source_df.loc[buy_date, 'FTD']
-          buy_index_ftd= source_df.loc[buy_date, 'FTD_Active']
+          buy_index_ftd_active= source_df.loc[buy_date, 'FTD_Active']
 
           buy_kospi_ma5_up = kospi_df.loc[buy_date, 'MA5_Up']
           buy_kospi_ma20_up = kospi_df.loc[buy_date, 'MA20_Up']
@@ -410,7 +410,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
         'Buy_Index_MA60_Up': buy_index_ma60_up,
         'Buy_Index_MA120_Up': buy_index_ma120_up,
         'Buy_Index_FTD': buy_index_ftd,
-        'Buy_Index_FTD_Active': buy_index_ftd,
+        'Buy_Index_FTD_Active': buy_index_ftd_active,
         'Sell_Date': sell_date,
         'Sell_Price': sell_price,
         'Sell_Index_ADX': sell_index_adx,
