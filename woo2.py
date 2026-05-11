@@ -138,7 +138,7 @@ def calculate_ftd(df, window=4, threshold=0.015):
   df['FTD_Active'] = pd.NA
 
   # [ON 스위치]: FTD 시그널이 뜬 날은 상태를 True로 설정
-  df.loc[df['FTD_Signal'], 'FTD_Active'] = True
+  df.loc[df['FTD'], 'FTD_Active'] = True
 
   # [OFF 스위치]: 단기 저점을 깨버린 날(Is_New_Low)은 상태를 False로 강제 해제
   df.loc[df['Is_New_Low'], 'FTD_Active'] = False
