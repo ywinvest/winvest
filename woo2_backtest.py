@@ -123,9 +123,36 @@ if __name__ == "__main__":
 
     result_file = "woo2_backtest_results.csv"
 
-    # 병렬 처리로 데이터 분석
+    # 1. 병렬 처리로 개별 종목 데이터 수집
     result_data = parallel_process_stocks(all_stocks)
-    result_data = rs.calculate_relative_strength(result_data)
+
+    # 2. 코스피, 코스닥 지수 데이터를 개별 종목 데이터와 동일한 형태로 가공
+    kospi_for_rs = kospi.copy()
+    kospi_for_rs['Code'] = 'KS11'
+    kospi_for_rs['Name'] = 'KOSPI'
+    kospi_for_rs = rs.calculate_indicators(kospi_for_rs)
+
+    kosdaq_for_rs = kosdaq.copy()
+    kosdaq_for_rs['Code'] = 'KQ11'
+    kosdaq_for_rs['Name'] = 'KOSDAQ'
+    kosdaq_for_rs = rs.calculate_indicators(kosdaq_for_rs)
+
+    # 3. 개별 종목 데이터와 지수 데이터 결합
+    combined_data = pd.concat([result_data, kospi_for_rs, kosdaq_for_rs])
+
+    # 4. 결합된 데이터로 전체 RS 계산 (지수도 개별 종목과 함께 랭킹 산정됨)
+    combined_data = rs.calculate_relative_strength(combined_data)
+
+    # 5. KOSPI, KOSDAQ의 RS 점수만 별도 분리하여 컬럼명 변경
+    kospi_rs_data = combined_data[combined_data['Code'] == 'KS11'][['RS']].rename(columns={'RS': 'KOSPI_RS'})
+    kosdaq_rs_data = combined_data[combined_data['Code'] == 'KQ11'][['RS']].rename(columns={'RS': 'KOSDAQ_RS'})
+
+    # 6. 결합 데이터에서 지수를 다시 제외하고 순수 종목 데이터만 남김
+    result_data = combined_data[~combined_data['Code'].isin(['KS11', 'KQ11'])].copy()
+
+    # 7. 날짜(Index)를 기준으로 종목 데이터에 지수 RS 값을 병합
+    result_data = result_data.join(kospi_rs_data, how='left').join(kosdaq_rs_data, how='left')
+
     filtered_data = woo1.filter_common_stocks(result_data)
 
     last_trading_day = result_data.index.max()
