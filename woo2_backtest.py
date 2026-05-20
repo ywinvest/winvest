@@ -126,25 +126,34 @@ if __name__ == "__main__":
     # 1. 병렬 처리로 개별 종목 데이터 수집
     result_data = parallel_process_stocks(all_stocks)
 
-    # 2. 코스피 지수 데이터 가공 및 기초 지표 계산
+    # --- [수정 핵심] RS 계산용 필수 컬럼만 식별 ---
+    return_cols = ['Return_1M', 'Return_3M', 'Return_6M', 'Return_12M']
+    rs_necessary_cols = ['Code', 'Name', 'Market'] + return_cols
+
+    # 코스피 지수 데이터 가공 및 필수 컬럼만 남기기
     kospi_for_rs = kospi.copy()
     kospi_for_rs['Code'] = 'KS11'
     kospi_for_rs['Name'] = 'KOSPI'
     kospi_for_rs['Market'] = 'KOSPI'
     kospi_for_rs = rs.calculate_indicators(kospi_for_rs)
+    kospi_for_rs = kospi_for_rs[rs_necessary_cols]  # 💡 원치 않는 지표 컬럼 제거
 
-    # 3. 코스닥 지수 데이터 가공 및 기초 지표 계산
+    # 코스닥 지수 데이터 가공 및 필수 컬럼만 남기기
     kosdaq_for_rs = kosdaq.copy()
     kosdaq_for_rs['Code'] = 'KQ11'
     kosdaq_for_rs['Name'] = 'KOSDAQ'
     kosdaq_for_rs['Market'] = 'KOSDAQ'
     kosdaq_for_rs = rs.calculate_indicators(kosdaq_for_rs)
+    kosdaq_for_rs = kosdaq_for_rs[rs_necessary_cols]  # 💡 원치 않는 지표 컬럼 제거
 
-    # 4. 전체 데이터 병합 후 RS 일괄 계산
+    # 원래 종목 데이터의 컬럼 리스트 백업
+    original_columns = result_data.columns.tolist()
+
+    # 전체 데이터 병합 후 일괄 RS 계산
     combined_data = pd.concat([result_data, kospi_for_rs, kosdaq_for_rs])
     combined_data = rs.calculate_relative_strength(combined_data)
 
-    # 5. 지수의 RS 점수만 따로 추출 (날짜, 시장 기준)
+    # 지수 데이터의 RS 점수만 맵(Series)으로 따로 저장
     index_filter = combined_data['Code'].isin(['KS11', 'KQ11'])
     index_rs_series = (
       combined_data[index_filter]
@@ -152,13 +161,14 @@ if __name__ == "__main__":
       .set_index(['Date', 'Market'])['RS']
     )
 
-    # 6. 개별 종목 데이터 분리
+    # 개별 종목 데이터만 분리 및 원본 컬럼 필터링
     result_data = combined_data[~index_filter].copy()
+    keep_cols = [col for col in result_data.columns if col in original_columns or col in ['RS', 'RS_1M', 'RS_3M', 'RS_6M', 'RS_12M']]
+    result_data = result_data[keep_cols]
 
-    # 7. 날짜와 시장을 매핑 기준으로 삼아 INDEX_RS 컬럼 추가
+    # 날짜와 시장을 기준으로 INDEX_RS 추가
     result_data = result_data.reset_index()
     mapping_market = result_data['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
-
     result_data['INDEX_RS'] = result_data.set_index(['Date', mapping_market]).index.map(index_rs_series)
     result_data = result_data.set_index('Date')
 
