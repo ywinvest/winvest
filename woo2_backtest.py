@@ -126,32 +126,41 @@ if __name__ == "__main__":
     # 1. 병렬 처리로 개별 종목 데이터 수집
     result_data = parallel_process_stocks(all_stocks)
 
-    # 2. 코스피, 코스닥 지수 데이터를 개별 종목 데이터와 동일한 형태로 가공
+    # 2. 코스피 지수 데이터 가공 및 기초 지표 계산
     kospi_for_rs = kospi.copy()
     kospi_for_rs['Code'] = 'KS11'
     kospi_for_rs['Name'] = 'KOSPI'
+    kospi_for_rs['Market'] = 'KOSPI'
     kospi_for_rs = rs.calculate_indicators(kospi_for_rs)
 
+    # 3. 코스닥 지수 데이터 가공 및 기초 지표 계산
     kosdaq_for_rs = kosdaq.copy()
     kosdaq_for_rs['Code'] = 'KQ11'
     kosdaq_for_rs['Name'] = 'KOSDAQ'
+    kosdaq_for_rs['Market'] = 'KOSDAQ'
     kosdaq_for_rs = rs.calculate_indicators(kosdaq_for_rs)
 
-    # 3. 개별 종목 데이터와 지수 데이터 결합
+    # 4. 전체 데이터 병합 후 RS 일괄 계산
     combined_data = pd.concat([result_data, kospi_for_rs, kosdaq_for_rs])
-
-    # 4. 결합된 데이터로 전체 RS 계산 (지수도 개별 종목과 함께 랭킹 산정됨)
     combined_data = rs.calculate_relative_strength(combined_data)
 
-    # 5. KOSPI, KOSDAQ의 RS 점수만 별도 분리하여 컬럼명 변경
-    kospi_rs_data = combined_data[combined_data['Code'] == 'KS11'][['RS']].rename(columns={'RS': 'KOSPI_RS'})
-    kosdaq_rs_data = combined_data[combined_data['Code'] == 'KQ11'][['RS']].rename(columns={'RS': 'KOSDAQ_RS'})
+    # 5. 지수의 RS 점수만 따로 추출 (날짜, 시장 기준)
+    index_filter = combined_data['Code'].isin(['KS11', 'KQ11'])
+    index_rs_series = (
+      combined_data[index_filter]
+      .reset_index()
+      .set_index(['Date', 'Market'])['RS']
+    )
 
-    # 6. 결합 데이터에서 지수를 다시 제외하고 순수 종목 데이터만 남김
-    result_data = combined_data[~combined_data['Code'].isin(['KS11', 'KQ11'])].copy()
+    # 6. 개별 종목 데이터 분리
+    result_data = combined_data[~index_filter].copy()
 
-    # 7. 날짜(Index)를 기준으로 종목 데이터에 지수 RS 값을 병합
-    result_data = result_data.join(kospi_rs_data, how='left').join(kosdaq_rs_data, how='left')
+    # 7. 날짜와 시장을 매핑 기준으로 삼아 INDEX_RS 컬럼 추가
+    result_data = result_data.reset_index()
+    mapping_market = result_data['Market'].replace('KOSDAQ GLOBAL', 'KOSDAQ')
+
+    result_data['INDEX_RS'] = result_data.set_index(['Date', mapping_market]).index.map(index_rs_series)
+    result_data = result_data.set_index('Date')
 
     filtered_data = woo1.filter_common_stocks(result_data)
 
