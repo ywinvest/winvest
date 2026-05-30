@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "skillHash": "sha256:5d2beed192f5bd1a51824af72fdb1a70d44f785f25ddb0948b5b5c09cea68221",
+  "scoredAt": "2026-05-13T13:54:46.735Z",
+  "backend": "ollama",
+  "model": "gpt-oss:20b",
+  "quality": {
+    "score": 93,
+    "dimensions": {
+      "clarity": "PASS",
+      "completeness": "WEAK",
+      "conciseness": "PASS",
+      "actionability": "PASS",
+      "crossPlatform": "PASS",
+      "examples": "PASS"
+    },
+    "issues": [
+      {
+        "severity": "MEDIUM",
+        "category": "completeness",
+        "detail": "The skill file only covers happy path examples and does not address error scenarios or edge cases."
+      }
+    ]
+  },
+  "security": {
+    "verdict": "SAFE",
+    "issues": []
+  },
+  "impact": {
+    "multiplier": 2.18,
+    "baselineAvg": 45,
+    "treatmentAvg": 98,
+    "scenarios": [
+      {
+        "name": "dropdown-with-outside-close",
+        "baseline": 0,
+        "treatment": 100,
+        "rationale": "Response A satisfies every rubric requirement, while Response B omits Alpine.js syntax and the required $dispatch event."
+      },
+      {
+        "name": "reusable-todo-list",
+        "baseline": 90,
+        "treatment": 95,
+        "rationale": "Both responses meet the rubric, but B uses x-data='todoList' exactly as required, giving it a slight edge."
+      }
+    ]
+  }
+}
