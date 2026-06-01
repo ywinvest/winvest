@@ -119,7 +119,7 @@
                     <div class="hidden md:block ml-10">
                         <div class="flex items-baseline space-x-4">
                             <!-- Active Menu -->
-                            <a href="/" class="text-cyan-400 bg-dark-bg px-3 py-2 rounded-md text-sm font-semibold shadow-sm border border-dark-border">상대강도 (RS)</a>
+                            <a href="/rs" class="text-cyan-400 bg-dark-bg px-3 py-2 rounded-md text-sm font-semibold shadow-sm border border-dark-border">상대강도 (RS)</a>
                         </div>
                     </div>
                 </div>
@@ -195,7 +195,7 @@
                 <p class="text-gray-400 font-medium">stocktide 모멘텀 데이터를 불러오는 중...</p>
             </div>
             
-            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table" hx-trigger="load">
+            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load">
                 <!-- 테이블이 여기에 렌더링됩니다 -->
             </div>
         </div>
@@ -210,13 +210,28 @@
             const marcapFilter = document.getElementById('marcapFilter');
             const dateInput = document.querySelector('input[type="date"][name="date"]');
             
-            // Set default date to today in local browser timezone
-            if (dateInput && !dateInput.value) {
+            // Check if backend provided a date via query param, otherwise use local today
+            const urlDate = "{{ date if date else '' }}";
+            
+            if (urlDate) {
+                dateInput.value = urlDate;
+            } else if (dateInput && !dateInput.value) {
                 const now = new Date();
                 const year = now.getFullYear();
                 const month = String(now.getMonth() + 1).padStart(2, '0');
                 const day = String(now.getDate()).padStart(2, '0');
                 dateInput.value = `${year}-${month}-${day}`;
+            }
+            
+            // Sync URL when date is changed
+            if (dateInput) {
+                dateInput.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        const newUrl = new URL(window.location);
+                        newUrl.searchParams.set('date', e.target.value);
+                        window.history.pushState({}, '', newUrl);
+                    }
+                });
             }
             
             let currentSortCol = 'rs';
