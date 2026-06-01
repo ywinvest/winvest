@@ -1,0 +1,115 @@
+{% if not stocks %}
+<div class="p-12 text-center text-gray-400">
+    <svg class="mx-auto h-12 w-12 text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+    <p class="text-lg font-medium">조회된 RS 데이터가 없습니다.</p>
+</div>
+{% else %}
+<div class="px-6 py-3 border-b border-dark-border flex justify-between items-center bg-dark-surface sticky top-0 z-20">
+    <div class="text-sm text-gray-400">
+        기준일: <span class="font-mono text-gray-200">{{ stocks[0].date }}</span>
+    </div>
+    <div class="text-sm text-gray-400">
+        총 <span class="font-mono text-indigo-400 font-semibold">{{ stocks|length }}</span> 개 종목
+    </div>
+</div>
+<table class="w-full text-sm text-left whitespace-nowrap">
+    <thead class="text-xs text-gray-400 uppercase bg-dark-surface border-b border-dark-border select-none">
+        <tr>
+            <th scope="col" class="px-4 py-3 font-semibold w-16 text-center cursor-pointer hover:text-white"
+                data-sort="rank">순위 <span class="sort-icon"></span></th>
+            <th scope="col" class="px-4 py-3 font-semibold cursor-pointer hover:text-white" data-sort="name">종목명 <span
+                    class="sort-icon"></span></th>
+            <th scope="col" class="px-4 py-3 font-semibold text-center cursor-pointer hover:text-white"
+                data-sort="market">시장 <span class="sort-icon"></span></th>
+            <th scope="col" class="px-4 py-3 font-semibold text-right cursor-pointer hover:text-white"
+                data-sort="changes_ratio">현재가 / 전일비 <span class="sort-icon"></span></th>
+            <th scope="col" class="px-4 py-3 font-semibold text-right cursor-pointer hover:text-white"
+                data-sort="marcap">시가총액(억) <span class="sort-icon"></span></th>
+            <th scope="col" class="px-4 py-3 font-semibold text-right cursor-pointer hover:text-white"
+                data-sort="amount">거래대금(억) <span class="sort-icon"></span></th>
+            <th scope="col" class="px-4 py-3 font-semibold text-right cursor-pointer hover:text-white" data-sort="rs">
+                RS<span class="sort-icon text-indigo-400">▼</span></th>
+            <th scope="col" class="px-3 py-3 font-semibold text-right text-gray-500 cursor-pointer hover:text-white"
+                data-sort="rs_1m">RS_1M <span class="sort-icon"></span></th>
+            <th scope="col" class="px-3 py-3 font-semibold text-right text-gray-500 cursor-pointer hover:text-white"
+                data-sort="rs_3m">RS_3M <span class="sort-icon"></span></th>
+            <th scope="col" class="px-3 py-3 font-semibold text-right text-gray-500 cursor-pointer hover:text-white"
+                data-sort="rs_6m">RS_6M <span class="sort-icon"></span></th>
+            <th scope="col" class="px-3 py-3 font-semibold text-right text-gray-500 cursor-pointer hover:text-white"
+                data-sort="rs_12m">RS_12M <span class="sort-icon"></span></th>
+        </tr>
+    </thead>
+    <tbody id="rs-table-body" class="divide-y divide-dark-border">
+        {% for stock in stocks %}
+        <tr class="stock-row hover:bg-[#1A1A1A] transition-colors group cursor-pointer" data-rank="{{ stock.rank }}"
+            data-name="{{ stock.name|lower }}" data-code="{{ stock.code|lower }}" data-market="{{ stock.market }}"
+            data-changes_ratio="{{ stock.changes_ratio }}" data-marcap="{{ stock.marcap }}"
+            data-amount="{{ stock.amount or 0 }}" data-rs="{{ stock.rs }}" data-rs_1m="{{ stock.rs_1m }}"
+            data-rs_3m="{{ stock.rs_3m }}" data-rs_6m="{{ stock.rs_6m }}" data-rs_12m="{{ stock.rs_12m }}">
+            <td
+                class="px-4 py-3 text-center font-mono text-gray-400 font-semibold group-hover:text-white transition-colors">
+                {{ stock.rank }}
+            </td>
+            <td class="px-4 py-3">
+                <div class="font-bold text-gray-200 text-[15px] tracking-tight">{{ stock.name }}</div>
+                <div class="text-xs text-gray-500 font-mono">{{ stock.code }}</div>
+            </td>
+            <td class="px-4 py-3 text-center">
+                {% if stock.market == "KOSPI" %}
+                <span
+                    class="px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold bg-indigo-900/30 text-indigo-400 rounded-md border border-indigo-800/50">KOSPI</span>
+                {% else %}
+                <span
+                    class="px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold bg-fuchsia-900/30 text-fuchsia-400 rounded-md border border-fuchsia-800/50">KOSDAQ</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right">
+                <!-- 아직 close(현재가) 컬럼이 라우터에서 안넘어오면 빈값처리됨, 우선 changes만 표현 -->
+                <div class="font-mono font-semibold 
+                    {% if stock.changes > 0 %} text-positive
+                    {% elif stock.changes < 0 %} text-negative
+                    {% else %} text-gray-400 {% endif %}">
+                    {% if stock.changes > 0 %}▲{% elif stock.changes < 0 %}▼{% endif %} {{ "{:,.0f}"
+                        .format(stock.changes|abs) }} </div>
+                        <div class="text-xs font-mono
+                    {% if stock.changes_ratio > 0 %} text-positive
+                    {% elif stock.changes_ratio < 0 %} text-negative
+                    {% else %} text-gray-500 {% endif %}">
+                            {% if stock.changes_ratio > 0 %}+{% endif %}{{ "%.2f"|format(stock.changes_ratio) }}%
+                        </div>
+            </td>
+            <td class="px-4 py-3 text-right font-mono text-gray-300">
+                {{ "{:,.0f}".format(stock.marcap / 100000000) }}
+            </td>
+            <td class="px-4 py-3 text-right font-mono text-gray-300">
+                {% if stock.amount %}
+                {{ "{:,.0f}".format(stock.amount / 100000000) }}
+                {% else %}
+                -
+                {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right">
+                <div class="inline-flex items-center px-3 py-1 rounded-md font-extrabold shadow-sm
+                    {% if stock.rs >= 90 %} bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]
+                    {% elif stock.rs >= 70 %} bg-emerald-900/20 text-emerald-500 border border-emerald-900/50
+                    {% elif stock.rs <= 30 %} bg-red-900/20 text-red-400 border border-red-900/50
+                    {% else %} text-gray-400 bg-gray-800/50 border border-gray-700/50 {% endif %}">
+                    {{ "%.0f"|format(stock.rs) }}
+                </div>
+            </td>
+            <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{
+                "%.0f"|format(stock.rs_1m) }}</td>
+            <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{
+                "%.0f"|format(stock.rs_3m) }}</td>
+            <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{
+                "%.0f"|format(stock.rs_6m) }}</td>
+            <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{
+                "%.0f"|format(stock.rs_12m) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}

@@ -1,0 +1,38 @@
+name: Manual Init Data Load
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'Year to initialize (e.g., 2026). Leave empty for current year.'
+        required: false
+        type: string
+
+jobs:
+  run-init-script:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-scripts.txt
+
+      - name: Run init_krx_daily_stock.py
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          if [ -z "${{ github.event.inputs.year }}" ]; then
+            python scripts/init_krx_daily_stock.py
+          else
+            python scripts/init_krx_daily_stock.py --year ${{ github.event.inputs.year }}
+          fi

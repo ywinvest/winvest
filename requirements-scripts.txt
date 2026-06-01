@@ -1,0 +1,15 @@
+fastapi[standard]
+jinja2
+sqlmodel
+pyturso
+sqlalchemy-libsql
+python-dotenv
+yfinance
+pandas_ta
+setuptools<82.0.0
+pykrx
+finance-datareader
+numpy>=1.26.0
+slack_sdk
+openpyxl
+pyarrow
