@@ -9,7 +9,7 @@
 {% else %}
 <div class="px-6 py-3 border-b border-dark-border flex justify-between items-center bg-dark-surface">
     <div class="text-sm text-gray-400">
-        기준일: <span class="font-mono text-gray-200">{{ stocks[0].date }}</span>
+        기준일: <span id="current-rendered-date" class="font-mono text-gray-200">{{ stocks[0].date }}</span>
     </div>
     <div class="text-sm text-gray-400">
         총 <span class="font-mono text-indigo-400 font-semibold">{{ stocks|length }}</span> 개 종목

@@ -216,19 +216,13 @@
             const searchInput = document.getElementById('searchInput');
             const marketFilter = document.getElementById('marketFilter');
             const marcapFilter = document.getElementById('marcapFilter');
-            const dateInput = document.querySelector('input[type="date"][name="date"]');
-            
-            // Check if backend provided a date via query param, otherwise use local today
-            const urlDate = "{{ date if date else '' }}";
+            // 날짜 필터 초기값은 서버에서 렌더링된 후 htmx:afterSwap에서 채워집니다.
+            const dateInput = document.querySelector('input[type="date"]');
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlDate = urlParams.get('date');
             
             if (urlDate) {
                 dateInput.value = urlDate;
-            } else if (dateInput && !dateInput.value) {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                dateInput.value = `${year}-${month}-${day}`;
             }
             
             // Sync URL when date is changed
@@ -265,8 +259,14 @@
             // HTMX Load event (when table is rendered or swapped)
             document.body.addEventListener('htmx:afterSwap', function(evt) {
                 if(evt.detail.target.id === 'rs-table-container' || evt.detail.target.id === 'rs-table-body') {
-                    // Update state from hidden inputs if they were updated by the server
-                    // Actually, the server doesn't send them back in the partial, so we use local state
+                    
+                    // 서버가 반환한 실제 기준일로 date picker 동기화
+                    const renderedDateEl = document.getElementById('current-rendered-date');
+                    if (renderedDateEl && dateInput) {
+                        const actualDate = renderedDateEl.textContent.trim();
+                        // input 이벤트 트리거를 막기 위해 value만 조용히 설정
+                        dateInput.value = actualDate;
+                    }
                     
                     // Attach click events to new headers
                     document.querySelectorAll('th[data-sort]').forEach(th => {
