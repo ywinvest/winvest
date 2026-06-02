@@ -237,19 +237,19 @@
             let currentSortCol = 'rs';
             let currentSortOrder = 'desc';
 
-            function applyFiltersAndSort() {
-                const tbody = document.getElementById('rs-table-body');
-                if (!tbody) return;
-                
-                const rows = Array.from(tbody.querySelectorAll('tr.stock-row'));
-                if (rows.length === 0) return;
+            let allRows = [];
+            let filteredRows = [];
+            let currentPage = 1;
+            const PAGE_SIZE = 50;
+            let observer = null;
 
+            function applyFiltersAndSort() {
                 const search = searchInput.value.toLowerCase();
                 const market = marketFilter.value;
                 const minMarcap = marcapFilter.value ? parseInt(marcapFilter.value) * 100000000 : 0;
 
                 // Filtering
-                rows.forEach(row => {
+                filteredRows = allRows.filter(row => {
                     const rowName = row.dataset.name || "";
                     const rowCode = row.dataset.code || "";
                     const rowMarket = row.dataset.market || "";
@@ -259,15 +259,11 @@
                     const matchMarket = market === "" || rowMarket === market;
                     const matchMarcap = minMarcap === 0 || rowMarcap >= minMarcap;
 
-                    if (matchSearch && matchMarket && matchMarcap) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
+                    return matchSearch && matchMarket && matchMarcap;
                 });
 
                 // Sorting
-                rows.sort((a, b) => {
+                filteredRows.sort((a, b) => {
                     let valA = a.dataset[currentSortCol];
                     let valB = b.dataset[currentSortCol];
 
@@ -282,11 +278,59 @@
                     return 0;
                 });
 
-                // Re-append to DOM
-                rows.forEach(row => tbody.appendChild(row));
-                
-                // Update icons
+                // Reset pagination and render
+                currentPage = 1;
+                renderPage();
                 updateSortIcons();
+            }
+
+            function renderPage() {
+                const tbody = document.getElementById('rs-table-body');
+                if (!tbody) return;
+                
+                tbody.innerHTML = '';
+                
+                const fragment = document.createDocumentFragment();
+                const rowsToRender = filteredRows.slice(0, currentPage * PAGE_SIZE);
+                
+                rowsToRender.forEach(row => fragment.appendChild(row));
+                tbody.appendChild(fragment);
+
+                setupObserver(tbody);
+            }
+
+            function loadMore() {
+                if (currentPage * PAGE_SIZE >= filteredRows.length) return;
+                
+                const tbody = document.getElementById('rs-table-body');
+                if (!tbody) return;
+
+                const fragment = document.createDocumentFragment();
+                const startIndex = currentPage * PAGE_SIZE;
+                currentPage++;
+                const endIndex = currentPage * PAGE_SIZE;
+                
+                const rowsToRender = filteredRows.slice(startIndex, endIndex);
+                rowsToRender.forEach(row => fragment.appendChild(row));
+                
+                tbody.appendChild(fragment);
+                setupObserver(tbody);
+            }
+
+            function setupObserver(tbody) {
+                if (observer) observer.disconnect();
+                
+                const lastRow = tbody.lastElementChild;
+                if (lastRow && (currentPage * PAGE_SIZE) < filteredRows.length) {
+                    if (!observer) {
+                        observer = new IntersectionObserver((entries) => {
+                            if (entries[0].isIntersecting) {
+                                loadMore();
+                            }
+                        }, { rootMargin: "200px" });
+                    }
+                    observer.observe(lastRow);
+                }
             }
             
             function updateSortIcons() {
@@ -311,6 +355,12 @@
             // HTMX Load event (when table is rendered)
             document.body.addEventListener('htmx:afterSwap', function(evt) {
                 if(evt.detail.target.id === 'rs-table-container') {
+                    
+                    const template = document.getElementById('all-rows-template');
+                    if (template) {
+                        allRows = Array.from(template.content.querySelectorAll('tr.stock-row'));
+                    }
+
                     // Attach click events to new headers
                     document.querySelectorAll('th[data-sort]').forEach(th => {
                         th.addEventListener('click', () => {
