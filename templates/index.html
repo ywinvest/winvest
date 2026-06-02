@@ -156,7 +156,7 @@
 
                 <!-- Market Filter (Client-side) -->
                 <div class="relative group">
-                    <select id="marketFilter" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none appearance-none pr-8">
+                    <select id="marketFilter" name="market" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none appearance-none pr-8">
                         <option value="">전체 시장</option>
                         <option value="KOSPI">KOSPI</option>
                         <option value="KOSDAQ">KOSDAQ</option>
@@ -168,7 +168,7 @@
                 
                 <!-- Marcap Filter (Client-side) -->
                 <div class="relative group">
-                    <select id="marcapFilter" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none appearance-none pr-8">
+                    <select id="marcapFilter" name="min_marcap" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none appearance-none pr-8">
                         <option value="">시가총액 전체</option>
                         <option value="2000">2천억 이상</option>
                         <option value="5000">5천억 이상</option>
@@ -183,6 +183,7 @@
                 <div class="relative group">
                     <input type="text" 
                            id="searchInput"
+                           name="search"
                            placeholder="종목명/코드 검색..." 
                            class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.3)] block w-64 p-2.5 text-white transition-all duration-300 outline-none">
                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">

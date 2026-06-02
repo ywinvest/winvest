@@ -15,12 +15,23 @@ async def get_rs_table(
     date: str = Query(default=None),
     search: str = Query(default=None),
     market: str = Query(default=None),
-    min_marcap: int = Query(default=None),
+    min_marcap: str | None = Query(default=None),
     sort_col: str = Query(default="rs"),
     sort_order: str = Query(default="desc"),
     page: int = Query(default=1),
     session: Session = Depends(get_session)
 ):
+    # 빈 문자열 처리
+    if search == "": search = None
+    if market == "": market = None
+    
+    parsed_marcap = None
+    if min_marcap and min_marcap.strip() != "":
+        try:
+            parsed_marcap = int(min_marcap)
+        except ValueError:
+            parsed_marcap = None
+
     """HTMX 요청을 받아 해당 날짜의 전체 DB 데이터를 읽고 table partial을 렌더링"""
     limit = 50
     offset = (page - 1) * limit
@@ -30,7 +41,7 @@ async def get_rs_table(
         date_str=date,
         search=search,
         market=market,
-        min_marcap=min_marcap,
+        min_marcap=parsed_marcap,
         sort_col=sort_col,
         sort_order=sort_order,
         limit=limit,
