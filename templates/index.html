@@ -42,9 +42,9 @@
             color: #E0E0E0;
         }
         
+        /* 테이블 컨테이너 스크롤 제거 (전체 페이지 스크롤 사용) */
         .table-container {
-            max-height: 80vh;
-            overflow-y: auto;
+            width: 100%;
         }
 
         /* 스크롤바 커스텀 */
@@ -63,10 +63,10 @@
             background: #777; 
         }
         
-        /* 테이블 헤더 고정 */
+        /* 테이블 헤더 고정 (네비게이션 바 아래에 고정) */
         thead th {
             position: sticky;
-            top: 0;
+            top: 64px; /* h-16 = 64px */
             z-index: 10;
             background-color: #141414;
             box-shadow: 0 1px 0 0 #2A2A2A;
