@@ -141,7 +141,14 @@
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="flex justify-end items-center mb-6">
-            <div class="flex flex-wrap items-center gap-3">
+            <form id="filter-form" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" 
+                  hx-trigger="change from:select, change from:input[type='date'], keyup changed delay:500ms from:#searchInput, sort-changed" 
+                  class="flex flex-wrap items-center gap-3">
+                
+                <!-- Hidden inputs for sorting -->
+                <input type="hidden" name="sort_col" id="sortColInput" value="{{ sort_col|default('rs') }}">
+                <input type="hidden" name="sort_order" id="sortOrderInput" value="{{ sort_order|default('desc') }}">
+
                 <!-- Date Filter (HTMX) -->
                 <div class="relative group">
                     <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none">
@@ -184,7 +191,7 @@
                         </svg>
                     </div>
                 </div>
-            </div>
+            </form>
         </div>
 
         <!-- Data Table Container (HTMX Target) -->
@@ -195,7 +202,7 @@
                 <p class="text-gray-400 font-medium">stocktide 모멘텀 데이터를 불러오는 중...</p>
             </div>
             
-            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load">
+            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-include="#filter-form" hx-trigger="load">
                 <!-- 테이블이 여기에 렌더링됩니다 -->
             </div>
         </div>
@@ -236,59 +243,10 @@
             
             let currentSortCol = 'rs';
             let currentSortOrder = 'desc';
+            const filterForm = document.getElementById('filter-form');
+            const sortColInput = document.getElementById('sortColInput');
+            const sortOrderInput = document.getElementById('sortOrderInput');
 
-            function applyFiltersAndSort() {
-                const tbody = document.getElementById('rs-table-body');
-                if (!tbody) return;
-                
-                const rows = Array.from(tbody.querySelectorAll('tr.stock-row'));
-                if (rows.length === 0) return;
-
-                const search = searchInput.value.toLowerCase();
-                const market = marketFilter.value;
-                const minMarcap = marcapFilter.value ? parseInt(marcapFilter.value) * 100000000 : 0;
-
-                // Filtering
-                rows.forEach(row => {
-                    const rowName = row.dataset.name || "";
-                    const rowCode = row.dataset.code || "";
-                    const rowMarket = row.dataset.market || "";
-                    const rowMarcap = parseFloat(row.dataset.marcap) || 0;
-
-                    const matchSearch = rowName.includes(search) || rowCode.includes(search);
-                    const matchMarket = market === "" || rowMarket === market;
-                    const matchMarcap = minMarcap === 0 || rowMarcap >= minMarcap;
-
-                    if (matchSearch && matchMarket && matchMarcap) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-
-                // Sorting
-                rows.sort((a, b) => {
-                    let valA = a.dataset[currentSortCol];
-                    let valB = b.dataset[currentSortCol];
-
-                    // Convert to numbers if possible
-                    if (!isNaN(parseFloat(valA)) && isFinite(valA)) {
-                        valA = parseFloat(valA);
-                        valB = parseFloat(valB);
-                    }
-
-                    if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
-                    if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
-                    return 0;
-                });
-
-                // Re-append to DOM
-                rows.forEach(row => tbody.appendChild(row));
-                
-                // Update icons
-                updateSortIcons();
-            }
-            
             function updateSortIcons() {
                 document.querySelectorAll('th[data-sort]').forEach(th => {
                     const icon = th.querySelector('.sort-icon');
@@ -303,14 +261,12 @@
                 });
             }
 
-            // Event Listeners for Filters
-            searchInput.addEventListener('input', applyFiltersAndSort);
-            marketFilter.addEventListener('change', applyFiltersAndSort);
-            marcapFilter.addEventListener('change', applyFiltersAndSort);
-
-            // HTMX Load event (when table is rendered)
+            // HTMX Load event (when table is rendered or swapped)
             document.body.addEventListener('htmx:afterSwap', function(evt) {
-                if(evt.detail.target.id === 'rs-table-container') {
+                if(evt.detail.target.id === 'rs-table-container' || evt.detail.target.id === 'rs-table-body') {
+                    // Update state from hidden inputs if they were updated by the server
+                    // Actually, the server doesn't send them back in the partial, so we use local state
+                    
                     // Attach click events to new headers
                     document.querySelectorAll('th[data-sort]').forEach(th => {
                         th.addEventListener('click', () => {
@@ -321,14 +277,21 @@
                                 currentSortCol = col;
                                 currentSortOrder = 'desc'; // Default to desc for new columns
                             }
-                            applyFiltersAndSort();
+                            
+                            // Update hidden inputs
+                            sortColInput.value = currentSortCol;
+                            sortOrderInput.value = currentSortOrder;
+                            
+                            // Trigger HTMX request
+                            htmx.trigger(filterForm, 'sort-changed');
+                            
+                            // Immediately update icons visually
+                            updateSortIcons();
                         });
                     });
                     
-                    // Reset sort to default if new data loaded
-                    currentSortCol = 'rs';
-                    currentSortOrder = 'desc';
-                    applyFiltersAndSort();
+                    // Update icons on load
+                    updateSortIcons();
                 }
             });
         });

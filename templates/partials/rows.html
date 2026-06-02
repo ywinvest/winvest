@@ -1,0 +1,56 @@
+{% for stock in stocks %}
+<tr class="stock-row hover:bg-[#1A1A1A] transition-colors group cursor-pointer" 
+    {% if loop.last and next_page %}
+    hx-get="/api/rs-table?page={{ next_page }}"
+    hx-trigger="revealed"
+    hx-swap="afterend"
+    hx-include="#filter-form"
+    {% endif %}
+>
+    <td class="px-4 py-3 text-center font-mono text-gray-400 font-semibold group-hover:text-white transition-colors">
+        {{ stock.rank }}
+    </td>
+    <td class="px-4 py-3">
+        <div class="font-bold text-gray-200 text-[15px] tracking-tight">{{ stock.name }}</div>
+        <div class="text-xs text-gray-500 font-mono">{{ stock.code }}</div>
+    </td>
+    <td class="px-4 py-3 text-center">
+        {% if stock.market == "KOSPI" %}
+        <span class="px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold bg-indigo-900/30 text-indigo-400 rounded-md border border-indigo-800/50">KOSPI</span>
+        {% else %}
+        <span class="px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold bg-fuchsia-900/30 text-fuchsia-400 rounded-md border border-fuchsia-800/50">KOSDAQ</span>
+        {% endif %}
+    </td>
+    <td class="px-4 py-3 text-right">
+        <div class="font-mono font-semibold {% if stock.changes > 0 %} text-positive {% elif stock.changes < 0 %} text-negative {% else %} text-gray-400 {% endif %}">
+            {% if stock.changes > 0 %}▲{% elif stock.changes < 0 %}▼{% endif %} {{ "{:,.0f}".format(stock.changes|abs) }}
+        </div>
+        <div class="text-xs font-mono {% if stock.changes_ratio > 0 %} text-positive {% elif stock.changes_ratio < 0 %} text-negative {% else %} text-gray-500 {% endif %}">
+            {% if stock.changes_ratio > 0 %}+{% endif %}{{ "%.2f"|format(stock.changes_ratio) }}%
+        </div>
+    </td>
+    <td class="px-4 py-3 text-right font-mono text-gray-300">
+        {{ "{:,.0f}".format(stock.marcap / 100000000) }}
+    </td>
+    <td class="px-4 py-3 text-right font-mono text-gray-300">
+        {% if stock.amount %}
+        {{ "{:,.0f}".format(stock.amount / 100000000) }}
+        {% else %}
+        -
+        {% endif %}
+    </td>
+    <td class="px-4 py-3 text-right">
+        <div class="inline-flex items-center px-3 py-1 rounded-md font-extrabold shadow-sm
+            {% if stock.rs >= 90 %} bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]
+            {% elif stock.rs >= 70 %} bg-emerald-900/20 text-emerald-500 border border-emerald-900/50
+            {% elif stock.rs <= 30 %} bg-red-900/20 text-red-400 border border-red-900/50
+            {% else %} text-gray-400 bg-gray-800/50 border border-gray-700/50 {% endif %}">
+            {{ "%.0f"|format(stock.rs) }}
+        </div>
+    </td>
+    <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{ "%.0f"|format(stock.rs_1m) }}</td>
+    <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{ "%.0f"|format(stock.rs_3m) }}</td>
+    <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{ "%.0f"|format(stock.rs_6m) }}</td>
+    <td class="px-3 py-3 text-right font-mono text-gray-500 group-hover:text-gray-300">{{ "%.0f"|format(stock.rs_12m) }}</td>
+</tr>
+{% endfor %}
