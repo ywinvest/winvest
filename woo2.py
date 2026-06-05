@@ -183,12 +183,22 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
     if stock_buy_signals.empty:
       continue
 
-    prev_sell_date = pd.Timestamp.min
+    active_slots = {}  # slot_index -> sell_date
 
     for buy_date, buy_row in stock_buy_signals.iterrows():
-      # 이전 거래가 끝나기 전의 신호는 무시합니다.
-      if buy_date <= prev_sell_date:
-        continue
+      # 이전 거래가 끝나기 전의 신호는 무시한다는 로직 주석 처리
+      # if buy_date <= prev_sell_date:
+      #   continue
+
+      # 만료된 거래 슬롯 비우기 (이전 거래 종료일이 현재 매수일보다 과거면 슬롯 해제)
+      slots_to_free = [slot for slot, s_date in active_slots.items() if s_date < buy_date]
+      for slot in slots_to_free:
+        del active_slots[slot]
+
+      # 가장 번호가 작은 빈 슬롯 찾기
+      slot_index = 1
+      while slot_index in active_slots:
+        slot_index += 1
 
       market = buy_row['Market']
       buy_index_rsi = None
@@ -360,6 +370,7 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       # 최종 거래 결과 기록
       trade_info = buy_row.to_dict()
       trade_info.update({
+        'Trade_Slot': slot_index,
         'Buy_Date': buy_date,
         'Buy_Price': buy_price,
         # 'Estimated_Marcap': estimated_marcap,
@@ -388,11 +399,11 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
       })
       trades.append(trade_info)
 
-      # 다음 거래가 이 거래의 종료일 이후에 시작되도록 설정
+      # 현재 슬롯의 종료일 업데이트
       if full_sell_date:
-        prev_sell_date = full_sell_date
-      else: # 매도가 일어나지 않았다면 이 종목은 더 이상 거래하지 않음
-        prev_sell_date = pd.Timestamp.max
+        active_slots[slot_index] = full_sell_date
+      else: # 매도가 일어나지 않았다면 이 슬롯은 계속 점유 상태로 둠
+        active_slots[slot_index] = pd.Timestamp.max
 
   return pd.DataFrame(trades)
 
