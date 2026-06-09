@@ -43,7 +43,7 @@
 - NFR-2: 안정성: API 호출 제한(Rate limits) 및 KRX 세션 인증을 안정적으로 처리.
 
 ## Architecture & Data Flow
-1. **Data Ingestion**: `fdr.StockListing`을 통해 모든 티커 심볼 수집.
+1. **Data Ingestion**: `krx_data.get_pykrx_market_listing`을 통해 모든 티커 심볼 수집.
 2. **Parallel Processing**: `parallel_process_stocks`를 사용해 전체 목록을 10개의 워커 스레드로 분할 처리.
 3. **Indicator Calculation**: `calculate_indicators` 함수로 Pandas-TA 기반의 기술적 지표 일괄 계산.
 4. **Signal Generation**: `buy_condition` (및 백테스트 매도 로직)으로 전체 데이터프레임 필터링.

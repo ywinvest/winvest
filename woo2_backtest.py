@@ -12,6 +12,7 @@ import krx_auth
 import rs
 import woo1
 import woo2
+from krx_data import get_pykrx_market_listing
 
 
 def parallel_process_stocks(all_stocks):
@@ -80,8 +81,10 @@ if __name__ == "__main__":
     print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
 
     all_stocks = pd.concat([
-      fdr.StockListing('KOSPI'),
-      fdr.StockListing('KOSDAQ')
+      # fdr.StockListing('KOSPI'),
+      # fdr.StockListing('KOSDAQ')
+      get_pykrx_market_listing('KOSPI'),
+      get_pykrx_market_listing('KOSDAQ')
     ], ignore_index=True)
 
     # 상장일 정보 가져오기

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import krx_auth
 import market
 import rs
+from krx_data import get_pykrx_market_listing
 from slack_utils import SlackMessageBuilder, send_slack_message
 
 BASE_RISK = 0.08  # 8% base risk (R value)
@@ -649,8 +650,10 @@ if __name__ == "__main__":
     print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
 
     all_stocks = pd.concat([
-      fdr.StockListing('KOSPI'),
-      fdr.StockListing('KOSDAQ')
+      # fdr.StockListing('KOSPI'),
+      # fdr.StockListing('KOSDAQ')
+      get_pykrx_market_listing('KOSPI'),
+      get_pykrx_market_listing('KOSDAQ')
     ], ignore_index=True)
 
     # 윤달(2월 29일) 방어 로직 포함

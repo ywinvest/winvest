@@ -18,6 +18,8 @@ def chunked_iterable(iterable, size):
         yield iterable[i:i + size]
 
 import FinanceDataReader as fdr
+import krx_auth
+from krx_data import get_pykrx_market_listing
 from sqlalchemy import text
 
 def update_daily_stock():
@@ -52,7 +54,9 @@ def update_daily_stock():
     # 3. 최신 전 종목 주가 가져오기
     print("\n3. Fetching latest KRX stock listing...")
     t3 = time.time()
-    df = fdr.StockListing('KRX')
+    # df = fdr.StockListing('KRX')
+    krx_auth.login_krx(os.getenv('KRX_ID'), os.getenv('KRX_PW'))
+    df = get_pykrx_market_listing('ALL')
     print(f"  -> Fetching KRX listing took {time.time() - t3:.2f} seconds.")
     
     # 필수 컬럼 리네임 (ChagesRatio 오타 주의)

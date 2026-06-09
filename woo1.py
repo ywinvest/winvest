@@ -3,12 +3,14 @@ import os
 import time
 from datetime import datetime
 from functools import partial
+from typing import Dict, List, Optional
 
 import FinanceDataReader as fdr
 import pandas as pd
 from dotenv import load_dotenv
 
 import krx_auth
+from krx_data import get_pykrx_market_listing
 from slack_utils import SlackMessageBuilder, send_slack_message
 
 
@@ -172,8 +174,10 @@ if __name__ == "__main__":
 
     # 종목 리스트 가져오기 및 필터링
     all_stocks = pd.concat([
-      filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
-      filter_common_stocks(fdr.StockListing('KOSDAQ'))
+      # filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
+      # filter_common_stocks(fdr.StockListing('KOSDAQ'))
+      filter_common_stocks(get_pykrx_market_listing('KOSPI').tail(-100)),
+      filter_common_stocks(get_pykrx_market_listing('KOSDAQ'))
     ], ignore_index=True)
 
     # 윤달(2월 29일) 방어 로직 포함

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 import krx_auth
 import woo1
+from krx_data import get_pykrx_market_listing
 
 TARGET_RETURN = 1.082
 
@@ -321,8 +322,10 @@ if __name__ == "__main__":
 
     # 종목 리스트 가져오기 및 필터링
     all_stocks = pd.concat([
-      woo1.filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
-      woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
+      # woo1.filter_common_stocks(fdr.StockListing('KOSPI').tail(-100)),
+      # woo1.filter_common_stocks(fdr.StockListing('KOSDAQ'))
+      woo1.filter_common_stocks(get_pykrx_market_listing('KOSPI').tail(-100)),
+      woo1.filter_common_stocks(get_pykrx_market_listing('KOSDAQ'))
     ], ignore_index=True)
 
     # KOSPI, KOSDAQ 지수 데이터 로드 및 지표 계산
