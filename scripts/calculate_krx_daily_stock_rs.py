@@ -34,7 +34,10 @@ def main():
     args = parser.parse_args()
 
     if args.date:
-        target_date = datetime.strptime(args.date, '%Y-%m-%d')
+        if '-' in args.date:
+            target_date = datetime.strptime(args.date, '%Y-%m-%d')
+        else:
+            target_date = datetime.strptime(args.date, '%Y%m%d')
     else:
         target_date = datetime.today()
         
