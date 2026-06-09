@@ -25,26 +25,31 @@ import krx_auth
 from krx_data import get_pykrx_market_listing
 from sqlalchemy import text
 
-def update_daily_stock():
+def update_daily_stock(target_date_str=None):
     start_time = time.time()
     
     print("=" * 60)
-    print("🚀 Starting Daily Stock Data Update (via FinanceDataReader)")
+    print("🚀 Starting Daily Stock Data Update (via FinanceDataReader / pykrx)")
     print("=" * 60)
     
-    # 1. 거래일 확인 (가장 확실한 방법: 시총 1위 삼성전자 주가 데이터의 마지막 날짜)
-    print("1. Fetching the latest actual trading date...")
     t1 = time.time()
-    
-    # 이달 1일부터 오늘까지 삼성전자(005930) 주가 조회
-    today = datetime.today()
-    start_of_month = today.replace(day=1).strftime('%Y-%m-%d')
-    df_samsung = fdr.DataReader('005930', start=start_of_month)
-    
-    # 가져온 데이터 중 가장 마지막 날짜가 최신 거래일
-    latest_trading_date = df_samsung.index[-1].strftime('%Y-%m-%d')
-    print(f"  -> Latest Trading Date: {latest_trading_date}")
-    print(f"  -> Date fetching took {time.time() - t1:.2f} seconds.")
+    if target_date_str:
+        dt = datetime.strptime(target_date_str, '%Y%m%d')
+        latest_trading_date = dt.strftime('%Y-%m-%d')
+        print(f"1. Using specified trading date: {target_date_str} -> {latest_trading_date}")
+    else:
+        # 1. 거래일 확인 (가장 확실한 방법: 시총 1위 삼성전자 주가 데이터의 마지막 날짜)
+        print("1. Fetching the latest actual trading date...")
+        
+        # 이달 1일부터 오늘까지 삼성전자(005930) 주가 조회
+        today = datetime.today()
+        start_of_month = today.replace(day=1).strftime('%Y-%m-%d')
+        df_samsung = fdr.DataReader('005930', start=start_of_month)
+        
+        # 가져온 데이터 중 가장 마지막 날짜가 최신 거래일
+        latest_trading_date = df_samsung.index[-1].strftime('%Y-%m-%d')
+        print(f"  -> Latest Trading Date: {latest_trading_date}")
+        print(f"  -> Date fetching took {time.time() - t1:.2f} seconds.")
     
     # 2. 덮어쓰기 로직 (오늘 날짜 데이터 삭제)
     print(f"\n2. Deleting any existing data for {latest_trading_date} to overwrite with latest snapshot...")
@@ -105,4 +110,9 @@ def update_daily_stock():
         print(f"❌ Failed to process data: {e}")
 
 if __name__ == "__main__":
-    update_daily_stock()
+    import argparse
+    parser = argparse.ArgumentParser(description="Update KRX Daily Stock")
+    parser.add_argument("--date", type=str, help="Target date in YYYYMMDD format. Leave empty for auto-detect.")
+    args = parser.parse_args()
+    
+    update_daily_stock(args.date)

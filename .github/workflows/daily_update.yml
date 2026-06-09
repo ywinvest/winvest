@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: 'Target date (YYYY-MM-DD) for RS calculation. Leave empty for today.'
+        description: 'Target date (YYYYMMDD). Leave empty for today.'
         required: false
         type: string
 
@@ -36,7 +36,13 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
-        run: python scripts/update_krx_daily_stock.py
+        run: |
+          if [ -z "${{ github.event.inputs.date }}" ]; then
+            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
+          else
+            TODAY="${{ github.event.inputs.date }}"
+          fi
+          python scripts/update_krx_daily_stock.py --date $TODAY
         
       - name: 2. Run RS Calculation (calculate_krx_daily_stock_rs.py)
         env:
@@ -44,8 +50,7 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
           if [ -z "${{ github.event.inputs.date }}" ]; then
-            # Fetch today's date in KST
-            TODAY=$(TZ=Asia/Seoul date +%Y-%m-%d)
+            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
           else
             TODAY="${{ github.event.inputs.date }}"
           fi
