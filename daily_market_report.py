@@ -133,11 +133,11 @@ def main():
 
   # 거래대금 TOP 10
   top10_trade_val = df_all_market.sort_values(by="Amount", ascending=False).head(10)
-  trade_val_list = [f"{i+1}위. {row['Name']} ({row['ChagesRatio']}%, {format_market_cap(row['Marcap'])})" for i, (_, row) in enumerate(top10_trade_val.iterrows())]
+  trade_val_list = [f"{i+1}위. {row['Name']} ({row['ChagesRatio']:.2f}%, {format_market_cap(row['Marcap'])})" for i, (_, row) in enumerate(top10_trade_val.iterrows())]
 
   # 상한가 종목
   limit_up_df = df_all_market[df_all_market['ChagesRatio'] >= 29.5].sort_values(by='ChagesRatio', ascending=False)
-  limit_up_list = [f"- {row['Name']} ({row['ChagesRatio']}%, {format_market_cap(row['Marcap'])})" for _, row in limit_up_df.iterrows()]
+  limit_up_list = [f"- {row['Name']} ({row['ChagesRatio']:.2f}%, {format_market_cap(row['Marcap'])})" for _, row in limit_up_df.iterrows()]
   if not limit_up_list: limit_up_list = ["- 상한가 종목 없음"]
 
   # ---------------------------------------------------------
@@ -181,8 +181,8 @@ def main():
     kosdaq_rs_df = final_df[final_df['Market'].str.contains('KOSDAQ')].sort_values(by=sort_columns, ascending=False).head(5)
 
     # [수정] RS 종목 (종목코드, RS점수, 등락률 ➡ 시가총액 순)
-    kospi_rs_list = [f"{i+1}위. {row['Name']} ({row['Code']}, RS: {row['RS']}, {row['ChagesRatio']}%, {format_market_cap(row['Marcap'])})" for i, (_, row) in enumerate(kospi_rs_df.iterrows())]
-    kosdaq_rs_list = [f"{i+1}위. {row['Name']} ({row['Code']}, RS: {row['RS']}, {row['ChagesRatio']}%, {format_market_cap(row['Marcap'])})" for i, (_, row) in enumerate(kosdaq_rs_df.iterrows())]
+    kospi_rs_list = [f"{i+1}위. {row['Name']} ({row['Code']}, RS: {row['RS']}, {row['ChagesRatio']:.2f}%, {format_market_cap(row['Marcap'])})" for i, (_, row) in enumerate(kospi_rs_df.iterrows())]
+    kosdaq_rs_list = [f"{i+1}위. {row['Name']} ({row['Code']}, RS: {row['RS']}, {row['ChagesRatio']:.2f}%, {format_market_cap(row['Marcap'])})" for i, (_, row) in enumerate(kosdaq_rs_df.iterrows())]
   else:
     kospi_rs_list = ["데이터 분석 실패"]; kosdaq_rs_list = ["데이터 분석 실패"]
 
