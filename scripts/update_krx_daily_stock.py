@@ -64,7 +64,9 @@ def update_daily_stock(target_date_str=None):
     t3 = time.time()
     # df = fdr.StockListing('KRX')
     krx_auth.login_krx(os.getenv('KRX_ID'), os.getenv('KRX_PW'))
-    df = get_pykrx_market_listing('ALL', latest_trading_date)
+    df_kospi = get_pykrx_market_listing('KOSPI', latest_trading_date)
+    df_kosdaq = get_pykrx_market_listing('KOSDAQ', latest_trading_date)
+    df = pd.concat([df_kospi, df_kosdaq], ignore_index=True)
     print(f"  -> Fetching KRX listing for {latest_trading_date} took {time.time() - t3:.2f} seconds.")
     
     # 필수 컬럼 리네임 (ChagesRatio 오타 주의)
