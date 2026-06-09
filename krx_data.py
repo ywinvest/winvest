@@ -25,8 +25,23 @@ def get_pykrx_market_listing(market: str) -> pd.DataFrame:
         '종목명': 'Name',
         '등락률': 'ChagesRatio',
         '시가총액': 'Marcap',
-        '거래대금': 'Amount'
+        '거래대금': 'Amount',
+        '시가': 'Open',
+        '고가': 'High',
+        '저가': 'Low',
+        '종가': 'Close',
+        '거래량': 'Volume'
     })
+    
+    # 빈 컬럼(Changes, Stocks) 채우기 (FDR 호환용)
+    if 'Close' in df.columns and 'Marcap' in df.columns:
+        # 상장주식수(Stocks) = 시가총액 // 종가
+        df['Stocks'] = (df['Marcap'] / df['Close'].replace(0, 1)).fillna(0).astype(int)
+    else:
+        df['Stocks'] = 0
+        
+    if 'Changes' not in df.columns:
+        df['Changes'] = 0
     
     df['Market'] = market
     return df
