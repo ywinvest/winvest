@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime
 
-def get_pykrx_market_listing(market: str) -> pd.DataFrame:
+def get_pykrx_market_listing(market: str, date_str: str = None) -> pd.DataFrame:
     """
     FinanceDataReader의 fdr.StockListing을 대체하는 pykrx 기반 데이터 수집 함수.
     KRX 봇 차단 이슈로 fdr.StockListing이 404 에러를 발생시키는 문제를 해결하기 위해 사용합니다.
@@ -10,7 +10,10 @@ def get_pykrx_market_listing(market: str) -> pd.DataFrame:
     from pykrx import stock
     from pykrx.website.krx.market.wrap import get_market_ticker_and_name
     
-    date = datetime.today().strftime('%Y%m%d')
+    if date_str is None:
+        date = datetime.today().strftime('%Y%m%d')
+    else:
+        date = date_str
     
     # pykrx의 OHLCV에는 시가, 고가, 저가, 종가, 거래량, 거래대금, 등락률, 시가총액이 모두 포함됨
     df_ohlcv = stock.get_market_ohlcv(date, market=market)
