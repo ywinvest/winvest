@@ -95,6 +95,33 @@ def process_stock(row, start_date):
   except Exception:
     return None
 
+def get_pykrx_market_listing(market):
+  """FinanceDataReader의 StockListing을 대체하는 pykrx 기반 데이터 수집 함수"""
+  from pykrx import stock
+  from pykrx.website.krx.market.wrap import get_market_ticker_and_name
+  from datetime import datetime
+  import pandas as pd
+
+  date = datetime.today().strftime('%Y%m%d')
+  
+  df_ohlcv = stock.get_market_ohlcv(date, market=market)
+  sr_name = get_market_ticker_and_name(date, market=market)
+  
+  # 병합
+  df = pd.concat([df_ohlcv, sr_name], axis=1, join='inner')
+  
+  # 인덱스 초기화 및 컬럼명 FDR 형식으로 변환
+  df = df.reset_index().rename(columns={
+      '티커': 'Code',
+      '종목명': 'Name',
+      '등락률': 'ChagesRatio',
+      '시가총액': 'Marcap',
+      '거래대금': 'Amount'
+  })
+  
+  df['Market'] = market
+  return df
+
 def main():
   start_time = time.time()
 
@@ -124,8 +151,8 @@ def main():
   # 1. KOSPI/KOSDAQ 리스팅 (상한가 및 거래대금 추출)
   # ---------------------------------------------------------
   print("1. 시장 데이터 수집 중...")
-  df_kospi_list = fdr.StockListing('KOSPI')
-  df_kosdaq_list = fdr.StockListing('KOSDAQ')
+  df_kospi_list = get_pykrx_market_listing('KOSPI')
+  df_kosdaq_list = get_pykrx_market_listing('KOSDAQ')
   df_all_market = pd.concat([df_kospi_list, df_kosdaq_list], ignore_index=True)
 
   # 거래대금 TOP 10
