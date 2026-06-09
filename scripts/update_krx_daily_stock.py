@@ -59,9 +59,8 @@ def update_daily_stock():
     t3 = time.time()
     # df = fdr.StockListing('KRX')
     krx_auth.login_krx(os.getenv('KRX_ID'), os.getenv('KRX_PW'))
-    target_date_str = latest_trading_date.replace('-', '')
-    df = get_pykrx_market_listing('ALL', target_date_str)
-    print(f"  -> Fetching KRX listing for {target_date_str} took {time.time() - t3:.2f} seconds.")
+    df = get_pykrx_market_listing('ALL', latest_trading_date)
+    print(f"  -> Fetching KRX listing for {latest_trading_date} took {time.time() - t3:.2f} seconds.")
     
     # 필수 컬럼 리네임 (ChagesRatio 오타 주의)
     df.rename(columns={

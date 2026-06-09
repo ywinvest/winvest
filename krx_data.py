@@ -13,7 +13,8 @@ def get_pykrx_market_listing(market: str, date_str: str = None) -> pd.DataFrame:
     if date_str is None:
         date = datetime.today().strftime('%Y%m%d')
     else:
-        date = date_str
+        # 입력된 날짜 포맷이 YYYY-MM-DD 인 경우를 대비해 하이픈 제거 (pykrx는 YYYYMMDD 요구)
+        date = date_str.replace('-', '')
     
     # pykrx의 OHLCV에는 시가, 고가, 저가, 종가, 거래량, 거래대금, 등락률, 시가총액이 모두 포함됨
     df_ohlcv = stock.get_market_ohlcv(date, market=market)
