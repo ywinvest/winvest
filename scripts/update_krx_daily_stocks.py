@@ -45,7 +45,7 @@ def update_daily_stock():
     print(f"\n2. Deleting any existing data for {latest_trading_date} to overwrite with latest snapshot...")
     t2 = time.time()
     with Session(engine) as session:
-        session.execute(text(f"DELETE FROM krx_daily_stock WHERE date = '{latest_trading_date}'"))
+        session.execute(text(f"DELETE FROM krx_daily_stocks WHERE date = '{latest_trading_date}'"))
         session.commit()
     print(f"  -> Deleting took {time.time() - t2:.2f} seconds.")
         

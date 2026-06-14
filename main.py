@@ -13,7 +13,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-# app.mount("/static", StaticFiles(directory="static"), name="static") # Uncomment when static dir exists
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(dashboard_router)
 app.include_router(rs_router, prefix="/api")

@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from models import KrxDailyStock, KrxDailyStockRS
+from models import KrxDailyStock, KrxDailyStockIndicator
 
 def get_rs_table_data(
     session: Session, 
@@ -13,7 +13,7 @@ def get_rs_table_data(
     else:
         # 가장 최신 날짜 가져오기
         latest_date_result = session.exec(
-            select(KrxDailyStockRS.date).order_by(KrxDailyStockRS.date.desc()).limit(1)
+            select(KrxDailyStockIndicator.date).order_by(KrxDailyStockIndicator.date.desc()).limit(1)
         ).first()
         target_date = latest_date_result
 
@@ -22,10 +22,10 @@ def get_rs_table_data(
     
     # 조인 기본 쿼리 및 기본 정렬 (통합 RS 내림차순)
     statement = (
-        select(KrxDailyStock, KrxDailyStockRS)
-        .join(KrxDailyStockRS, (KrxDailyStock.code == KrxDailyStockRS.code) & (KrxDailyStock.date == KrxDailyStockRS.date))
-        .where(KrxDailyStockRS.date == target_date)
-        .order_by(KrxDailyStockRS.rs.desc())
+        select(KrxDailyStock, KrxDailyStockIndicator)
+        .join(KrxDailyStockIndicator, (KrxDailyStock.code == KrxDailyStockIndicator.code) & (KrxDailyStock.date == KrxDailyStockIndicator.date))
+        .where(KrxDailyStockIndicator.date == target_date)
+        .order_by(KrxDailyStockIndicator.rs.desc())
     )
         
     results = session.exec(statement).all()

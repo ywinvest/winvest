@@ -10,6 +10,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- Theme Manager (FOUC Prevention) -->
+    <script>
+        try {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        } catch (_) {}
+    </script>
     <!-- Tailwind CSS (CDN for testing, replace with CLI later) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tailwind Config for Dark Mode -->
@@ -23,10 +33,12 @@
                         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
                     },
                     colors: {
-                        dark: {
-                            bg: '#0A0A0A',
-                            surface: '#141414',
-                            border: '#2A2A2A'
+                        theme: {
+                            bg: 'var(--color-bg)',
+                            surface: 'var(--color-surface)',
+                            border: 'var(--color-border)',
+                            text: 'var(--color-text)',
+                            muted: 'var(--color-muted)'
                         }
                     }
                 }
@@ -36,10 +48,27 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
+        [x-cloak] { display: none !important; }
+        :root {
+            color-scheme: light;
+            --color-bg: #F9FAFB;
+            --color-surface: #FFFFFF;
+            --color-border: #E5E7EB;
+            --color-text: #111827;
+            --color-muted: #6B7280;
+        }
+        :root.dark {
+            color-scheme: dark;
+            --color-bg: #0A0A0A;
+            --color-surface: #141414;
+            --color-border: #2A2A2A;
+            --color-text: #E0E0E0;
+            --color-muted: #9CA3AF;
+        }
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #0A0A0A;
-            color: #E0E0E0;
+            background-color: var(--color-bg);
+            color: var(--color-text);
         }
         
         .table-container {
@@ -53,7 +82,7 @@
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #141414; 
+            background: var(--color-surface); 
         }
         ::-webkit-scrollbar-thumb {
             background: #444; 
@@ -68,8 +97,8 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background-color: #141414;
-            box-shadow: 0 1px 0 0 #2A2A2A;
+            background-color: var(--color-surface);
+            box-shadow: 0 1px 0 0 var(--color-border);
         }
         
         /* 긍정/부정 색상 (한국 증시: 상승=Red, 하락=Blue) */
@@ -96,22 +125,21 @@
             display: block;
         }
     </style>
+    <link rel="icon" type="image/png" href="/static/stockspace_logo_transparent.png">
 </head>
-<body class="bg-dark-bg text-gray-200 min-h-screen">
+<body class="bg-theme-bg text-theme-text min-h-screen">
     <!-- Navbar -->
-    <nav class="border-b border-dark-border bg-dark-surface sticky top-0 z-50">
+    <nav class="border-b border-theme-border bg-theme-surface sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <!-- Left side: Logo & Navigation -->
                 <div class="flex items-center">
                     <!-- Logo -->
-                    <div class="flex items-center space-x-3">
-                        <svg class="h-8 w-8 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
+                    <div class="flex items-center space-x-1.5">
+                        <img src="/static/stockspace_logo_transparent.png" alt="Stockspace Logo" class="h-8 w-8 drop-shadow-[0_0_12px_rgba(34,211,238,0.4)] transform transition-transform hover:scale-105">
                         <div class="flex items-center space-x-2">
-                            <span class="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-cyan-400">stocktide</span>
-                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-300 bg-cyan-900/30 border border-cyan-500/30 rounded-full relative top-0.5 shadow-[0_0_10px_rgba(34,211,238,0.2)]">beta</span>
+                            <span class="text-2xl font-extrabold tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-cyan-400" style="padding-bottom: 2px;">stockspace</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider leading-none text-cyan-300 bg-cyan-900/30 border border-cyan-500/30 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.2)]">beta</span>
                         </div>
                     </div>
                     
@@ -119,20 +147,70 @@
                     <div class="hidden md:block ml-10">
                         <div class="flex items-baseline space-x-4">
                             <!-- Active Menu -->
-                            <a href="/rs" class="text-cyan-400 bg-dark-bg px-3 py-2 rounded-md text-sm font-semibold shadow-sm border border-dark-border">상대강도 (RS)</a>
+                            <a href="/rs" class="text-cyan-400 bg-theme-bg px-3 py-2 rounded-md text-sm font-semibold shadow-sm border border-theme-border">상대강도 (RS)</a>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Right side: Actions -->
                 <div class="flex items-center space-x-4">
-                    <!-- User Profile / Settings placeholder -->
-                    <button class="text-gray-400 hover:text-white transition-colors">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                    </button>
+                    <!-- Theme Toggle Dropdown -->
+                    <div class="relative" x-data="{ 
+                        open: false,
+                        theme: localStorage.theme || 'system',
+                        setTheme(val) {
+                            this.theme = val;
+                            if (val === 'system') {
+                                localStorage.removeItem('theme');
+                                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                                    document.documentElement.classList.add('dark');
+                                } else {
+                                    document.documentElement.classList.remove('dark');
+                                }
+                            } else {
+                                localStorage.theme = val;
+                                if (val === 'dark') {
+                                    document.documentElement.classList.add('dark');
+                                } else {
+                                    document.documentElement.classList.remove('dark');
+                                }
+                            }
+                            this.open = false;
+                        }
+                    }">
+                        <button @click="open = !open" @click.away="open = false" class="text-theme-muted hover:text-theme-text transition-colors p-2 rounded-full hover:bg-theme-border/50 focus:outline-none">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div x-show="open" x-cloak
+                             x-transition:enter="transition ease-out duration-100"
+                             x-transition:enter-start="transform opacity-0 scale-95"
+                             x-transition:enter-end="transform opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-75"
+                             x-transition:leave-start="transform opacity-100 scale-100"
+                             x-transition:leave-end="transform opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-36 bg-theme-surface border border-theme-border rounded-lg shadow-xl z-50 overflow-hidden"
+                             style="display: none;">
+                            <div class="py-1">
+                                <button @click="setTheme('light')" class="flex items-center w-full px-4 py-2 text-sm text-theme-text hover:bg-theme-bg/80 transition-colors" :class="{ 'text-indigo-500 font-semibold bg-theme-bg': theme === 'light' }">
+                                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                    Light
+                                </button>
+                                <button @click="setTheme('dark')" class="flex items-center w-full px-4 py-2 text-sm text-theme-text hover:bg-theme-bg/80 transition-colors" :class="{ 'text-indigo-500 font-semibold bg-theme-bg': theme === 'dark' }">
+                                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                                    Dark
+                                </button>
+                                <button @click="setTheme('system')" class="flex items-center w-full px-4 py-2 text-sm text-theme-text hover:bg-theme-bg/80 transition-colors" :class="{ 'text-indigo-500 font-semibold bg-theme-bg': theme === 'system' }">
+                                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                    System
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -141,45 +219,45 @@
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="flex justify-end items-center mb-6">
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <!-- Date Filter (HTMX) -->
-                <div class="relative group">
-                    <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none">
+                <div class="relative group w-full sm:w-auto">
+                    <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none">
                 </div>
 
                 <!-- Market Filter (Client-side) -->
-                <div class="relative group">
-                    <select id="marketFilter" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none appearance-none pr-8">
+                <div class="relative group w-full sm:w-auto">
+                    <select id="marketFilter" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none appearance-none pr-8">
                         <option value="">전체 시장</option>
                         <option value="KOSPI">KOSPI</option>
                         <option value="KOSDAQ">KOSDAQ</option>
                     </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-theme-muted">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                 </div>
                 
                 <!-- Marcap Filter (Client-side) -->
-                <div class="relative group">
-                    <select id="marcapFilter" class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 text-white outline-none appearance-none pr-8">
+                <div class="relative group w-full sm:w-auto">
+                    <select id="marcapFilter" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none appearance-none pr-8">
                         <option value="">시가총액 전체</option>
-                        <option value="2000">2천억 이상</option>
+                        <option value="2000" selected>2천억 이상</option>
                         <option value="5000">5천억 이상</option>
                         <option value="10000">1조 이상</option>
                     </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-theme-muted">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                 </div>
 
                 <!-- Search Input (Client-side) -->
-                <div class="relative group">
+                <div class="relative group w-full sm:w-auto">
                     <input type="text" 
                            id="searchInput"
                            placeholder="종목명/코드 검색..." 
-                           class="bg-dark-surface border border-dark-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.3)] block w-64 p-2.5 text-white transition-all duration-300 outline-none">
+                           class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.3)] block w-full sm:w-64 p-2.5 text-theme-text transition-all duration-300 outline-none">
                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg class="w-4 h-4 text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                        <svg class="w-4 h-4 text-theme-muted" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
                             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
                         </svg>
                     </div>
@@ -188,11 +266,11 @@
         </div>
 
         <!-- Data Table Container (HTMX Target) -->
-        <div class="bg-dark-surface border border-dark-border rounded-xl shadow-2xl overflow-hidden fade-in">
+        <div class="bg-theme-surface border border-theme-border rounded-xl shadow-2xl overflow-hidden fade-in">
             <!-- Loading Indicator -->
             <div id="loading" class="htmx-indicator p-16 text-center">
                 <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-                <p class="text-gray-400 font-medium">stocktide 모멘텀 데이터를 불러오는 중...</p>
+                <p class="text-theme-muted font-medium">stockspace 모멘텀 데이터를 불러오는 중...</p>
             </div>
             
             <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load">
@@ -256,7 +334,8 @@
                     const rowMarcap = parseFloat(row.dataset.marcap) || 0;
 
                     const matchSearch = rowName.includes(search) || rowCode.includes(search);
-                    const matchMarket = market === "" || rowMarket === market;
+                    // startsWith allows "KOSDAQ GLOBAL" to match when "KOSDAQ" is selected
+                    const matchMarket = market === "" || rowMarket.startsWith(market);
                     const matchMarcap = minMarcap === 0 || rowMarcap >= minMarcap;
 
                     return matchSearch && matchMarket && matchMarcap;
@@ -282,6 +361,12 @@
                 currentPage = 1;
                 renderPage();
                 updateSortIcons();
+                
+                // Update stock count display
+                const stockCountEl = document.getElementById('stockCount');
+                if (stockCountEl) {
+                    stockCountEl.textContent = filteredRows.length;
+                }
             }
 
             function renderPage() {

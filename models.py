@@ -1,8 +1,9 @@
 from typing import Optional
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Column
+from sqlalchemy import BigInteger
 
 class KrxDailyStock(SQLModel, table=True):
-    __tablename__ = "krx_daily_stock"
+    __tablename__ = "krx_daily_stocks"
     date: str = Field(primary_key=True)
     code: str = Field(primary_key=True)
     name: str
@@ -11,16 +12,27 @@ class KrxDailyStock(SQLModel, table=True):
     high: int
     low: int
     close: int
-    volume: int
-    amount: int
+    volume: int = Field(sa_column=Column(BigInteger()))
+    amount: int = Field(sa_column=Column(BigInteger()))
     changes: int
     changes_ratio: float
-    marcap: int
-    stocks: int
+    marcap: int = Field(sa_column=Column(BigInteger()))
+    stocks: int = Field(sa_column=Column(BigInteger()))
     rank: int
 
-class KrxDailyStockRS(SQLModel, table=True):
-    __tablename__ = "krx_daily_stock_rs"
+class KrxDailyAdjustedStock(SQLModel, table=True):
+    __tablename__ = "krx_daily_adjusted_stocks"
+    date: str = Field(primary_key=True)
+    code: str = Field(primary_key=True)
+    open: int
+    high: int
+    low: int
+    close: int
+    volume: int = Field(sa_column=Column(BigInteger()))
+    change: float
+
+class KrxDailyStockIndicator(SQLModel, table=True):
+    __tablename__ = "krx_daily_stock_indicators"
     date: str = Field(primary_key=True)
     code: str = Field(primary_key=True)
     rs: float
