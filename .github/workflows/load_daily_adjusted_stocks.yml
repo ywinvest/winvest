@@ -1,0 +1,45 @@
+name: Initial Load - KRX Daily Adjusted Stocks
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: 'Start date to load (YYYY-MM-DD)'
+        required: false
+        default: '2015-06-15'
+        type: string
+      ticker:
+        description: 'Specific ticker to load (e.g., 005930). Leave empty to load all active tickers.'
+        required: false
+        type: string
+
+jobs:
+  run-load-adjusted-stocks:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-scripts.txt
+
+      - name: Run Load KRX Daily Adjusted Stocks
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          CMD="python scripts/load_krx_daily_adjusted_stocks.py --start ${{ github.event.inputs.start }}"
+          if [ -n "${{ github.event.inputs.ticker }}" ]; then
+            CMD="$CMD --ticker ${{ github.event.inputs.ticker }}"
+          fi
+          echo "Running: $CMD"
+          $CMD
