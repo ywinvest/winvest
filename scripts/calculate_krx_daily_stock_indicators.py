@@ -28,11 +28,11 @@ def filter_common_stocks(df):
 
 def main():
     parser = argparse.ArgumentParser(description="Calculate KRX Daily Stock RS (Vectorized)")
-    parser.add_argument("--date", type=str, help="Target date in YYYY-MM-DD format. Defaults to today.")
+    parser.add_argument("--date", type=str, help="Target date in YYYYMMDD format. Defaults to today.")
     args = parser.parse_args()
 
     if args.date:
-        target_date = datetime.strptime(args.date, '%Y-%m-%d')
+        target_date = datetime.strptime(args.date, '%Y%m%d')
     else:
         target_date = datetime.today()
         
