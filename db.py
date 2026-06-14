@@ -5,19 +5,27 @@ import models  # 테이블 레지스트리 등록을 위해 반드시 임포트
 
 load_dotenv()
 
-# Turso DB 연결 URL 및 Auth Token
-# URL 형식: libsql://[데이터베이스-이름]-[조직이름].turso.io
-turso_url = os.getenv("TURSO_DATABASE_URL")
-turso_token = os.getenv("TURSO_AUTH_TOKEN")
+# Supabase (PostgreSQL) 연결 URL 우선 사용
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    # 하위 호환성을 위해 Turso URL 지원
+    turso_url = os.getenv("TURSO_DATABASE_URL")
+    if turso_url:
+        db_url = f"sqlite+{turso_url}/?secure=true"
+    else:
+        raise ValueError("DATABASE_URL 환경 변수가 설정되지 않았습니다.")
 
-if not turso_url:
-    raise ValueError("TURSO_DATABASE_URL 환경 변수가 설정되지 않았습니다.")
+connect_args = {}
+if "sqlite" in db_url:
+    turso_token = os.getenv("TURSO_AUTH_TOKEN")
+    connect_args = {'check_same_thread': False, 'auth_token': turso_token}
+elif "postgres" in db_url:
+    # Supabase default statement_timeout is very short. Increase to 5 minutes for massive analytics queries.
+    connect_args = {"options": "-c statement_timeout=300000"}
 
-# 1. 원격 Turso 클라우드 엔진 (웹 서버 및 데이터 적재 파이프라인용)
-remote_db_url = f"sqlite+{turso_url}/?secure=true"
 engine = create_engine(
-    remote_db_url,
-    connect_args={'check_same_thread': False, 'auth_token': turso_token},
+    db_url,
+    connect_args=connect_args,
     echo=False
 )
 

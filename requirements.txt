@@ -4,3 +4,4 @@ sqlmodel
 pyturso
 sqlalchemy-libsql
 python-dotenv
+psycopg2-binary

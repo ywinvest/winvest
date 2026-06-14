@@ -10,7 +10,7 @@ import pandas as pd
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import rs
-from models import KrxDailyStockRS
+from models import KrxDailyStockIndicator
 from db import engine
 from sqlmodel import Session
 from sqlalchemy import insert
@@ -21,12 +21,10 @@ def chunked_iterable(iterable, size):
         yield iterable[i:i + size]
 
 def filter_common_stocks(df):
-    """시가총액 2000억 이상, 스팩/우선주 등 제외"""
+    """스팩/우선주 등 제외"""
     exclude_pattern = r'스팩'
     return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
-              & (~df['Code'].str.endswith(("5", "7", "9", "K", "L", "M", "N", "O"))) 
-              & (df['Marcap'] >= 200_000_000_000)
-              ]
+              & (~df['Code'].str.endswith(("5", "7", "9", "K", "L", "M", "N", "O")))]
 
 def main():
     parser = argparse.ArgumentParser(description="Calculate KRX Daily Stock RS (Vectorized)")
@@ -49,15 +47,15 @@ def main():
     print("1. Fetching historical close prices from local DB...")
     start_time = time.time()
     
-    query_prices = f"SELECT date, code, close FROM krx_daily_stock WHERE date >= '{start_date_str}' AND date <= '{target_date_str}'"
+    query_prices = f"SELECT date, code, close as adj_close FROM krx_daily_adjusted_stocks WHERE date >= '{start_date_str}' AND date <= '{target_date_str}'"
     df_prices = pd.read_sql(query_prices, engine)
     
     if df_prices.empty:
-        print("❌ No data found in the database. Please run update_krx_daily_stock.py first.")
+        print("❌ No data found in the database. Please run update_krx_daily_stocks.py first.")
         return
 
     print("2. Fetching target date metadata for filtering...")
-    query_meta = f"SELECT code, name, market, marcap FROM krx_daily_stock WHERE date = '{target_date_str}'"
+    query_meta = f"SELECT code, name, market, marcap FROM krx_daily_stocks WHERE date = '{target_date_str}'"
     df_meta = pd.read_sql(query_meta, engine)
     
     if df_meta.empty:
@@ -68,8 +66,8 @@ def main():
     
     print("3. Pivoting data and calculating returns (Vectorized)...")
     # 2. Pivot to get closing prices matrix
-    # Index: date, Columns: code, Values: close
-    df_pivot = df_prices.pivot(index='date', columns='code', values='close').sort_index()
+    # Index: date, Columns: code, Values: adj_close
+    df_pivot = df_prices.pivot(index='date', columns='code', values='adj_close').sort_index()
     
     # Calculate Returns for all stocks simultaneously (Vectorized)
     first_day_close = df_pivot.iloc[0]
@@ -124,22 +122,34 @@ def main():
     
     print(f"✅ Successfully calculated RS for {len(rs_dicts)} stocks.")
 
-    # 4. Turso DB에 벌크 인서트 (Chunk 적용)
-    print("6. Inserting RS data into Turso Database in chunks...")
+    # 4. Supabase DB에 벌크 인서트 (Chunk 적용)
+    print("6. Inserting RS data into Supabase Database in chunks...")
     try:
-        chunk_size = 100
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        chunk_size = 4000
         total_chunks = (len(rs_dicts) + chunk_size - 1) // chunk_size
         
         with Session(engine) as session:
             for i, chunk in enumerate(chunked_iterable(rs_dicts, chunk_size)):
-                session.execute(insert(KrxDailyStockRS).values(chunk))
+                stmt = pg_insert(KrxDailyStockIndicator).values(chunk)
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=['date', 'code'],
+                    set_={
+                        'rs': stmt.excluded.rs,
+                        'rs_1m': stmt.excluded.rs_1m,
+                        'rs_3m': stmt.excluded.rs_3m,
+                        'rs_6m': stmt.excluded.rs_6m,
+                        'rs_12m': stmt.excluded.rs_12m
+                    }
+                )
+                session.exec(stmt)
             session.commit()
                 
         elapsed = time.time() - start_time
         print(f"\n🎉 RS Update & Database Insert Completed Successfully! (⏱️ {elapsed:.2f} seconds)")
         
     except Exception as e:
-        print(f"\n❌ Failed to insert data into Turso: {e}")
+        print(f"\n❌ Failed to insert data into Supabase: {e}")
 
 if __name__ == "__main__":
     main()

@@ -13,3 +13,4 @@ numpy>=1.26.0
 slack_sdk
 openpyxl
 pyarrow
+psycopg2-binary

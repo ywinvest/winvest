@@ -7,16 +7,16 @@
     <p class="text-lg font-medium">조회된 RS 데이터가 없습니다.</p>
 </div>
 {% else %}
-<div class="px-6 py-3 border-b border-dark-border flex justify-between items-center bg-dark-surface sticky top-0 z-20">
+<div class="px-6 py-3 border-b border-theme-border flex justify-between items-center bg-theme-surface sticky top-0 z-20">
     <div class="text-sm text-gray-400">
         기준일: <span id="current-rendered-date" class="font-mono text-gray-200">{{ stocks[0].date }}</span>
     </div>
     <div class="text-sm text-gray-400">
-        총 <span class="font-mono text-indigo-400 font-semibold">{{ stocks|length }}</span> 개 종목
+        총 <span id="stockCount" class="font-mono text-indigo-400 font-semibold">{{ stocks|length }}</span> 개 종목
     </div>
 </div>
 <table class="w-full text-sm text-left whitespace-nowrap">
-    <thead class="text-xs text-gray-400 uppercase bg-dark-surface border-b border-dark-border select-none">
+    <thead class="text-xs text-gray-400 uppercase bg-theme-surface border-b border-theme-border select-none">
         <tr>
             <th scope="col" class="px-4 py-3 font-semibold w-16 text-center cursor-pointer hover:text-white"
                 data-sort="rank">순위 <span class="sort-icon"></span></th>
@@ -42,7 +42,7 @@
                 data-sort="rs_12m">RS_12M <span class="sort-icon"></span></th>
         </tr>
     </thead>
-    <tbody id="rs-table-body" class="divide-y divide-dark-border">
+    <tbody id="rs-table-body" class="divide-y divide-theme-border">
         <!-- Rows will be injected here by client-side JS -->
     </tbody>
 </table>
