@@ -32,6 +32,7 @@ jobs:
 
       - name: 1. Run Daily Stock Update (update_krx_daily_stocks.py)
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
@@ -44,6 +45,7 @@ jobs:
         
       - name: 2. Run RS Calculation (calculate_krx_daily_stock_indicators.py)
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |

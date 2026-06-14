@@ -34,6 +34,7 @@ jobs:
 
       - name: Run Load KRX Daily Adjusted Stocks
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
