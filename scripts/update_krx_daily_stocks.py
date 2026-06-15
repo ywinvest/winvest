@@ -106,13 +106,7 @@ def update_daily_stock(target_date_str=None):
     
     df = df[['date', 'code', 'name', 'market', 'open', 'high', 'low', 'close', 'volume', 'amount', 'changes', 'changes_ratio', 'marcap', 'stocks', 'rank']]
     
-    # 2. Delete existing raw data for the date
-    print(f"\n2. Deleting any existing raw data for {latest_trading_date} to overwrite...")
-    t2 = time.time()
-    with Session(engine) as session:
-        session.exec(text(f"DELETE FROM krx_daily_stocks WHERE date = '{latest_trading_date}'"))
-        session.commit()
-    print(f"  -> Deleting took {time.time() - t2:.2f} seconds.")
+    # 2. Skip deletion, we will use on_conflict_do_nothing
     
     # 3. Insert raw data
     records = df.to_dict(orient='records')
@@ -123,7 +117,9 @@ def update_daily_stock(target_date_str=None):
     t3 = time.time()
     for i, chunk in enumerate(chunked_iterable(records, chunk_size)):
         with Session(engine) as session:
-            session.exec(pg_insert(KrxDailyStock).values(chunk))
+            stmt = pg_insert(KrxDailyStock).values(chunk)
+            stmt = stmt.on_conflict_do_nothing(index_elements=['date', 'code'])
+            session.exec(stmt)
             session.commit()
         if (i + 1) % 10 == 0 or (i + 1) == total_chunks:
             print(f"  -> Inserted raw chunk {i+1} / {total_chunks}")
@@ -134,10 +130,7 @@ def update_daily_stock(target_date_str=None):
     print(f"\n4. Fetching Adjusted Stock data for {len(active_tickers)} tickers on {latest_trading_date}...")
     t4 = time.time()
     
-    # Delete existing adjusted data for the date
-    with Session(engine) as session:
-        session.exec(text(f"DELETE FROM krx_daily_adjusted_stocks WHERE date = '{latest_trading_date}'"))
-        session.commit()
+    # Delete logic removed; relying on on_conflict_do_nothing in worker
         
     fetch_func = partial(fetch_and_insert_adjusted_ticker, target_date_str=latest_trading_date)
     total_processed = 0
