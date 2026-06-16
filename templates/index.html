@@ -116,13 +116,16 @@
         
         /* Loading indicator fix for empty space */
         .htmx-indicator {
-            display: none;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease-in-out;
         }
-        .htmx-request .htmx-indicator {
-            display: block;
-        }
-        .htmx-request.htmx-indicator {
-            display: block;
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator,
+        .htmx-indicator.initial-loading {
+            opacity: 1;
+            pointer-events: auto;
+            transition: none;
         }
     </style>
     <link rel="icon" type="image/png" href="/static/stockspace_logo_transparent.png">
@@ -266,14 +269,13 @@
         </div>
 
         <!-- Data Table Container (HTMX Target) -->
-        <div class="bg-theme-surface border border-theme-border rounded-xl shadow-2xl overflow-hidden fade-in">
+        <div class="bg-theme-surface border border-theme-border rounded-xl shadow-2xl overflow-hidden fade-in relative min-h-[300px]">
             <!-- Loading Indicator -->
-            <div id="loading" class="htmx-indicator p-16 text-center">
-                <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-                <p class="text-theme-muted font-medium">stockspace 모멘텀 데이터를 불러오는 중...</p>
+            <div id="loading" x-data @htmx:after-settle.window="$el.classList.remove('initial-loading')" class="htmx-indicator initial-loading absolute inset-0 z-50 flex flex-col items-center justify-center bg-theme-surface/80 backdrop-blur-sm">
+                <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
             </div>
             
-            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load">
+            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load" hx-indicator="#loading">
                 <!-- 테이블이 여기에 렌더링됩니다 -->
             </div>
         </div>
@@ -312,8 +314,8 @@
                 });
             }
             
-            let currentSortCol = 'rs';
-            let currentSortOrder = 'desc';
+            let currentSortCol = 'rs_rank';
+            let currentSortOrder = 'asc';
 
             let allRows = [];
             let filteredRows = [];
@@ -461,8 +463,8 @@
                     });
                     
                     // Reset sort to default if new data loaded
-                    currentSortCol = 'rs';
-                    currentSortOrder = 'desc';
+                    currentSortCol = 'rs_rank';
+                    currentSortOrder = 'asc';
                     applyFiltersAndSort();
                 }
             });
