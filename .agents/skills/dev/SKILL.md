@@ -1,6 +1,6 @@
 ---
 name: dev
-description: Master development skill for the Winvest project. ALWAYS trigger this skill when the user asks to create, modify, debug, or review any feature, component, route, template, or code in the winvest repository. Covers the full tech stack (FastAPI + HTMX + Alpine.js + Jinja2 + Tailwind CSS + Turso/SQLModel), project structure conventions inspired by Hybridhash/FastAPI-HTMX, PRD-driven workflow, and Cloudflare deployment rules. Use even when the user says things like "add a page", "make a route", "fix the template", "update the DB", or "deploy this".
+description: Master development skill for the Winvest project. ALWAYS trigger this skill when the user asks to create, modify, debug, or review any feature, component, route, template, or code in the winvest repository. Covers the full tech stack (FastAPI + HTMX + Alpine.js + Jinja2 + Tailwind CSS + Supabase/SQLModel), project structure conventions inspired by Hybridhash/FastAPI-HTMX, PRD-driven workflow, and Cloudflare deployment rules. Use even when the user says things like "add a page", "make a route", "fix the template", "update the DB", or "deploy this".
 ---
 
 # Winvest Development Skill
@@ -25,14 +25,14 @@ Master guideline for the Winvest project. This skill handles **project-level dec
 | Interactivity | HTMX 2.x |
 | Client-side state | Alpine.js |
 | Styling | Tailwind CSS v4 (CDN, no build step) |
-| Database | Turso via `sqlalchemy-libsql` + SQLModel |
+| Database | Supabase PostgreSQL + SQLModel |
 | Deployment | Cloudflare Tunnels |
 
 **Non-negotiable constraints:**
 - No React, Vue, or other SPA frameworks.
-- No Cloudflare R2 or flat JSON files for structured/time-series data — use Turso.
+- No Cloudflare R2 or flat JSON files for structured/time-series data — use Supabase PostgreSQL.
 - Return **HTML partials** from HTMX endpoints, not JSON.
-- DB credentials exclusively from `.env`: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
+- DB credentials exclusively from `.env`: `DATABASE_URL`.
 
 ---
 
@@ -44,7 +44,7 @@ For full layout with per-file responsibilities → read `references/project-stru
 ```
 winvest/
 ├── main.py              # App entry, lifespan, router registration
-├── db.py                # Turso engine + get_session()
+├── db.py                # Supabase PostgreSQL engine + get_session()
 ├── models.py            # SQLModel table definitions
 ├── routes/
 │   ├── views/           # GET → full TemplateResponse (pages)
@@ -125,15 +125,8 @@ with Session(engine) as session:
     session.commit()
 ```
 
-### Turso DB Connection (Critical — Known Gotcha)
-`sqlalchemy-libsql` requires `auth_token` in `connect_args`, **not** in the URL:
-```python
-engine = create_engine(
-    f"sqlite+{turso_url}/?secure=true",   # turso_url starts with libsql://
-    connect_args={"check_same_thread": False, "auth_token": turso_token},
-)
-```
-Embedding `authToken=...` in the URL causes 401 Unauthorized. For advanced Turso queries, CDC, vector search → invoke `turso-db` skill.
+### Supabase PostgreSQL Connection
+Use `DATABASE_URL` for the standard PostgreSQL connection string. Ensure the connection pool is configured if necessary for serverless environments. For bulk inserts or upserts, use `sqlalchemy.dialects.postgresql.insert` with `on_conflict_do_update`.
 
 ---
 
@@ -170,7 +163,7 @@ When you need deep, technology-specific knowledge, invoke these skills explicitl
 | HTMX 2.x / 4.0 breaking changes & new features | `htmx-knowledge-patch` |
 | Tailwind v4 utilities, theme tokens, v3→v4 migration | `tailwind` |
 | Alpine.js directives, stores, magic helpers | `alpine` |
-| Turso queries, migrations, vector/full-text search | `turso-db` |
+
 | Cloudflare Tunnels, D1, R2, Workers | `cloudflare` |
 | Browser testing the local web app (Playwright) | `webapp-testing` |
 | Bold aesthetic direction, premium UI styling, typography | `frontend-design` |
