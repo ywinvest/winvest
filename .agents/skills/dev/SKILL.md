@@ -163,7 +163,8 @@ When you need deep, technology-specific knowledge, invoke these skills explicitl
 | HTMX 2.x / 4.0 breaking changes & new features | `htmx-knowledge-patch` |
 | Tailwind v4 utilities, theme tokens, v3→v4 migration | `tailwind` |
 | Alpine.js directives, stores, magic helpers | `alpine` |
-
+| Supabase Auth, DB, Edge Functions, RLS, MCP | `supabase` |
+| Postgres performance optimization, indexing, query reviews | `supabase-postgres-best-practices` |
 | Cloudflare Tunnels, D1, R2, Workers | `cloudflare` |
 | Browser testing the local web app (Playwright) | `webapp-testing` |
 | Bold aesthetic direction, premium UI styling, typography | `frontend-design` |
