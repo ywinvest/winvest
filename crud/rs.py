@@ -25,7 +25,14 @@ def get_rs_table_data(
         select(KrxDailyStock, KrxDailyStockIndicator)
         .join(KrxDailyStockIndicator, (KrxDailyStock.code == KrxDailyStockIndicator.code) & (KrxDailyStock.date == KrxDailyStockIndicator.date))
         .where(KrxDailyStockIndicator.date == target_date)
-        .order_by(KrxDailyStockIndicator.rs.desc())
+        .order_by(
+            KrxDailyStockIndicator.rs.desc(),
+            KrxDailyStockIndicator.rs_1m.desc(),
+            KrxDailyStockIndicator.rs_3m.desc(),
+            KrxDailyStockIndicator.rs_6m.desc(),
+            KrxDailyStockIndicator.rs_12m.desc(),
+            KrxDailyStock.marcap.desc()
+        )
     )
         
     results = session.exec(statement).all()
@@ -42,7 +49,8 @@ def get_rs_table_data(
             "changes": marcap.changes,
             "marcap": marcap.marcap,
             "amount": marcap.amount,
-            "rank": idx,  # RS Rank
+            "rs_rank": idx,
+            "close": marcap.close,
             "rs": rs_data.rs,
             "rs_1m": rs_data.rs_1m,
             "rs_3m": rs_data.rs_3m,

@@ -314,8 +314,8 @@
                 });
             }
             
-            let currentSortCol = 'rs';
-            let currentSortOrder = 'desc';
+            let currentSortCol = 'rs_rank';
+            let currentSortOrder = 'asc';
 
             let allRows = [];
             let filteredRows = [];
@@ -463,8 +463,8 @@
                     });
                     
                     // Reset sort to default if new data loaded
-                    currentSortCol = 'rs';
-                    currentSortOrder = 'desc';
+                    currentSortCol = 'rs_rank';
+                    currentSortOrder = 'asc';
                     applyFiltersAndSort();
                 }
             });
