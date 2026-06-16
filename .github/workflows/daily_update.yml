@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: 'Target date (YYYY-MM-DD) for RS calculation. Leave empty for today.'
+        description: 'Target date (YYYYMMDD) for RS calculation. Leave empty for today.'
         required: false
         type: string
 
@@ -30,21 +30,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-scripts.txt
 
-      - name: 1. Run Daily Stock Update (update_krx_daily_stock.py)
+      - name: 1. Run Daily Stock Update (update_krx_daily_stocks.py)
         env:
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-        run: python scripts/update_krx_daily_stock.py
-        
-      - name: 2. Run RS Calculation (calculate_krx_daily_stock_rs.py)
-        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
           if [ -z "${{ github.event.inputs.date }}" ]; then
-            # Fetch today's date in KST
-            TODAY=$(TZ=Asia/Seoul date +%Y-%m-%d)
+            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
           else
             TODAY="${{ github.event.inputs.date }}"
           fi
-          python scripts/calculate_krx_daily_stock_rs.py --date $TODAY
+          python scripts/update_krx_daily_stocks.py --date $TODAY
+        
+      - name: 2. Run RS Calculation (calculate_krx_daily_stock_indicators.py)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          if [ -z "${{ github.event.inputs.date }}" ]; then
+            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
+          else
+            TODAY="${{ github.event.inputs.date }}"
+          fi
+          python scripts/calculate_krx_daily_stock_indicators.py --date $TODAY
