@@ -42,7 +42,7 @@ def calculate_indicators(df):
   # 39주 신고가 돌파 여부
   # is_39weekhigh_break = df['Close'] > df['Pre39WeekHigh']
   # 52주 신고가 돌파 여부
-  is_52weekhigh_break = df['Close'] > df['Pre52WeekHigh']
+  is_52weekhigh_break = df['Close'] >= df['Pre52WeekHigh']
 
   # 연속적인 신고가 돌파를 그룹화하여 첫 돌파만 선택
   # 돌파가 시작되는 지점을 그룹화 기준으로 사용
