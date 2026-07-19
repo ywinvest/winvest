@@ -1,0 +1,17 @@
+{
+  "skill_name": "winvest-stack",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "RS 대시보드 개발을 시작하려고 해. Phase 1부터 진행해줘.",
+      "expected_output": "에이전트가 코딩을 시작하기 전에 tasks/prd-rs-dashboard.md 파일을 읽고, 데이터베이스로 SQLite를 사용하며, FastAPI와 SQLModel 셋업을 시작함.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "사용자 리스트를 보여주는 페이지를 만들어줘.",
+      "expected_output": "에이전트가 JSON API + React가 아닌, FastAPI Jinja2 템플릿과 HTMX를 사용하여 HTML Partial을 응답하는 형태로 구현함. 스타일링은 Tailwind CDN을 사용함.",
+      "files": []
+    }
+  ]
+}

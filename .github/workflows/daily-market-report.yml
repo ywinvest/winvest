@@ -1,0 +1,37 @@
+name: Daily Market Report
+
+on:
+  workflow_dispatch:
+  schedule:
+  # 매주 월~금 오후 3:30 (UTC 기준 시간), 대기열로 인해 발생하는 지연시간을 고려함
+  - cron: "30 6 * * 1-5"  # 오후 3:30 (UTC+9)
+
+jobs:
+  run-python:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 레포지토리 클론
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    # Python 설치
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13"
+        cache: "pip"
+        cache-dependency-path: "requirements.txt"
+
+    # 의존성 설치
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-scripts.txt
+
+    - name: Run python script
+      env:
+        KRX_ID: ${{ secrets.KRX_ID }}
+        KRX_PW: ${{ secrets.KRX_PW }}
+      run: |
+        python daily_market_report.py

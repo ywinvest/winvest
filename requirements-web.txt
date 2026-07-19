@@ -1,0 +1,6 @@
+fastapi[standard]
+jinja2
+sqlmodel
+pyturso
+sqlalchemy-libsql
+python-dotenv

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>상대강도 (RS)</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- Theme Manager (FOUC Prevention) -->
+    <script>
+        try {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        } catch (_) {}
+    </script>
+    <!-- Tailwind CSS (CDN for testing, replace with CLI later) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind Config for Dark Mode -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+                    },
+                    colors: {
+                        theme: {
+                            bg: 'var(--color-bg)',
+                            surface: 'var(--color-surface)',
+                            border: 'var(--color-border)',
+                            text: 'var(--color-text)',
+                            muted: 'var(--color-muted)'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        :root {
+            color-scheme: light;
+            --color-bg: #F9FAFB;
+            --color-surface: #FFFFFF;
+            --color-border: #E5E7EB;
+            --color-text: #111827;
+            --color-muted: #6B7280;
+        }
+        :root.dark {
+            color-scheme: dark;
+            --color-bg: #0A0A0A;
+            --color-surface: #141414;
+            --color-border: #2A2A2A;
+            --color-text: #E0E0E0;
+            --color-muted: #9CA3AF;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+        }
+        
+        .table-container {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--color-surface); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #444; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777; 
+        }
+        
+        /* 테이블 헤더 고정 */
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: var(--color-surface);
+            box-shadow: 0 1px 0 0 var(--color-border);
+        }
+        
+        /* 긍정/부정 색상 (한국 증시: 상승=Red, 하락=Blue) */
+        .text-positive { color: #EF4444; }
+        .text-negative { color: #3B82F6; }
+        
+        /* 부드러운 전환 효과 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Loading indicator fix for empty space */
+        .htmx-indicator {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator,
+        .htmx-indicator.initial-loading {
+            opacity: 1;
+            pointer-events: auto;
+            transition: none;
+        }
+    </style>
+    <link rel="icon" type="image/png" href="/static/stockspace_logo_transparent.png">
+</head>
+<body class="bg-theme-bg text-theme-text min-h-screen">
+    <!-- Navbar -->
+    <nav class="border-b border-theme-border bg-theme-surface sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Left side: Logo & Navigation -->
+                <div class="flex items-center">
+                    <!-- Logo -->
+                    <div class="flex items-center space-x-1.5">
+                        <img src="/static/stockspace_logo_transparent.png" alt="Stockspace Logo" class="h-8 w-8 drop-shadow-[0_0_12px_rgba(34,211,238,0.4)] transform transition-transform hover:scale-105">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-2xl font-extrabold tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-cyan-400" style="padding-bottom: 2px;">stockspace</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider leading-none text-cyan-300 bg-cyan-900/30 border border-cyan-500/30 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.2)]">beta</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Desktop Menu -->
+                    <div class="hidden md:block ml-10">
+                        <div class="flex items-baseline space-x-4">
+                            <!-- Active Menu -->
+                            <a href="/rs" class="text-cyan-400 bg-theme-bg px-3 py-2 rounded-md text-sm font-semibold shadow-sm border border-theme-border">상대강도 (RS)</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right side: Actions -->
+                <div class="flex items-center space-x-4">
+                    <!-- Theme Toggle Dropdown -->
+                    <div class="relative" x-data="{ 
+                        open: false,
+                        theme: localStorage.theme || 'system',
+                        setTheme(val) {
+                            this.theme = val;
+                            if (val === 'system') {
+                                localStorage.removeItem('theme');
+                                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                                    document.documentElement.classList.add('dark');
+                                } else {
+                                    document.documentElement.classList.remove('dark');
+                                }
+                            } else {
+                                localStorage.theme = val;
+                                if (val === 'dark') {
+                                    document.documentElement.classList.add('dark');
+                                } else {
+                                    document.documentElement.classList.remove('dark');
+                                }
+                            }
+                            this.open = false;
+                        }
+                    }">
+                        <button @click="open = !open" @click.away="open = false" class="text-theme-muted hover:text-theme-text transition-colors p-2 rounded-full hover:bg-theme-border/50 focus:outline-none">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div x-show="open" x-cloak
+                             x-transition:enter="transition ease-out duration-100"
+                             x-transition:enter-start="transform opacity-0 scale-95"
+                             x-transition:enter-end="transform opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-75"
+                             x-transition:leave-start="transform opacity-100 scale-100"
+                             x-transition:leave-end="transform opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-36 bg-theme-surface border border-theme-border rounded-lg shadow-xl z-50 overflow-hidden"
+                             style="display: none;">
+                            <div class="py-1">
+                                <button @click="setTheme('light')" class="flex items-center w-full px-4 py-2 text-sm text-theme-text hover:bg-theme-bg/80 transition-colors" :class="{ 'text-indigo-500 font-semibold bg-theme-bg': theme === 'light' }">
+                                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                    Light
+                                </button>
+                                <button @click="setTheme('dark')" class="flex items-center w-full px-4 py-2 text-sm text-theme-text hover:bg-theme-bg/80 transition-colors" :class="{ 'text-indigo-500 font-semibold bg-theme-bg': theme === 'dark' }">
+                                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                                    Dark
+                                </button>
+                                <button @click="setTheme('system')" class="flex items-center w-full px-4 py-2 text-sm text-theme-text hover:bg-theme-bg/80 transition-colors" :class="{ 'text-indigo-500 font-semibold bg-theme-bg': theme === 'system' }">
+                                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                    System
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex justify-end items-center mb-6">
+            <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                <!-- Date Filter (HTMX) -->
+                <div class="relative group w-full sm:w-auto">
+                    <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none">
+                </div>
+
+                <!-- Market Filter (Client-side) -->
+                <div class="relative group w-full sm:w-auto">
+                    <select id="marketFilter" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none appearance-none pr-8">
+                        <option value="">전체 시장</option>
+                        <option value="KOSPI">KOSPI</option>
+                        <option value="KOSDAQ">KOSDAQ</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-theme-muted">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+                
+                <!-- Marcap Filter (Client-side) -->
+                <div class="relative group w-full sm:w-auto">
+                    <select id="marcapFilter" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none appearance-none pr-8">
+                        <option value="">시가총액 전체</option>
+                        <option value="2000" selected>2천억 이상</option>
+                        <option value="5000">5천억 이상</option>
+                        <option value="10000">1조 이상</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-theme-muted">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+
+                <!-- Search Input (Client-side) -->
+                <div class="relative group w-full sm:w-auto">
+                    <input type="text" 
+                           id="searchInput"
+                           placeholder="종목명/코드 검색..." 
+                           class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.3)] block w-full sm:w-64 p-2.5 text-theme-text transition-all duration-300 outline-none">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <svg class="w-4 h-4 text-theme-muted" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table Container (HTMX Target) -->
+        <div class="bg-theme-surface border border-theme-border rounded-xl shadow-2xl overflow-hidden fade-in relative min-h-[300px]">
+            <!-- Loading Indicator -->
+            <div id="loading" x-data @htmx:after-settle.window="$el.classList.remove('initial-loading')" class="htmx-indicator initial-loading absolute inset-0 z-50 flex flex-col items-center justify-center bg-theme-surface/80 backdrop-blur-sm">
+                <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+            </div>
+            
+            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load" hx-indicator="#loading">
+                <!-- 테이블이 여기에 렌더링됩니다 -->
+            </div>
+        </div>
+    </main>
+
+
+    <!-- Client-side filtering and sorting script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('searchInput');
+            const marketFilter = document.getElementById('marketFilter');
+            const marcapFilter = document.getElementById('marcapFilter');
+            const dateInput = document.querySelector('input[type="date"][name="date"]');
+            
+            // Check if backend provided a date via query param, otherwise use local today
+            const urlDate = "{{ date if date else '' }}";
+            
+            if (urlDate) {
+                dateInput.value = urlDate;
+            } else if (dateInput && !dateInput.value) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                dateInput.value = `${year}-${month}-${day}`;
+            }
+            
+            // Sync URL when date is changed
+            if (dateInput) {
+                dateInput.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        const newUrl = new URL(window.location);
+                        newUrl.searchParams.set('date', e.target.value);
+                        window.history.pushState({}, '', newUrl);
+                    }
+                });
+            }
+            
+            let currentSortCol = 'rs_rank';
+            let currentSortOrder = 'asc';
+
+            let allRows = [];
+            let filteredRows = [];
+            let currentPage = 1;
+            const PAGE_SIZE = 50;
+            let observer = null;
+
+            function applyFiltersAndSort() {
+                const search = searchInput.value.toLowerCase();
+                const market = marketFilter.value;
+                const minMarcap = marcapFilter.value ? parseInt(marcapFilter.value) * 100000000 : 0;
+
+                // Filtering
+                filteredRows = allRows.filter(row => {
+                    const rowName = row.dataset.name || "";
+                    const rowCode = row.dataset.code || "";
+                    const rowMarket = row.dataset.market || "";
+                    const rowMarcap = parseFloat(row.dataset.marcap) || 0;
+
+                    const matchSearch = rowName.includes(search) || rowCode.includes(search);
+                    // startsWith allows "KOSDAQ GLOBAL" to match when "KOSDAQ" is selected
+                    const matchMarket = market === "" || rowMarket.startsWith(market);
+                    const matchMarcap = minMarcap === 0 || rowMarcap >= minMarcap;
+
+                    return matchSearch && matchMarket && matchMarcap;
+                });
+
+                // Sorting
+                filteredRows.sort((a, b) => {
+                    let valA = a.dataset[currentSortCol];
+                    let valB = b.dataset[currentSortCol];
+
+                    // Convert to numbers if possible
+                    if (!isNaN(parseFloat(valA)) && isFinite(valA)) {
+                        valA = parseFloat(valA);
+                        valB = parseFloat(valB);
+                    }
+
+                    if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
+                    if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+                // Reset pagination and render
+                currentPage = 1;
+                renderPage();
+                updateSortIcons();
+                
+                // Update stock count display
+                const stockCountEl = document.getElementById('stockCount');
+                if (stockCountEl) {
+                    stockCountEl.textContent = filteredRows.length;
+                }
+            }
+
+            function renderPage() {
+                const tbody = document.getElementById('rs-table-body');
+                if (!tbody) return;
+                
+                tbody.innerHTML = '';
+                
+                const fragment = document.createDocumentFragment();
+                const rowsToRender = filteredRows.slice(0, currentPage * PAGE_SIZE);
+                
+                rowsToRender.forEach(row => fragment.appendChild(row));
+                tbody.appendChild(fragment);
+
+                setupObserver(tbody);
+            }
+
+            function loadMore() {
+                if (currentPage * PAGE_SIZE >= filteredRows.length) return;
+                
+                const tbody = document.getElementById('rs-table-body');
+                if (!tbody) return;
+
+                const fragment = document.createDocumentFragment();
+                const startIndex = currentPage * PAGE_SIZE;
+                currentPage++;
+                const endIndex = currentPage * PAGE_SIZE;
+                
+                const rowsToRender = filteredRows.slice(startIndex, endIndex);
+                rowsToRender.forEach(row => fragment.appendChild(row));
+                
+                tbody.appendChild(fragment);
+                setupObserver(tbody);
+            }
+
+            function setupObserver(tbody) {
+                if (observer) observer.disconnect();
+                
+                const lastRow = tbody.lastElementChild;
+                if (lastRow && (currentPage * PAGE_SIZE) < filteredRows.length) {
+                    if (!observer) {
+                        observer = new IntersectionObserver((entries) => {
+                            if (entries[0].isIntersecting) {
+                                loadMore();
+                            }
+                        }, { rootMargin: "200px" });
+                    }
+                    observer.observe(lastRow);
+                }
+            }
+            
+            function updateSortIcons() {
+                document.querySelectorAll('th[data-sort]').forEach(th => {
+                    const icon = th.querySelector('.sort-icon');
+                    if(icon) icon.innerHTML = '';
+                    th.classList.remove('text-indigo-400');
+                    if (th.dataset.sort === currentSortCol) {
+                        th.classList.add('text-indigo-400');
+                        if(icon) {
+                            icon.innerHTML = currentSortOrder === 'asc' ? '▲' : '▼';
+                        }
+                    }
+                });
+            }
+
+            // Event Listeners for Filters
+            searchInput.addEventListener('input', applyFiltersAndSort);
+            marketFilter.addEventListener('change', applyFiltersAndSort);
+            marcapFilter.addEventListener('change', applyFiltersAndSort);
+
+            // HTMX Load event (when table is rendered)
+            document.body.addEventListener('htmx:afterSwap', function(evt) {
+                if(evt.detail.target.id === 'rs-table-container') {
+                    
+                    const template = document.getElementById('all-rows-template');
+                    if (template) {
+                        allRows = Array.from(template.content.querySelectorAll('tr.stock-row'));
+                    }
+
+                    // Attach click events to new headers
+                    document.querySelectorAll('th[data-sort]').forEach(th => {
+                        th.addEventListener('click', () => {
+                            const col = th.dataset.sort;
+                            if (currentSortCol === col) {
+                                currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+                            } else {
+                                currentSortCol = col;
+                                currentSortOrder = 'desc'; // Default to desc for new columns
+                            }
+                            applyFiltersAndSort();
+                        });
+                    });
+                    
+                    // Reset sort to default if new data loaded
+                    currentSortCol = 'rs_rank';
+                    currentSortOrder = 'asc';
+                    applyFiltersAndSort();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

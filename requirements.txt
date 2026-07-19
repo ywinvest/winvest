@@ -1,9 +1,8 @@
-yfinance
-pandas_ta
-setuptools<82.0.0
-pykrx
-finance-datareader
-plotly
+fastapi[standard]
+jinja2
+sqlmodel
+pyturso
+sqlalchemy-libsql
 python-dotenv
 numpy>=1.26.0
 slack_sdk
@@ -12,3 +11,4 @@ backtrader
 vectorbt
 anywidget
 numba
+psycopg2-binary

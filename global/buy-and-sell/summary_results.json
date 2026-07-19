@@ -1,0 +1,38 @@
+{
+  "NASDAQ": {
+    "avg_return": -1.5015357604390833,
+    "avg_holding_period": 15.244897959183673,
+    "buy_count": 98,
+    "total_return": -14.981532530716787,
+    "win_rate": 29.591836734693878,
+    "max_drawdown": -25.190665056764637,
+    "sharpe_ratio": -0.08549305294528552
+  },
+  "Gold": {
+    "avg_return": -1.0409077505743176,
+    "avg_holding_period": 25.283333333333335,
+    "buy_count": 60,
+    "total_return": -15.825107795897775,
+    "win_rate": 30.0,
+    "max_drawdown": -23.64094207224251,
+    "sharpe_ratio": -0.18545696850802895
+  },
+  "Bitcoin": {
+    "avg_return": -3.506349214978951,
+    "avg_holding_period": 12.288461538461538,
+    "buy_count": 52,
+    "total_return": -44.48199042741362,
+    "win_rate": 21.153846153846153,
+    "max_drawdown": -48.36061894753857,
+    "sharpe_ratio": -0.2434504189354134
+  },
+  "NASDAQ100 Future": {
+    "avg_return": -1.9886096563915385,
+    "avg_holding_period": 16.121951219512194,
+    "buy_count": 82,
+    "total_return": -57.045146067292926,
+    "win_rate": 21.951219512195124,
+    "max_drawdown": -59.61098310710524,
+    "sharpe_ratio": -0.23325888536432246
+  }
+}
