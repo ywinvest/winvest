@@ -21,13 +21,13 @@ jobs:
       with:
         python-version: "3.13"
         cache: "pip"
-        cache-dependency-path: "requirements.txt"
+        cache-dependency-path: "requirements-scripts.txt"
 
     # 의존성 설치
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-scripts.txt
 
     - name: Run python script
       env:
