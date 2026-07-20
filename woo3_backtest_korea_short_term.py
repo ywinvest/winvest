@@ -38,7 +38,7 @@ def buy_condition(df):
 
 def sell_condition_technical_bounce(df):
   """기술적 반등 매도 조건 - 10일선 돌파 (매수 회수가 적을 때)."""
-  return (df['MA_10_Cross'] | df['MA_20_Cross']) & \
+  return (df['MA_10_Cross'] | df['MA_20_Cross'] | (df['Change_Rate'] >= 5)) & \
           df['Bullish'] & (df['RSI'] > DEFAULT_RSI_THRESHOLD)
 
 def sell_condition_snap_back(df):
@@ -109,6 +109,10 @@ def backtest(data, ticker):
     change_rate = df.loc[buy_date, 'Change_Rate']
 
     should_buy = True
+
+    # [조건 0] 첫 매수일 때, 등락율이 -1% 미만이어야 함
+    if is_first_buy and change_rate >= -1:
+      should_buy = False
 
     # [조건 1] 첫 매수가 아닌데 가격이 올랐으면 매수 스킵
     if not is_first_buy:
