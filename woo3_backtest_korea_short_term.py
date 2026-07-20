@@ -3,30 +3,8 @@ import os
 from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
-import requests
 
 import indicators
-import krx_auth
-
-# --- 몽키 패칭(Monkey Patching) 시작 ---
-# 기존 requests의 get, post 함수를 백업해둡니다.
-_original_get = requests.get
-_original_post = requests.post
-
-# krx_auth 모듈에서 쿠키를 가져오는 방식에 맞춰 아래 'krx_auth.get_cookies()' 부분을 수정해주세요.
-# (만약 krx_auth 내부에 이미 인증된 session 객체가 있다면 kwargs['cookies'] = krx_auth.session.cookies 로 접근할 수 있습니다.)
-def _patched_get(*args, **kwargs):
-  kwargs['cookies'] = krx_auth._session.cookies  # 예시: krx_auth의 쿠키 주입
-  return _original_get(*args, **kwargs)
-
-def _patched_post(*args, **kwargs):
-  kwargs['cookies'] = krx_auth._session.cookies  # 예시: krx_auth의 쿠키 주입
-  return _original_post(*args, **kwargs)
-
-# 파이썬 환경의 기본 requests를 패치된 함수로 바꿔치기합니다.
-requests.get = _patched_get
-requests.post = _patched_post
-# --- 몽키 패칭 끝 ---
 
 DEFAULT_RSI_THRESHOLD = 30
 
@@ -220,15 +198,6 @@ if __name__ == "__main__":
 
   end_date_str = end_date.strftime('%Y-%m-%d')
   start_date_str = start_date.strftime('%Y-%m-%d')
-
-  krx_id = os.getenv("KRX_ID")
-  krx_pw = os.getenv("KRX_PW")
-
-  print("0. KRX 정보데이터시스템 로그인 진행 중...")
-  if not krx_auth.login_krx(krx_id, krx_pw):
-    print("❌ KRX 로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요.")
-    exit()
-  print("✅ KRX 로그인 성공! 세션 쿠키가 확보되었습니다.")
 
   for ticker, name in tickers.items():
     print(f"Processing {ticker} ({name})...")
