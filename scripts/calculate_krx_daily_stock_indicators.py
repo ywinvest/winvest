@@ -51,7 +51,7 @@ def main():
     df_prices = pd.read_sql(query_prices, engine)
     
     if df_prices.empty:
-        print("❌ No data found in the database. Please run update_krx_daily_stocks.py first.")
+        print("❌ No data found in the database. Please run sync_krx_daily_stocks.py first.")
         return
 
     print("2. Fetching target date metadata for filtering (excluding KONEX)...")

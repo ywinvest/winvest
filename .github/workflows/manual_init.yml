@@ -26,13 +26,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-scripts.txt
 
-      - name: Run init_krx_daily_stock.py
+      - name: Run migrate_krx_daily_stocks.py
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
           if [ -z "${{ github.event.inputs.year }}" ]; then
-            python scripts/init_krx_daily_stock.py
+            python scripts/migrate_krx_daily_stocks.py
           else
-            python scripts/init_krx_daily_stock.py --year ${{ github.event.inputs.year }}
+            python scripts/migrate_krx_daily_stocks.py --start-year ${{ github.event.inputs.year }}
           fi

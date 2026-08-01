@@ -30,7 +30,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-scripts.txt
 
-      - name: 1. Run Daily Stock Update (update_krx_daily_stocks.py)
+      - name: 1. Run Daily Stock Update (sync_krx_daily_stocks.py)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
@@ -41,9 +41,22 @@ jobs:
           else
             TODAY="${{ github.event.inputs.date }}"
           fi
-          python scripts/update_krx_daily_stocks.py --date $TODAY
+          python scripts/sync_krx_daily_stocks.py --date $TODAY
+          
+      - name: 2. Run Adjusted Stock Update (sync_krx_daily_adjusted_stocks.py)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          if [ -z "${{ github.event.inputs.date }}" ]; then
+            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
+          else
+            TODAY="${{ github.event.inputs.date }}"
+          fi
+          python scripts/sync_krx_daily_adjusted_stocks.py --date $TODAY
         
-      - name: 2. Run RS Calculation (calculate_krx_daily_stock_indicators.py)
+      - name: 3. Run RS Calculation (calculate_krx_daily_stock_indicators.py)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
