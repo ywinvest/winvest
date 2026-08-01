@@ -1,10 +1,8 @@
 def calculate_indicators(df):
-  first_day_close = df['Close'].iloc[0]
   for period_days in [21, 63, 126, 252]:
     period_str = f"{period_days // 21}M"
     return_col = f'Return_{period_str}'
     base_price = df['Close'].shift(period_days)
-    base_price.fillna(first_day_close, inplace=True)
     df[return_col] = df['Close'] / base_price - 1
 
   # df['Weighted_Return'] = (df['Return_1M'] * 0.4 +

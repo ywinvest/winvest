@@ -38,11 +38,10 @@ def calculate_returns_matrix(df_prices: pd.DataFrame) -> pd.DataFrame:
     df_pivot = df_prices.pivot(index='date', columns='code', values='adj_close').sort_index()
     
     # Calculate Returns for all stocks simultaneously (Vectorized)
-    first_day_close = df_pivot.iloc[0]
     
     returns = {}
     for period_days, period_str in [(21, '1M'), (63, '3M'), (126, '6M'), (252, '12M')]:
-        base_price = df_pivot.shift(period_days).fillna(first_day_close)
+        base_price = df_pivot.shift(period_days)
         ret = df_pivot / base_price - 1
         returns[period_str] = ret.iloc[-1]  # Only keep the last date's returns
         
