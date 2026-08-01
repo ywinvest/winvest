@@ -25,6 +25,8 @@ def get_rs_table_data(
         select(KrxDailyStock, KrxDailyStockIndicator)
         .join(KrxDailyStockIndicator, (KrxDailyStock.code == KrxDailyStockIndicator.code) & (KrxDailyStock.date == KrxDailyStockIndicator.date))
         .where(KrxDailyStockIndicator.date == target_date)
+        .where(~KrxDailyStock.name.like('%스팩%'))
+        .where(~KrxDailyStock.code.regexp_match(r'.*[579KLMNO]$'))
         .order_by(
             KrxDailyStockIndicator.rs.desc(),
             KrxDailyStockIndicator.rs_1m.desc(),

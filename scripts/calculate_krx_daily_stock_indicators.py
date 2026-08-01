@@ -5,67 +5,35 @@ import argparse
 from datetime import datetime, timedelta
 
 import pandas as pd
+from psycopg2.extras import execute_values
 
 # Add root project path to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import rs
-from models import KrxDailyStockIndicator
 from db import engine
-from sqlmodel import Session
-from sqlalchemy import insert
 
-def chunked_iterable(iterable, size):
-    """Yield successive chunks from iterable."""
-    for i in range(0, len(iterable), size):
-        yield iterable[i:i + size]
-
-def filter_common_stocks(df):
-    """스팩/우선주 등 제외"""
-    exclude_pattern = r'스팩'
-    return df[(~df['Name'].str.contains(exclude_pattern, na=False, regex=True))
-              & (~df['Code'].str.endswith(("5", "7", "9", "K", "L", "M", "N", "O")))]
-
-def main():
-    parser = argparse.ArgumentParser(description="Calculate KRX Daily Stock RS (Vectorized)")
-    parser.add_argument("--date", type=str, help="Target date in YYYYMMDD format. Defaults to today.")
-    args = parser.parse_args()
-
-    if args.date:
-        target_date = datetime.strptime(args.date, '%Y%m%d')
-    else:
-        target_date = datetime.today()
-        
-    target_date_str = target_date.strftime('%Y-%m-%d')
-    
-    print("=" * 60)
-    print(f"🚀 Starting Vectorized RS Data Calculation for {target_date_str}")
-    print("=" * 60)
-
-    start_date_str = (target_date - timedelta(days=540)).strftime('%Y-%m-%d')
-    
+def fetch_historical_prices(start_date_str: str, target_date_str: str) -> pd.DataFrame:
+    """Fetch historical adjusted close prices from DB."""
     print("1. Fetching historical close prices from local DB...")
-    start_time = time.time()
-    
     query_prices = f"SELECT date, code, close as adj_close FROM krx_daily_adjusted_stocks WHERE date >= '{start_date_str}' AND date <= '{target_date_str}'"
-    df_prices = pd.read_sql(query_prices, engine)
-    
-    if df_prices.empty:
-        print("❌ No data found in the database. Please run sync_krx_daily_stocks.py first.")
-        return
+    return pd.read_sql(query_prices, engine)
 
+def fetch_target_date_metadata(target_date_str: str) -> pd.DataFrame:
+    """Fetch metadata for the target date to use in filtering (excluding KONEX)."""
     print("2. Fetching target date metadata for filtering (excluding KONEX)...")
     query_meta = f"SELECT code, name, market, marcap FROM krx_daily_stocks WHERE date = '{target_date_str}' AND market != 'KONEX'"
     df_meta = pd.read_sql(query_meta, engine)
     
-    if df_meta.empty:
-        print(f"❌ No metadata found for target date {target_date_str}. Date might be a weekend or holiday.")
-        return
+    if not df_meta.empty:
+        df_meta.rename(columns={'code': 'Code', 'name': 'Name', 'market': 'Market', 'marcap': 'Marcap'}, inplace=True)
         
-    df_meta.rename(columns={'code': 'Code', 'name': 'Name', 'market': 'Market', 'marcap': 'Marcap'}, inplace=True)
-    
+    return df_meta
+
+def calculate_returns_matrix(df_prices: pd.DataFrame) -> pd.DataFrame:
+    """Pivot data and calculate returns across multiple periods."""
     print("3. Pivoting data and calculating returns (Vectorized)...")
-    # 2. Pivot to get closing prices matrix
+    # Pivot to get closing prices matrix
     # Index: date, Columns: code, Values: adj_close
     df_pivot = df_prices.pivot(index='date', columns='code', values='adj_close').sort_index()
     
@@ -87,11 +55,12 @@ def main():
         'Return_12M': returns['12M'].values,
     })
     
+    return final_df
+
+def prepare_rs_records(final_df: pd.DataFrame, df_meta: pd.DataFrame, target_date_str: str) -> list:
+    """Merge metadata, calculate RS scores, and format as list of dictionaries."""
     # Merge metadata
     final_df = pd.merge(final_df, df_meta, on='Code', how='inner')
-    
-    # Apply filter_common_stocks
-    final_df = filter_common_stocks(final_df)
     
     # Set index to target date for calculate_relative_strength
     final_df['date'] = target_date_str
@@ -100,9 +69,7 @@ def main():
     print("4. Calculating Relative Strength (RS) scores...")
     final_df = rs.calculate_relative_strength(final_df)
     
-    # 3. DataFrame을 Dictionary 리스트로 변환 (Vectorized)
     print("5. Converting DataFrame to dictionary records...")
-    
     # Fill NaN
     final_df = final_df.fillna(0.0)
     
@@ -119,35 +86,86 @@ def main():
     df_rs['date'] = target_date_str
     
     rs_dicts = df_rs.to_dict(orient='records')
-    
     print(f"✅ Successfully calculated RS for {len(rs_dicts)} stocks.")
+    
+    return rs_dicts
 
-    # 4. Supabase DB에 벌크 인서트 (Chunk 적용)
-    print("6. Inserting RS data into Supabase Database in chunks...")
+def bulk_insert_rs_data(rs_dicts: list, target_date_str: str):
+    """Insert RS data into Supabase using DELETE + bulk execute_values."""
+    print("6. Inserting RS data into Supabase Database using DELETE + Bulk INSERT...")
+    raw_conn = engine.raw_connection()
     try:
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-        chunk_size = 4000
-        total_chunks = (len(rs_dicts) + chunk_size - 1) // chunk_size
+        cursor = raw_conn.cursor()
         
-        with Session(engine) as session:
-            for i, chunk in enumerate(chunked_iterable(rs_dicts, chunk_size)):
-                stmt = pg_insert(KrxDailyStockIndicator).values(chunk)
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=['date', 'code'],
-                    set_={
-                        'rs': stmt.excluded.rs,
-                        'rs_1m': stmt.excluded.rs_1m,
-                        'rs_3m': stmt.excluded.rs_3m,
-                        'rs_6m': stmt.excluded.rs_6m,
-                        'rs_12m': stmt.excluded.rs_12m
-                    }
-                )
-                session.exec(stmt)
-            session.commit()
-                
+        # 1. DELETE existing data for the target date to ensure 100% data integrity
+        cursor.execute(f"DELETE FROM krx_daily_stock_indicators WHERE date = '{target_date_str}'")
+        
+        # 2. Bulk INSERT using execute_values (Ultra-fast, Raw DB API)
+        tuples = [
+            (r['date'], r['code'], r['rs'], r['rs_1m'], r['rs_3m'], r['rs_6m'], r['rs_12m'])
+            for r in rs_dicts
+        ]
+        
+        query = """
+            INSERT INTO krx_daily_stock_indicators (date, code, rs, rs_1m, rs_3m, rs_6m, rs_12m)
+            VALUES %s
+        """
+        
+        # Chunking to prevent PgBouncer statement buffer overflow
+        chunk_size = 2000
+        for i in range(0, len(tuples), chunk_size):
+            execute_values(cursor, query, tuples[i:i+chunk_size])
+            
+        raw_conn.commit()
+    except Exception as inner_e:
+        raw_conn.rollback()
+        raise inner_e
+    finally:
+        raw_conn.close()
+
+def main():
+    parser = argparse.ArgumentParser(description="Calculate KRX Daily Stock RS (Vectorized)")
+    parser.add_argument("--date", type=str, help="Target date in YYYYMMDD format. Defaults to today.")
+    args = parser.parse_args()
+
+    if args.date:
+        target_date = datetime.strptime(args.date, '%Y%m%d')
+    else:
+        target_date = datetime.today()
+        
+    target_date_str = target_date.strftime('%Y-%m-%d')
+    
+    print("=" * 60)
+    print(f"🚀 Starting Vectorized RS Data Calculation for {target_date_str}")
+    print("=" * 60)
+
+    start_date_str = (target_date - timedelta(days=540)).strftime('%Y-%m-%d')
+    
+    start_time = time.time()
+    
+    # 1. DB에서 과거 주가 데이터 가져오기
+    df_prices = fetch_historical_prices(start_date_str, target_date_str)
+    if df_prices.empty:
+        print("❌ No data found in the database. Please run sync_krx_daily_stocks.py first.")
+        return
+
+    # 2. 대상일의 메타데이터(시가총액, 시장 등) 가져오기
+    df_meta = fetch_target_date_metadata(target_date_str)
+    if df_meta.empty:
+        print(f"❌ No metadata found for target date {target_date_str}. Date might be a weekend or holiday.")
+        return
+        
+    # 3. 주가 수익률 계산 (Vectorized Matrix)
+    final_df = calculate_returns_matrix(df_prices)
+    
+    # 4. 최종 RS 점수 계산 및 딕셔너리 변환
+    rs_dicts = prepare_rs_records(final_df, df_meta, target_date_str)
+    
+    # 5. DB에 Bulk Insert
+    try:
+        bulk_insert_rs_data(rs_dicts, target_date_str)
         elapsed = time.time() - start_time
         print(f"\n🎉 RS Update & Database Insert Completed Successfully! (⏱️ {elapsed:.2f} seconds)")
-        
     except Exception as e:
         print(f"\n❌ Failed to insert data into Supabase: {e}")
 
