@@ -54,8 +54,8 @@ def main():
         print("❌ No data found in the database. Please run update_krx_daily_stocks.py first.")
         return
 
-    print("2. Fetching target date metadata for filtering...")
-    query_meta = f"SELECT code, name, market, marcap FROM krx_daily_stocks WHERE date = '{target_date_str}'"
+    print("2. Fetching target date metadata for filtering (excluding KONEX)...")
+    query_meta = f"SELECT code, name, market, marcap FROM krx_daily_stocks WHERE date = '{target_date_str}' AND market != 'KONEX'"
     df_meta = pd.read_sql(query_meta, engine)
     
     if df_meta.empty:
