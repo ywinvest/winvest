@@ -20,7 +20,7 @@ def calculate_relative_strength(df):
     rs_col = f'RS_{period}'
 
     df[rs_col] = grouped[return_col].rank(pct=True) * 98 + 1
-    df[rs_col] = df[rs_col].fillna(1).round(0).astype(int).clip(1, 99)
+    df[rs_col] = df[rs_col].fillna(0).round(0).astype(int).clip(0, 99)
 
   df['Base_Score'] = (
       # df['RS_1M'] * 0.2 +
@@ -31,7 +31,7 @@ def calculate_relative_strength(df):
 
   df['RS_Score'] = grouped['Base_Score'].rank(pct=True) * 98 + 1
   # df['RS'] = base_score.round(0)
-  df['RS'] = df['RS_Score'].fillna(1).round(0).astype(int).clip(1, 99)
+  df['RS'] = df['RS_Score'].fillna(0).round(0).astype(int).clip(0, 99)
 
   df.drop(columns=['Base_Score'], inplace=True)
   return df
