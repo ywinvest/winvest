@@ -56,7 +56,20 @@ jobs:
           fi
           python scripts/sync_krx_daily_adjusted_stocks.py --date $TODAY
         
-      - name: 3. Run RS Calculation (calculate_krx_daily_stock_indicators.py)
+      - name: 3. Run Market Indices Update (sync_krx_daily_indices.py)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          if [ -z "${{ github.event.inputs.date }}" ]; then
+            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
+          else
+            TODAY="${{ github.event.inputs.date }}"
+          fi
+          python scripts/sync_krx_daily_indices.py --date $TODAY
+
+      - name: 4. Run RS Calculation (calculate_krx_daily_stock_indicators.py)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}

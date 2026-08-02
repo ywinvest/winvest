@@ -1,0 +1,277 @@
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 max-w-[1200px] mx-auto w-full">
+    <!-- KOSPI Card (aspect-[2/1] on mobile to form 1:1 when stacked) -->
+    <div class="bg-white/5 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl p-3 md:p-5 shadow-xl relative overflow-hidden group flex flex-col justify-center aspect-[2/1] lg:aspect-auto">
+        <!-- Decoration -->
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-cyan-500/10 dark:bg-cyan-500/20 rounded-full blur-3xl group-hover:bg-cyan-500/20 transition-all duration-500"></div>
+        
+        <!-- Header Row: Market Info -->
+        <div class="relative z-20 flex items-center justify-start gap-2 md:gap-3 mb-2 md:mb-4 px-1 w-full">
+            <!-- Market Badge -->
+            <div class="inline-flex items-center px-2 md:px-2.5 py-1 md:py-1.5 rounded-md bg-white/40 dark:bg-black/20 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-sm gap-1.5">
+                <div class="w-1.5 h-1.5 rounded-full {% if kospi.signal == 'green' %}bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.8)]{% elif kospi.signal == 'yellow' %}bg-yellow-400 shadow-[0_0_4px_rgba(250,204,21,0.8)]{% else %}bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]{% endif %}"></div>
+                <span class="text-xs md:text-sm font-black tracking-widest text-gray-800 dark:text-gray-200 leading-none">코스피</span>
+            </div>
+            
+            <!-- Index & Ratio -->
+            <div class="flex items-center gap-1.5 md:gap-2">
+                <div class="text-sm md:text-base font-black text-gray-900 dark:text-white tabular-nums tracking-tight leading-none">
+                    {{ "{:,.2f}".format(kospi.close) }}
+                </div>
+                <div class="text-sm md:text-base font-bold tabular-nums leading-none
+                    {% if kospi.change > 0 %} text-red-500 dark:text-red-400
+                    {% elif kospi.change < 0 %} text-blue-500 dark:text-blue-400
+                    {% else %} text-gray-500 {% endif %}">
+                    {{ "{:+.2f}%".format(kospi.change * 100) }}
+                </div>
+            </div>
+        </div>
+
+        <div class="relative z-10 grid grid-cols-2 gap-3 md:gap-6 items-center flex-1 w-full">
+            <!-- Left: Signal Gauge ONLY -->
+            <div class="flex flex-col items-center justify-center border-r border-gray-100 dark:border-white/10 pr-2 md:pr-4 h-full relative">
+                <!-- SVG Gauge Meter -->
+                <div class="w-full max-w-[160px] md:max-w-[220px] relative my-1 mx-auto" title="{{ kospi.status_msg }}">
+                    <svg viewBox="0 0 100 60" class="w-full h-full overflow-visible filter drop-shadow-md">
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="currentColor" class="text-gray-200 dark:text-gray-800" stroke-width="18" stroke-linecap="round" />
+                        <path d="M 10 50 A 40 40 0 0 1 30 15.36" fill="none" stroke="currentColor" stroke-width="18" class="{% if kospi.signal == 'green' %}text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]{% else %}text-green-100 dark:text-green-950/80{% endif %} transition-all duration-500" />
+                        <path d="M 30 15.36 A 40 40 0 0 1 70 15.36" fill="none" stroke="currentColor" stroke-width="18" class="{% if kospi.signal == 'yellow' %}text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]{% else %}text-yellow-100 dark:text-yellow-950/80{% endif %} transition-all duration-500" />
+                        <path d="M 70 15.36 A 40 40 0 0 1 90 50" fill="none" stroke="currentColor" stroke-width="18" class="{% if kospi.signal == 'red' %}text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.6)]{% else %}text-red-100 dark:text-red-950/80{% endif %} transition-all duration-500" />
+                        
+                        <!-- Signal Texts -->
+                        <g>
+                            <!-- Green -->
+                            <g transform="translate(15.36, 30) rotate(-60)">
+                                <text x="0" y="0" font-size="6" font-weight="bold" fill="currentColor" class="{% if kospi.signal == 'green' %}text-white dark:text-gray-900{% else %}text-green-400 dark:text-green-800{% endif %} transition-colors duration-500" text-anchor="middle" dominant-baseline="central">양호</text>
+                            </g>
+                            <!-- Yellow -->
+                            <g transform="translate(50, 10)">
+                                <text x="0" y="0" font-size="6" font-weight="bold" fill="currentColor" class="{% if kospi.signal == 'yellow' %}text-gray-900 dark:text-gray-900{% else %}text-yellow-500 dark:text-yellow-700/80{% endif %} transition-colors duration-500" text-anchor="middle" dominant-baseline="central">주의</text>
+                            </g>
+                            <!-- Red -->
+                            <g transform="translate(84.64, 30) rotate(60)">
+                                <text x="0" y="0" font-size="6" font-weight="bold" fill="currentColor" class="{% if kospi.signal == 'red' %}text-white dark:text-gray-900{% else %}text-red-400 dark:text-red-800{% endif %} transition-colors duration-500" text-anchor="middle" dominant-baseline="central">경고</text>
+                            </g>
+                        </g>
+
+                        <!-- Needle -->
+                        <g class="transition-transform duration-1000 origin-[50px_50px]" style="transform: rotate({% if kospi.signal == 'green' %}-60deg{% elif kospi.signal == 'yellow' %}0deg{% else %}60deg{% endif %});">
+                            <polygon points="48,50 52,50 50,22" class="fill-gray-900 dark:fill-gray-100" />
+                            <circle cx="50" cy="50" r="3.5" class="fill-gray-900 dark:fill-gray-100" />
+                        </g>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Right: Stocks List -->
+            <div class="overflow-hidden h-full flex flex-col justify-center w-full">
+                
+                <!-- Mobile: Big Highlight (Visible only on mobile) -->
+                <div class="flex flex-col justify-center h-full w-full lg:hidden py-1">
+                    {% set top_stock = (kospi_rs_top5 | selectattr('is_top_gainer') | list | first) %}
+                    {% if not top_stock %}{% set top_stock = (kospi_rs_top5 | first) %}{% endif %}
+                    
+                    {% if top_stock %}
+                    <div class="relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-b from-red-500/20 to-red-500/5 p-3 flex flex-col justify-center items-center gap-1 shadow-[0_0_30px_rgba(239,68,68,0.15)] w-full h-full max-h-[140px]">
+                        <!-- Top accent line -->
+                        <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500"></div>
+                        
+                        <!-- Name -->
+                        <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white truncate w-full text-center tracking-tight leading-tight mb-0.5">
+                            {{ top_stock.name }}
+                        </div>
+                        
+                        <!-- Price and Ratio -->
+                        <div class="flex items-baseline justify-center gap-2 w-full mt-1">
+                            <div class="text-xl md:text-2xl font-mono font-semibold tabular-nums leading-none {% if top_stock.changes_ratio > 0 %}text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]{% elif top_stock.changes_ratio < 0 %}text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]{% else %}text-gray-500{% endif %}">
+                                {{ "{:,.0f}".format(top_stock.close) }}
+                            </div>
+                            <div class="text-xl md:text-2xl font-mono font-semibold tabular-nums tracking-tighter leading-none {% if top_stock.changes_ratio > 0 %}text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]{% elif top_stock.changes_ratio < 0 %}text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]{% else %}text-gray-500{% endif %}">
+                                {{ "{:+.2f}".format(top_stock.changes_ratio) }}%
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-xs text-gray-500 text-center">데이터 없음</div>
+                    {% endif %}
+                </div>
+
+                <!-- Desktop: Top 5 List (Visible only on lg) -->
+                <div class="hidden lg:flex flex-col justify-center h-full w-full">
+                    <div class="space-y-1.5">
+                        {% for stock in kospi_rs_top5 %}
+                        <div class="items-center justify-between p-1.5 md:p-2 rounded-md md:rounded-xl border border-gray-100 dark:border-white/5 bg-white dark:bg-white/5 flex">
+                            
+                            <!-- Horizontal Row: RS Badge | Name | Change% -->
+                            <div class="flex items-center gap-2 md:gap-3 min-w-0 w-full">
+                                <!-- RS Badge -->
+                                <div class="flex-shrink-0 flex items-center">
+                                    <div class="inline-flex items-center justify-center px-1 md:px-1.5 py-0.5 md:py-1 rounded-[4px] md:rounded-md text-[9px] md:text-xs font-extrabold leading-none shadow-sm w-5 md:w-7 h-[18px] md:h-6
+                                        {% if stock.rs >= 90 %} bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50 shadow-[0_0_6px_rgba(16,185,129,0.2)]
+                                        {% elif stock.rs >= 70 %} bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500 border border-emerald-300 dark:border-emerald-900/50
+                                        {% elif stock.rs <= 30 %} bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-900/50
+                                        {% else %} text-gray-600 bg-gray-100 border border-gray-200 dark:text-gray-400 dark:bg-gray-800/50 dark:border-gray-700/50 {% endif %}">
+                                        {{ "%.0f"|format(stock.rs) }}
+                                    </div>
+                                </div>
+                                
+                                <!-- Name -->
+                                <div class="flex items-center min-w-0 flex-1 justify-between gap-1">
+                                    <div class="text-[11px] md:text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1 min-w-0 leading-none">
+                                        <span class="truncate">{{ stock.name }}</span>
+                                    </div>
+                                </div>
+                                <!-- Change Ratio -->
+                                <div class="text-right flex-shrink-0 ml-0.5 w-12 md:w-16">
+                                    <div class="font-extrabold text-[10px] md:text-sm tabular-nums whitespace-nowrap {% if stock.changes_ratio > 0 %}text-red-500{% elif stock.changes_ratio < 0 %}text-blue-500{% else %}text-gray-500{% endif %}">
+                                        {{ "{:+.2f}".format(stock.changes_ratio) }}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="text-xs text-gray-500 p-2 text-center bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">데이터 없음</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KOSDAQ Card (aspect-[2/1] on mobile to form 1:1 when stacked) -->
+    <div class="bg-white/5 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl p-3 md:p-5 shadow-xl relative overflow-hidden group flex flex-col justify-center aspect-[2/1] lg:aspect-auto">
+        <!-- Decoration -->
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all duration-500"></div>
+        
+        <!-- Header Row: Market Info -->
+        <div class="relative z-20 flex items-center justify-start gap-2 md:gap-3 mb-2 md:mb-4 px-1 w-full">
+            <!-- Market Badge -->
+            <div class="inline-flex items-center px-2 md:px-2.5 py-1 md:py-1.5 rounded-md bg-white/40 dark:bg-black/20 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-sm gap-1.5">
+                <div class="w-1.5 h-1.5 rounded-full {% if kosdaq.signal == 'green' %}bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.8)]{% elif kosdaq.signal == 'yellow' %}bg-yellow-400 shadow-[0_0_4px_rgba(250,204,21,0.8)]{% else %}bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]{% endif %}"></div>
+                <span class="text-xs md:text-sm font-black tracking-widest text-gray-800 dark:text-gray-200 leading-none">코스닥</span>
+            </div>
+            
+            <!-- Index & Ratio -->
+            <div class="flex items-center gap-1.5 md:gap-2">
+                <div class="text-sm md:text-base font-black text-gray-900 dark:text-white tabular-nums tracking-tight leading-none">
+                    {{ "{:,.2f}".format(kosdaq.close) }}
+                </div>
+                <div class="text-sm md:text-base font-bold tabular-nums leading-none
+                    {% if kosdaq.change > 0 %} text-red-500 dark:text-red-400
+                    {% elif kosdaq.change < 0 %} text-blue-500 dark:text-blue-400
+                    {% else %} text-gray-500 {% endif %}">
+                    {{ "{:+.2f}%".format(kosdaq.change * 100) }}
+                </div>
+            </div>
+        </div>
+
+        <div class="relative z-10 grid grid-cols-2 gap-3 md:gap-6 items-center flex-1 w-full">
+            <!-- Left: Signal Gauge ONLY -->
+            <div class="flex flex-col items-center justify-center border-r border-gray-100 dark:border-white/10 pr-2 md:pr-4 h-full relative">
+                <!-- SVG Gauge Meter -->
+                <div class="w-full max-w-[160px] md:max-w-[220px] relative my-1 mx-auto" title="{{ kosdaq.status_msg }}">
+                    <svg viewBox="0 0 100 60" class="w-full h-full overflow-visible filter drop-shadow-md">
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="currentColor" class="text-gray-200 dark:text-gray-800" stroke-width="18" stroke-linecap="round" />
+                        <path d="M 10 50 A 40 40 0 0 1 30 15.36" fill="none" stroke="currentColor" stroke-width="18" class="{% if kosdaq.signal == 'green' %}text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]{% else %}text-green-100 dark:text-green-950/80{% endif %} transition-all duration-500" />
+                        <path d="M 30 15.36 A 40 40 0 0 1 70 15.36" fill="none" stroke="currentColor" stroke-width="18" class="{% if kosdaq.signal == 'yellow' %}text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]{% else %}text-yellow-100 dark:text-yellow-950/80{% endif %} transition-all duration-500" />
+                        <path d="M 70 15.36 A 40 40 0 0 1 90 50" fill="none" stroke="currentColor" stroke-width="18" class="{% if kosdaq.signal == 'red' %}text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.6)]{% else %}text-red-100 dark:text-red-950/80{% endif %} transition-all duration-500" />
+                        
+                        <!-- Signal Texts -->
+                        <g>
+                            <!-- Green -->
+                            <g transform="translate(15.36, 30) rotate(-60)">
+                                <text x="0" y="0" font-size="6" font-weight="bold" fill="currentColor" class="{% if kosdaq.signal == 'green' %}text-white dark:text-gray-900{% else %}text-green-400 dark:text-green-800{% endif %} transition-colors duration-500" text-anchor="middle" dominant-baseline="central">양호</text>
+                            </g>
+                            <!-- Yellow -->
+                            <g transform="translate(50, 10)">
+                                <text x="0" y="0" font-size="6" font-weight="bold" fill="currentColor" class="{% if kosdaq.signal == 'yellow' %}text-gray-900 dark:text-gray-900{% else %}text-yellow-500 dark:text-yellow-700/80{% endif %} transition-colors duration-500" text-anchor="middle" dominant-baseline="central">주의</text>
+                            </g>
+                            <!-- Red -->
+                            <g transform="translate(84.64, 30) rotate(60)">
+                                <text x="0" y="0" font-size="6" font-weight="bold" fill="currentColor" class="{% if kosdaq.signal == 'red' %}text-white dark:text-gray-900{% else %}text-red-400 dark:text-red-800{% endif %} transition-colors duration-500" text-anchor="middle" dominant-baseline="central">경고</text>
+                            </g>
+                        </g>
+
+                        <!-- Needle -->
+                        <g class="transition-transform duration-1000 origin-[50px_50px]" style="transform: rotate({% if kosdaq.signal == 'green' %}-60deg{% elif kosdaq.signal == 'yellow' %}0deg{% else %}60deg{% endif %});">
+                            <polygon points="48,50 52,50 50,22" class="fill-gray-900 dark:fill-gray-100" />
+                            <circle cx="50" cy="50" r="3.5" class="fill-gray-900 dark:fill-gray-100" />
+                        </g>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Right: Stocks List -->
+            <div class="overflow-hidden h-full flex flex-col justify-center w-full">
+                
+                <!-- Mobile: Big Highlight (Visible only on mobile) -->
+                <div class="flex flex-col justify-center h-full w-full lg:hidden py-1">
+                    {% set top_stock = (kosdaq_rs_top5 | selectattr('is_top_gainer') | list | first) %}
+                    {% if not top_stock %}{% set top_stock = (kosdaq_rs_top5 | first) %}{% endif %}
+                    
+                    {% if top_stock %}
+                    <div class="relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-b from-red-500/20 to-red-500/5 p-3 flex flex-col justify-center items-center gap-1 shadow-[0_0_30px_rgba(239,68,68,0.15)] w-full h-full max-h-[140px]">
+                        <!-- Top accent line -->
+                        <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500"></div>
+                        
+                        <!-- Name -->
+                        <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white truncate w-full text-center tracking-tight leading-tight mb-0.5">
+                            {{ top_stock.name }}
+                        </div>
+                        
+                        <!-- Price and Ratio -->
+                        <div class="flex items-baseline justify-center gap-2 w-full mt-1">
+                            <div class="text-xl md:text-2xl font-mono font-semibold tabular-nums leading-none {% if top_stock.changes_ratio > 0 %}text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]{% elif top_stock.changes_ratio < 0 %}text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]{% else %}text-gray-500{% endif %}">
+                                {{ "{:,.0f}".format(top_stock.close) }}
+                            </div>
+                            <div class="text-xl md:text-2xl font-mono font-semibold tabular-nums tracking-tighter leading-none {% if top_stock.changes_ratio > 0 %}text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]{% elif top_stock.changes_ratio < 0 %}text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]{% else %}text-gray-500{% endif %}">
+                                {{ "{:+.2f}".format(top_stock.changes_ratio) }}%
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-xs text-gray-500 text-center">데이터 없음</div>
+                    {% endif %}
+                </div>
+
+                <!-- Desktop: Top 5 List (Visible only on lg) -->
+                <div class="hidden lg:flex flex-col justify-center h-full w-full">
+                    <div class="space-y-1.5">
+                        {% for stock in kosdaq_rs_top5 %}
+                        <div class="items-center justify-between p-1.5 md:p-2 rounded-md md:rounded-xl border border-gray-100 dark:border-white/5 bg-white dark:bg-white/5 flex">
+                            
+                            <!-- Horizontal Row: RS Badge | Name | Change% -->
+                            <div class="flex items-center gap-2 md:gap-3 min-w-0 w-full">
+                                <!-- RS Badge -->
+                                <div class="flex-shrink-0 flex items-center">
+                                    <div class="inline-flex items-center justify-center px-1 md:px-1.5 py-0.5 md:py-1 rounded-[4px] md:rounded-md text-[9px] md:text-xs font-extrabold leading-none shadow-sm w-5 md:w-7 h-[18px] md:h-6
+                                        {% if stock.rs >= 90 %} bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50 shadow-[0_0_6px_rgba(16,185,129,0.2)]
+                                        {% elif stock.rs >= 70 %} bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500 border border-emerald-300 dark:border-emerald-900/50
+                                        {% elif stock.rs <= 30 %} bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-900/50
+                                        {% else %} text-gray-600 bg-gray-100 border border-gray-200 dark:text-gray-400 dark:bg-gray-800/50 dark:border-gray-700/50 {% endif %}">
+                                        {{ "%.0f"|format(stock.rs) }}
+                                    </div>
+                                </div>
+                                
+                                <!-- Name -->
+                                <div class="flex items-center min-w-0 flex-1 justify-between gap-1">
+                                    <div class="text-[11px] md:text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1 min-w-0 leading-none">
+                                        <span class="truncate">{{ stock.name }}</span>
+                                    </div>
+                                </div>
+                                <!-- Change Ratio -->
+                                <div class="text-right flex-shrink-0 ml-0.5 w-12 md:w-16">
+                                    <div class="font-extrabold text-[10px] md:text-sm tabular-nums whitespace-nowrap {% if stock.changes_ratio > 0 %}text-red-500{% elif stock.changes_ratio < 0 %}text-blue-500{% else %}text-gray-500{% endif %}">
+                                        {{ "{:+.2f}".format(stock.changes_ratio) }}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="text-xs text-gray-500 p-2 text-center bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">데이터 없음</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
