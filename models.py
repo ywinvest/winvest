@@ -40,3 +40,26 @@ class KrxDailyStockIndicator(SQLModel, table=True):
     rs_3m: float
     rs_6m: float
     rs_12m: float
+
+class KrxDailyIndex(SQLModel, table=True):
+    __tablename__ = "krx_daily_indices"
+    date: str = Field(primary_key=True)
+    market: str = Field(primary_key=True)
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int = Field(sa_column=Column(BigInteger()))
+    change: float
+
+class KrxDailyIndexIndicator(SQLModel, table=True):
+    __tablename__ = "krx_daily_index_indicators"
+    date: str = Field(primary_key=True)
+    market: str = Field(primary_key=True)
+    ma5: float
+    ma20: float
+    ma60: float
+    ma120: float
+    rsi: float
+    adx: float
+    di: bool
