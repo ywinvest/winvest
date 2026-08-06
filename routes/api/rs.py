@@ -10,7 +10,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 @router.get("/rs-table", response_class=HTMLResponse)
-async def get_rs_table(
+def get_rs_table(
     request: Request, 
     response: Response,
     date: str = None,

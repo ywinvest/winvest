@@ -88,14 +88,18 @@ def format_market_cap(marcap):
         return f"{marcap/1e8:.0f}억"
 
 @router.get("/market-status", response_class=HTMLResponse)
-async def market_status(request: Request, session: Session = Depends(get_session)):
+def market_status(request: Request, session: Session = Depends(get_session)):
+    print("market_status API called")
     # 1. KOSPI & KOSDAQ Status
     kospi = get_market_status('KS11', session)
+    print("get_market_status KS11 done")
     kosdaq = get_market_status('KQ11', session)
+    print("get_market_status KQ11 done")
     
     # 2. Get the latest date in DB
     latest_date_result = None
     try:
+        print("Querying latest date")
         latest_date_result = session.exec(
             select(KrxDailyStockIndicator.date).order_by(KrxDailyStockIndicator.date.desc()).limit(1)
         ).first()
