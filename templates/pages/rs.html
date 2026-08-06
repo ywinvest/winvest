@@ -6,55 +6,38 @@
         <div class="flex justify-end items-center mb-6">
             <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <!-- Date Filter (HTMX) -->
-                <div class="relative group w-full sm:w-auto">
-                    <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none">
-                </div>
+                <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" class="input w-full sm:w-auto">
 
                 <!-- Market Filter (Client-side) -->
-                <div class="relative group w-full sm:w-auto">
-                    <select id="marketFilter" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none appearance-none pr-8">
-                        <option value="">전체 시장</option>
-                        <option value="KOSPI">KOSPI</option>
-                        <option value="KOSDAQ">KOSDAQ</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-theme-muted">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                </div>
+                <select id="marketFilter" class="select w-full sm:w-auto">
+                    <option value="">전체 시장</option>
+                    <option value="KOSPI">KOSPI</option>
+                    <option value="KOSDAQ">KOSDAQ</option>
+                </select>
                 
                 <!-- Marcap Filter (Client-side) -->
-                <div class="relative group w-full sm:w-auto">
-                    <select id="marcapFilter" class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:w-auto p-2.5 text-theme-text outline-none appearance-none pr-8">
-                        <option value="">시가총액 전체</option>
-                        <option value="2000" selected>2천억 이상</option>
-                        <option value="5000">5천억 이상</option>
-                        <option value="10000">1조 이상</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-theme-muted">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                </div>
+                <select id="marcapFilter" class="select w-full sm:w-auto">
+                    <option value="">시가총액 전체</option>
+                    <option value="2000" selected>2천억 이상</option>
+                    <option value="5000">5천억 이상</option>
+                    <option value="10000">1조 이상</option>
+                </select>
 
                 <!-- Search Input (Client-side) -->
-                <div class="relative group w-full sm:w-auto">
-                    <input type="text" 
-                           id="searchInput"
-                           placeholder="종목명/코드 검색..." 
-                           class="bg-theme-surface border border-theme-border text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.3)] block w-full sm:w-64 p-2.5 text-theme-text transition-all duration-300 outline-none">
-                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg class="w-4 h-4 text-theme-muted" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-                        </svg>
-                    </div>
-                </div>
+                <label class="input w-full sm:w-64">
+                    <input type="text" id="searchInput" placeholder="종목명/코드 검색..." class="grow">
+                    <svg class="w-4 h-4 opacity-50" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                    </svg>
+                </label>
             </div>
         </div>
 
         <!-- Data Table Container (HTMX Target) -->
-        <div class="bg-theme-surface border border-theme-border rounded-xl shadow-2xl overflow-hidden fade-in relative min-h-[300px]">
+        <div class="card glass rounded-xl shadow-2xl overflow-hidden fade-in relative min-h-[300px]">
             <!-- Loading Indicator -->
-            <div id="loading" x-data @htmx:after-settle.window="$el.classList.remove('initial-loading')" class="htmx-indicator initial-loading absolute inset-0 z-50 flex flex-col items-center justify-center bg-theme-surface/80 backdrop-blur-sm">
-                <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+            <div id="loading" x-data @htmx:after-settle.window="$el.classList.remove('initial-loading')" class="htmx-indicator initial-loading absolute inset-0 z-50 flex flex-col items-center justify-center bg-base-100/80 backdrop-blur-sm">
+                <span class="loading loading-spinner loading-lg text-primary"></span>
             </div>
             
             <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load" hx-indicator="#loading">
@@ -206,9 +189,9 @@
                 document.querySelectorAll('th[data-sort]').forEach(th => {
                     const icon = th.querySelector('.sort-icon');
                     if(icon) icon.innerHTML = '';
-                    th.classList.remove('text-indigo-400');
+                    th.classList.remove('text-primary');
                     if (th.dataset.sort === currentSortCol) {
-                        th.classList.add('text-indigo-400');
+                        th.classList.add('text-primary');
                         if(icon) {
                             icon.innerHTML = currentSortOrder === 'asc' ? '▲' : '▼';
                         }
