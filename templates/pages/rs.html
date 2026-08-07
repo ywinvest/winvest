@@ -171,8 +171,9 @@
                     { value: '10000', label: '1조 이상' }
                 ],
                 init() {
-                    // Set default selected for market and marcap
+                    // Set default selected for market
                     this.filters.market = ['ALL'];
+                    // 기본적으로 2천억 이상 필터 적용
                     this.filters.marcap = ['2000'];
                     window.alpineFilters = this.filters;
                     
@@ -361,7 +362,10 @@
                 const fragment = document.createDocumentFragment();
                 const rowsToRender = filteredRows.slice(0, currentPage * PAGE_SIZE);
                 
-                rowsToRender.forEach(row => fragment.appendChild(row));
+                rowsToRender.forEach(row => {
+                    // cloneNode ensures we don't remove the original row from template.content
+                    fragment.appendChild(row.cloneNode(true));
+                });
                 tbody.appendChild(fragment);
 
                 setupObserver(tbody);
@@ -379,7 +383,9 @@
                 const endIndex = currentPage * PAGE_SIZE;
                 
                 const rowsToRender = filteredRows.slice(startIndex, endIndex);
-                rowsToRender.forEach(row => fragment.appendChild(row));
+                rowsToRender.forEach(row => {
+                    fragment.appendChild(row.cloneNode(true));
+                });
                 
                 tbody.appendChild(fragment);
                 setupObserver(tbody);
