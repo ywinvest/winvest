@@ -1,58 +1,251 @@
 {% extends "base.html" %}
 {% block title %}종목 (RS) - stockspace{% endblock %}
 {% block content %}
+    <style>
+        /* 확실한 Sticky 고정을 위한 강제 CSS */
+        #sticky-header-block {
+            position: -webkit-sticky !important;
+            position: sticky !important;
+            top: 64px !important; /* Navbar 높이 4rem(64px) 바로 아래 */
+            z-index: 30 !important;
+        }
+        
+        .table-pin-rows thead th,
+        .table-pin-rows thead tr th {
+            position: -webkit-sticky !important;
+            position: sticky !important;
+            top: calc(64px + var(--sticky-header-height, 60px)) !important;
+            z-index: 20 !important;
+            background-color: var(--color-base-100, #1d232a) !important;
+        }
+        
+        /* 스크롤바 숨김 (가로 스크롤 필터용) */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="flex justify-end items-center mb-6">
-            <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                <!-- Date Filter (HTMX) -->
-                <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" class="input w-full sm:w-auto">
-
-                <!-- Market Filter (Client-side) -->
-                <select id="marketFilter" class="select w-full sm:w-auto">
-                    <option value="">전체 시장</option>
-                    <option value="KOSPI">KOSPI</option>
-                    <option value="KOSDAQ">KOSDAQ</option>
-                </select>
-                
-                <!-- Marcap Filter (Client-side) -->
-                <select id="marcapFilter" class="select w-full sm:w-auto">
-                    <option value="">시가총액 전체</option>
-                    <option value="2000" selected>2천억 이상</option>
-                    <option value="5000">5천억 이상</option>
-                    <option value="10000">1조 이상</option>
-                </select>
-
-                <!-- Search Input (Client-side) -->
-                <label class="input w-full sm:w-64">
-                    <input type="text" id="searchInput" placeholder="종목명/코드 검색..." class="grow">
-                    <svg class="w-4 h-4 opacity-50" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-                    </svg>
-                </label>
-            </div>
-        </div>
-
-        <!-- Data Table Container (HTMX Target) -->
-        <div class="card glass rounded-xl shadow-2xl overflow-hidden fade-in relative min-h-[300px]">
-            <!-- Loading Indicator -->
-            <div id="loading" x-data @htmx:after-settle.window="$el.classList.remove('initial-loading')" class="htmx-indicator initial-loading absolute inset-0 z-50 flex flex-col items-center justify-center bg-base-100/80 backdrop-blur-sm">
-                <span class="loading loading-spinner loading-lg text-primary"></span>
-            </div>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 !overflow-visible">
+        
+        <div class="card bg-base-100 border border-base-200 rounded-xl shadow-2xl relative min-h-[300px] !overflow-visible">
             
-            <div class="table-container" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load" hx-indicator="#loading">
-                <!-- 테이블이 여기에 렌더링됩니다 -->
+            <!-- Sticky Header Block -->
+            <div id="sticky-header-block" class="z-30 bg-base-100 rounded-t-xl shadow-sm transition-all" x-data="facetFilters()">
+                <div class="pt-4 sm:pt-6 pb-2 px-4 sm:px-6">
+                    
+
+                    
+                    <!-- 1. Active Chips Area & Stock Count -->
+                    <div class="flex justify-between items-end mb-3 min-h-[32px]">
+                        <div x-show="activeChips.length > 0" x-cloak class="flex flex-wrap gap-2">
+                            <template x-for="chip in activeChips" :key="chip.category + chip.value">
+                                <div class="badge badge-primary gap-1 p-3 cursor-pointer hover:badge-error transition-colors font-medium shadow-sm" @click="removeFilter(chip.category, chip.value)">
+                                    <span x-text="chip.label"></span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block h-4 w-4 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div class="text-[13px] text-base-content/50 ml-auto pb-0.5 shrink-0 whitespace-nowrap pl-4">
+                            총 <span id="stockCount" class="font-bold text-base-content">-</span> 종목
+                        </div>
+                    </div>
+
+                    <!-- 2. Horizontally scrollable wrapper -->
+                    <div class="flex flex-row items-center gap-3 overflow-x-auto pb-2 scrollbar-hide w-full whitespace-nowrap">
+                        
+                        <!-- Search Input (Client-side) -->
+                        <div x-data="{ focused: false, val: '' }" 
+                             class="shrink-0 transition-all duration-300 ease-out"
+                             :class="(focused || val.length > 0) ? 'w-56 sm:w-64' : 'w-12'">
+                            <label class="input input-bordered w-full bg-base-200 shadow-sm flex items-center p-0 cursor-text overflow-hidden transition-colors duration-300"
+                                   :class="(focused || val.length > 0) ? 'border-primary' : 'hover:bg-base-300'">
+                                
+                                <div class="flex-none w-12 h-12 flex items-center justify-center cursor-pointer text-base-content/50 transition-colors"
+                                     :class="(focused || val.length > 0) ? 'text-primary' : ''"
+                                     @click="$refs.searchInput.focus()">
+                                    <svg class="w-5 h-5 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                                    </svg>
+                                </div>
+                                
+                                <input x-ref="searchInput"
+                                       type="text" 
+                                       id="searchInput" 
+                                       x-model="val"
+                                       @focus="focused = true"
+                                       @blur="focused = false"
+                                       placeholder="종목명/코드 검색..." 
+                                       class="grow outline-none bg-transparent h-full placeholder:text-base-content/40 transition-opacity duration-300"
+                                       :class="(focused || val.length > 0) ? 'opacity-100 pr-4' : 'opacity-0 w-0'">
+                            </label>
+                        </div>
+                        
+                        <!-- Date Filter (HTMX) -->
+                        <div class="shrink-0 w-[145px]">
+                            <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" onclick="try{this.showPicker();}catch(e){}" class="input input-bordered w-full bg-base-200 shadow-sm text-sm tracking-tighter px-2 cursor-pointer relative">
+                        </div>
+
+                        <!-- Market Filter Button -->
+                        <div class="shrink-0">
+                            <button class="btn btn-outline bg-base-200 shadow-sm" :class="{ 'border-primary text-primary': openMenu === 'market' }" @click="toggleMenu('market')">
+                                시장
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': openMenu === 'market' }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Marcap Filter Button -->
+                        <div class="shrink-0">
+                            <button class="btn btn-outline bg-base-200 shadow-sm" :class="{ 'border-primary text-primary': openMenu === 'marcap' }" @click="toggleMenu('marcap')">
+                                시가총액
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': openMenu === 'marcap' }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 3. Expandable Filter Panels -->
+                    <div x-show="openMenu" x-cloak 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="mt-1 p-3 bg-base-200/50 rounded-lg border border-base-200 flex flex-wrap gap-2">
+                         
+                        <template x-if="openMenu === 'market'">
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="opt in marketOptions" :key="opt.value">
+                                    <button class="btn btn-sm rounded-full" :class="filters.market.includes(opt.value) ? 'btn-primary' : 'btn-ghost border border-base-300 bg-base-100'" @click="toggleFilter('market', opt.value)" x-text="opt.label"></button>
+                                </template>
+                            </div>
+                        </template>
+                        
+                        <template x-if="openMenu === 'marcap'">
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="opt in marcapOptions" :key="opt.value">
+                                    <button class="btn btn-sm rounded-full" :class="filters.marcap.includes(opt.value) ? 'btn-primary' : 'btn-ghost border border-base-300 bg-base-100'" @click="toggleFilter('marcap', opt.value)" x-text="opt.label"></button>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+
+            </div>
+            <!-- Table and Loading Wrapper -->
+            <div class="relative min-h-[200px]">
+                <!-- Loading Indicator -->
+                <div id="loading" x-data @htmx:after-settle.window="$el.classList.remove('initial-loading')" class="htmx-indicator initial-loading absolute inset-0 z-50 flex flex-col items-center justify-start pt-32 bg-base-100/80 backdrop-blur-sm rounded-b-xl">
+                    <span class="loading loading-spinner loading-lg text-primary"></span>
+                </div>
+                
+                <div class="w-full" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load" hx-indicator="#loading">
+                    <!-- 테이블이 여기에 렌더링됩니다 -->
+                </div>
             </div>
         </div>
     </main>
 
 
+    <!-- Facet Filter State (Alpine) -->
+    <script>
+        window.alpineFilters = { market: [], marcap: [] };
+        
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('facetFilters', () => ({
+                openMenu: null,
+                filters: {
+                    market: [],
+                    marcap: []
+                },
+                marketOptions: [
+                    { value: 'ALL', label: '전체 시장' },
+                    { value: 'KOSPI', label: 'KOSPI' },
+                    { value: 'KOSDAQ', label: 'KOSDAQ' }
+                ],
+                marcapOptions: [
+                    { value: '2000', label: '2천억 이상' },
+                    { value: '5000', label: '5천억 이상' },
+                    { value: '10000', label: '1조 이상' }
+                ],
+                init() {
+                    // Set default selected for market and marcap
+                    this.filters.market = ['ALL'];
+                    this.filters.marcap = ['2000'];
+                    window.alpineFilters = this.filters;
+                    
+                    this.$watch('filters', (val) => {
+                        window.alpineFilters = val;
+                        window.dispatchEvent(new CustomEvent('alpine-filters-updated'));
+                    }, { deep: true });
+                },
+                toggleMenu(menu) {
+                    this.openMenu = this.openMenu === menu ? null : menu;
+                },
+                toggleFilter(category, value) {
+                    if (category === 'marcap') {
+                        // 시가총액은 단일 선택(Single Select)
+                        if (this.filters.marcap.includes(value)) {
+                            this.filters.marcap = [];
+                        } else {
+                            this.filters.marcap = [value];
+                        }
+                    } else {
+                        // 시장 필터 다중 선택 (ALL 로직 포함)
+                        if (value === 'ALL') {
+                            this.filters.market = ['ALL'];
+                        } else {
+                            // 전체 시장 칩이 켜져 있으면 제거
+                            const allIdx = this.filters.market.indexOf('ALL');
+                            if (allIdx !== -1) {
+                                this.filters.market.splice(allIdx, 1);
+                            }
+                            
+                            const idx = this.filters[category].indexOf(value);
+                            if (idx === -1) {
+                                this.filters[category].push(value);
+                            } else {
+                                this.filters[category].splice(idx, 1);
+                            }
+                            
+                            // 만약 다 껐으면 전체 시장으로 복귀
+                            if (this.filters.market.length === 0) {
+                                this.filters.market = ['ALL'];
+                            }
+                        }
+                    }
+                },
+                removeFilter(category, value) {
+                    const idx = this.filters[category].indexOf(value);
+                    if (idx !== -1) {
+                        this.filters[category].splice(idx, 1);
+                    }
+                    if (category === 'market' && this.filters.market.length === 0) {
+                        this.filters.market = ['ALL'];
+                    }
+                },
+                get activeChips() {
+                    let chips = [];
+                    this.filters.market.forEach(val => {
+                        const opt = this.marketOptions.find(o => o.value === val);
+                        if(opt) chips.push({ category: 'market', value: val, label: opt.label });
+                    });
+                    this.filters.marcap.forEach(val => {
+                        const opt = this.marcapOptions.find(o => o.value === val);
+                        if(opt) chips.push({ category: 'marcap', value: val, label: opt.label });
+                    });
+                    return chips;
+                }
+            }));
+        });
+    </script>
+
     <!-- Client-side filtering and sorting script -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
-            const marketFilter = document.getElementById('marketFilter');
-            const marcapFilter = document.getElementById('marcapFilter');
             const dateInput = document.querySelector('input[type="date"][name="date"]');
             
             // Check if backend provided a date via query param, otherwise use local today
@@ -90,8 +283,17 @@
 
             function applyFiltersAndSort() {
                 const search = searchInput.value.toLowerCase();
-                const market = marketFilter.value;
-                const minMarcap = marcapFilter.value ? parseInt(marcapFilter.value) * 100000000 : 0;
+                
+                // Read from Alpine state
+                const activeMarkets = window.alpineFilters.market || [];
+                const activeMarcaps = window.alpineFilters.marcap || [];
+                
+                // For market cap, we find the minimum selected threshold
+                let minMarcap = 0;
+                if (activeMarcaps.length > 0) {
+                    const thresholds = activeMarcaps.map(v => parseInt(v) * 100000000);
+                    minMarcap = Math.min(...thresholds);
+                }
 
                 // Filtering
                 filteredRows = allRows.filter(row => {
@@ -101,8 +303,11 @@
                     const rowMarcap = parseFloat(row.dataset.marcap) || 0;
 
                     const matchSearch = rowName.includes(search) || rowCode.includes(search);
-                    // startsWith allows "KOSDAQ GLOBAL" to match when "KOSDAQ" is selected
-                    const matchMarket = market === "" || rowMarket.startsWith(market);
+                    
+                    // Match market: if ALL selected, show all. Else, must start with one of the selected markets.
+                    const matchMarket = activeMarkets.includes('ALL') || activeMarkets.some(m => rowMarket.startsWith(m));
+                    
+                    // Match marcap
                     const matchMarcap = minMarcap === 0 || rowMarcap >= minMarcap;
 
                     return matchSearch && matchMarket && matchMarcap;
@@ -141,6 +346,17 @@
                 if (!tbody) return;
                 
                 tbody.innerHTML = '';
+                
+                if (filteredRows.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="12" class="text-center py-20">
+                                <p class="text-base-content/50">조건에 맞는 종목이 없습니다.</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
                 
                 const fragment = document.createDocumentFragment();
                 const rowsToRender = filteredRows.slice(0, currentPage * PAGE_SIZE);
@@ -201,8 +417,7 @@
 
             // Event Listeners for Filters
             searchInput.addEventListener('input', applyFiltersAndSort);
-            marketFilter.addEventListener('change', applyFiltersAndSort);
-            marcapFilter.addEventListener('change', applyFiltersAndSort);
+            window.addEventListener('alpine-filters-updated', applyFiltersAndSort);
 
             // HTMX Load event (when table is rendered)
             document.body.addEventListener('htmx:afterSwap', function(evt) {
@@ -211,6 +426,8 @@
                     const template = document.getElementById('all-rows-template');
                     if (template) {
                         allRows = Array.from(template.content.querySelectorAll('tr.stock-row'));
+                    } else {
+                        allRows = [];
                     }
 
                     // Attach click events to new headers
@@ -231,8 +448,25 @@
                     currentSortCol = 'rs_rank';
                     currentSortOrder = 'asc';
                     applyFiltersAndSort();
+                    
+                    // Sync date input with actual data date
+                    const actualDateEl = document.getElementById('actual-rendered-date');
+                    if (actualDateEl && actualDateEl.value) {
+                        const dateInput = document.querySelector('input[name="date"]');
+                        if (dateInput) dateInput.value = actualDateEl.value;
+                    }
                 }
             });
+            // Sticky header observer for table headers
+            const stickyHeader = document.getElementById('sticky-header-block');
+            if (stickyHeader) {
+                const resizeObserver = new ResizeObserver(entries => {
+                    for (let entry of entries) {
+                        document.documentElement.style.setProperty('--sticky-header-height', entry.target.offsetHeight + 'px');
+                    }
+                });
+                resizeObserver.observe(stickyHeader);
+            }
         });
     </script>
 {% endblock %}
