@@ -161,7 +161,6 @@
                     marcap: []
                 },
                 marketOptions: [
-                    { value: 'ALL', label: '전체 시장' },
                     { value: 'KOSPI', label: 'KOSPI' },
                     { value: 'KOSDAQ', label: 'KOSDAQ' }
                 ],
@@ -171,8 +170,8 @@
                     { value: '10000', label: '1조 이상' }
                 ],
                 init() {
-                    // Set default selected for market
-                    this.filters.market = ['ALL'];
+                    // Set default selected for market (empty means all markets)
+                    this.filters.market = [];
                     // 기본적으로 2천억 이상 필터 적용
                     this.filters.marcap = ['2000'];
                     window.alpineFilters = this.filters;
@@ -186,45 +185,16 @@
                     this.openMenu = this.openMenu === menu ? null : menu;
                 },
                 toggleFilter(category, value) {
-                    if (category === 'marcap') {
-                        // 시가총액은 단일 선택(Single Select)
-                        if (this.filters.marcap.includes(value)) {
-                            this.filters.marcap = [];
-                        } else {
-                            this.filters.marcap = [value];
-                        }
+                    if (this.filters[category].includes(value)) {
+                        this.filters[category] = [];
                     } else {
-                        // 시장 필터 다중 선택 (ALL 로직 포함)
-                        if (value === 'ALL') {
-                            this.filters.market = ['ALL'];
-                        } else {
-                            // 전체 시장 칩이 켜져 있으면 제거
-                            const allIdx = this.filters.market.indexOf('ALL');
-                            if (allIdx !== -1) {
-                                this.filters.market.splice(allIdx, 1);
-                            }
-                            
-                            const idx = this.filters[category].indexOf(value);
-                            if (idx === -1) {
-                                this.filters[category].push(value);
-                            } else {
-                                this.filters[category].splice(idx, 1);
-                            }
-                            
-                            // 만약 다 껐으면 전체 시장으로 복귀
-                            if (this.filters.market.length === 0) {
-                                this.filters.market = ['ALL'];
-                            }
-                        }
+                        this.filters[category] = [value];
                     }
                 },
                 removeFilter(category, value) {
                     const idx = this.filters[category].indexOf(value);
                     if (idx !== -1) {
                         this.filters[category].splice(idx, 1);
-                    }
-                    if (category === 'market' && this.filters.market.length === 0) {
-                        this.filters.market = ['ALL'];
                     }
                 },
                 get activeChips() {
@@ -305,8 +275,8 @@
 
                     const matchSearch = rowName.includes(search) || rowCode.includes(search);
                     
-                    // Match market: if ALL selected, show all. Else, must start with one of the selected markets.
-                    const matchMarket = activeMarkets.includes('ALL') || activeMarkets.some(m => rowMarket.startsWith(m));
+                    // Match market: if empty, show all. Else, must start with one of the selected markets.
+                    const matchMarket = activeMarkets.length === 0 || activeMarkets.some(m => rowMarket.startsWith(m));
                     
                     // Match marcap
                     const matchMarcap = minMarcap === 0 || rowMarcap >= minMarcap;
