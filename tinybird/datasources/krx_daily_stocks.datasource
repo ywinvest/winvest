@@ -1,0 +1,20 @@
+SCHEMA >
+    date Date,
+    code String,
+    name String,
+    market String,
+    open Int32,
+    high Int32,
+    low Int32,
+    close Int32,
+    volume Int64,
+    amount Int64,
+    changes Int32,
+    changes_ratio Float32,
+    marcap Int64,
+    stocks Int64,
+    rank Int32
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYYYY(date)"
+ENGINE_SORTING_KEY "date, code"
