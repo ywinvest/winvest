@@ -46,7 +46,7 @@
 <template id="all-rows-template">
     {% for stock in stocks %}
     <tr class="stock-row hover transition-colors group cursor-pointer" data-rs_rank="{{ stock.rs_rank }}" data-close="{{ stock.close }}"
-        data-name="{{ stock.name|lower }}" data-code="{{ stock.code|lower }}" data-market="{{ stock.market }}"
+        data-name="{{ stock.name }}" data-code="{{ stock.code }}" data-market="{{ stock.market }}"
         data-changes_ratio="{{ stock.changes_ratio }}" data-marcap="{{ stock.marcap }}"
         data-amount="{{ stock.amount or 0 }}" data-rs="{{ stock.rs }}" data-rs_1m="{{ stock.rs_1m }}"
         data-rs_3m="{{ stock.rs_3m }}" data-rs_6m="{{ stock.rs_6m }}" data-rs_12m="{{ stock.rs_12m }}">

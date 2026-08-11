@@ -28,8 +28,12 @@
             scrollbar-width: none;
         }
     </style>
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 !overflow-visible">
+    <!-- Drawer Structure -->
+    <div class="drawer drawer-end responsive-drawer" x-data="stockDrawer()" @open-stock-drawer.window="openDrawer($event.detail)" @keydown.escape.window="isOpen = false">
+        <input id="stock-detail-drawer" type="checkbox" class="drawer-toggle" x-model="isOpen" />
+        <div class="drawer-content">
+            <!-- Main Content -->
+            <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 !overflow-visible">
         
         <div class="card bg-base-100 border border-base-200 rounded-xl shadow-2xl relative min-h-[300px] !overflow-visible">
             
@@ -147,13 +151,53 @@
             </div>
         </div>
     </main>
+        </div>
+        
+        {% include 'partials/rs_drawer.html' %}
+    </div>
 
-
-    <!-- Facet Filter State (Alpine) -->
+    <!-- Facet Filter & Drawer State (Alpine) -->
     <script>
         window.alpineFilters = { market: [], marcap: [] };
         
         document.addEventListener('alpine:init', () => {
+            Alpine.data('stockDrawer', () => ({
+                isOpen: false,
+                stockData: {},
+                openDrawer(data) {
+                    this.stockData = data;
+                    this.isOpen = true;
+                },
+                formatNumber(val) {
+                    if (!val && val !== 0) return '-';
+                    return Math.round(Number(val)).toLocaleString();
+                },
+                formatRatio(val) {
+                    if (!val && val !== 0) return '0.00';
+                    return Number(val).toFixed(2);
+                },
+                formatCap(val) {
+                    if (!val && val !== 0) return '-';
+                    return Math.round(Number(val) / 100000000).toLocaleString();
+                },
+                getRsBadgeClass(rs) {
+                    const val = Number(rs);
+                    if (isNaN(val)) return 'badge-neutral badge-outline opacity-50';
+                    if (val >= 90) return 'badge-success badge-outline border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]';
+                    if (val >= 70) return 'badge-success badge-outline';
+                    if (val <= 30) return 'badge-error badge-outline';
+                    return 'badge-neutral badge-outline opacity-50';
+                },
+                getRsLabel(rs) {
+                    const val = Number(rs);
+                    if (isNaN(val)) return '-';
+                    if (val >= 90) return '최상위';
+                    if (val >= 70) return '강세';
+                    if (val <= 30) return '약세';
+                    return '보통';
+                }
+            }));
+
             Alpine.data('facetFilters', () => ({
                 openMenu: null,
                 filters: {
@@ -394,6 +438,18 @@
             // Event Listeners for Filters
             searchInput.addEventListener('input', applyFiltersAndSort);
             window.addEventListener('alpine-filters-updated', applyFiltersAndSort);
+
+            // Add click listener for rows (Event Delegation)
+            const tableContainer = document.getElementById('rs-table-container');
+            if (tableContainer) {
+                tableContainer.addEventListener('click', (e) => {
+                    const row = e.target.closest('.stock-row');
+                    if (row) {
+                        const data = { ...row.dataset };
+                        window.dispatchEvent(new CustomEvent('open-stock-drawer', { detail: data }));
+                    }
+                });
+            }
 
             // HTMX Load event (when table is rendered)
             document.body.addEventListener('htmx:afterSwap', function(evt) {
