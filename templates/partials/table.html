@@ -12,30 +12,30 @@
 <table class="table table-zebra table-pin-rows w-full text-sm">
     <thead class="text-xs uppercase select-none">
         <tr>
-            <th scope="col" class="bg-base-100 hidden md:table-cell cursor-pointer hover:text-base-content w-16 text-primary" data-sort="rs_rank">순위 <span
+            <th scope="col" class="bg-base-100 hidden md:table-cell cursor-pointer hover:text-base-content w-16 text-primary" data-sort="rs_rank" hx-on:click="window.handleSort(this.dataset.sort)">순위 <span
                     class="sort-icon">▲</span></th>
-            <th scope="col" class="bg-base-100 cursor-pointer hover:text-base-content" data-sort="name">종목명 <span
+            <th scope="col" class="bg-base-100 cursor-pointer hover:text-base-content" data-sort="name" hx-on:click="window.handleSort(this.dataset.sort)">종목명 <span
                     class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-right cursor-pointer hover:text-base-content"
-                data-sort="close">현재가 <span class="sort-icon"></span></th>
+                data-sort="close" hx-on:click="window.handleSort(this.dataset.sort)">현재가 <span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 text-right cursor-pointer hover:text-base-content"
-                data-sort="changes_ratio">등락률(%) <span class="sort-icon"></span></th>
-            <th scope="col" class="bg-base-100 text-right cursor-pointer hover:text-base-content" data-sort="rs">
+                data-sort="changes_ratio" hx-on:click="window.handleSort(this.dataset.sort)">등락률(%) <span class="sort-icon"></span></th>
+            <th scope="col" class="bg-base-100 text-right cursor-pointer hover:text-base-content" data-sort="rs" hx-on:click="window.handleSort(this.dataset.sort)">
                 RS<span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-right text-base-content/60 cursor-pointer hover:text-base-content"
-                data-sort="rs_1m">RS_1M <span class="sort-icon"></span></th>
+                data-sort="rs_1m" hx-on:click="window.handleSort(this.dataset.sort)">RS_1M <span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-right text-base-content/60 cursor-pointer hover:text-base-content"
-                data-sort="rs_3m">RS_3M <span class="sort-icon"></span></th>
+                data-sort="rs_3m" hx-on:click="window.handleSort(this.dataset.sort)">RS_3M <span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-right text-base-content/60 cursor-pointer hover:text-base-content"
-                data-sort="rs_6m">RS_6M <span class="sort-icon"></span></th>
+                data-sort="rs_6m" hx-on:click="window.handleSort(this.dataset.sort)">RS_6M <span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-right text-base-content/60 cursor-pointer hover:text-base-content"
-                data-sort="rs_12m">RS_12M <span class="sort-icon"></span></th>
+                data-sort="rs_12m" hx-on:click="window.handleSort(this.dataset.sort)">RS_12M <span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-center cursor-pointer hover:text-base-content"
-                data-sort="market">시장 <span class="sort-icon"></span></th>
+                data-sort="market" hx-on:click="window.handleSort(this.dataset.sort)">시장 <span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-right cursor-pointer hover:text-base-content"
-                data-sort="marcap">시가총액(억) <span class="sort-icon"></span></th>
+                data-sort="marcap" hx-on:click="window.handleSort(this.dataset.sort)">시가총액(억) <span class="sort-icon"></span></th>
             <th scope="col" class="bg-base-100 hidden md:table-cell text-right cursor-pointer hover:text-base-content"
-                data-sort="amount">거래대금(억) <span class="sort-icon"></span></th>
+                data-sort="amount" hx-on:click="window.handleSort(this.dataset.sort)">거래대금(억) <span class="sort-icon"></span></th>
         </tr>
     </thead>
     <tbody id="rs-table-body">
