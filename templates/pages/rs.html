@@ -312,8 +312,8 @@
 
                 // Filtering
                 filteredRows = allRows.filter(row => {
-                    const rowName = row.dataset.name || "";
-                    const rowCode = row.dataset.code || "";
+                    const rowName = (row.dataset.name || "").toLowerCase();
+                    const rowCode = (row.dataset.code || "").toLowerCase();
                     const rowMarket = row.dataset.market || "";
                     const rowMarcap = parseFloat(row.dataset.marcap) || 0;
 
