@@ -99,85 +99,58 @@ def market_status(request: Request, session: Session = Depends(get_session)):
     # 2. Get the latest date in DB
     latest_date_result = None
     try:
-        print("Querying latest date")
-        latest_date_result = session.exec(
-            select(KrxDailyStockIndicator.date).order_by(KrxDailyStockIndicator.date.desc()).limit(1)
-        ).first()
+        from tinybird.client import tinybird
+        print("Querying latest date from Tinybird")
+        date_res = tinybird.latest_rs_date.query()
+        if date_res.get("data") and len(date_res["data"]) > 0:
+            latest_date_result = date_res["data"][0]["date"]
     except Exception as e:
-        print(f"Database query failed: {e}")
+        print(f"Tinybird query failed for latest date: {e}")
     
-    kospi_top_stock = None
-    kosdaq_top_stock = None
+    kospi_rs_top5_list = []
+    kosdaq_rs_top5_list = []
     
     if latest_date_result:
-        # KOSPI TOP 5 RS
-        kospi_rs_top5_list = []
-        statement = (
-            select(KrxDailyStock, KrxDailyStockIndicator)
-            .join(KrxDailyStockIndicator, (KrxDailyStock.code == KrxDailyStockIndicator.code) & (KrxDailyStock.date == KrxDailyStockIndicator.date))
-            .where(KrxDailyStockIndicator.date == latest_date_result)
-            .where(KrxDailyStock.market == 'KOSPI')
-            .where(KrxDailyStock.marcap >= 200_000_000_000)
-            .where(~KrxDailyStock.name.like('%스팩%'))
-            .where(~KrxDailyStock.code.regexp_match(r'.*[579KLMNO]$'))
-            .order_by(
-                KrxDailyStockIndicator.rs.desc(),
-                KrxDailyStockIndicator.rs_1m.desc(),
-                KrxDailyStockIndicator.rs_3m.desc(),
-                KrxDailyStockIndicator.rs_6m.desc(),
-                KrxDailyStockIndicator.rs_12m.desc()
-            )
-            .limit(5)
-        )
-        kospi_rs_top5 = session.exec(statement).all()
-        if kospi_rs_top5:
-            # find max by changes_ratio
-            best_kospi = max(kospi_rs_top5, key=lambda x: x[0].changes_ratio)
-            for row in kospi_rs_top5:
-                kospi_rs_top5_list.append({
-                    "name": row[0].name,
-                    "code": row[0].code,
-                    "close": row[0].close,
-                    "changes_ratio": row[0].changes_ratio,
-                    "marcap_formatted": format_market_cap(row[0].marcap),
-                    "amount_formatted": format_market_cap(row[0].amount),
-                    "rs": row[1].rs,
-                    "is_top_gainer": row == best_kospi
-                })
+        # KOSPI TOP 5 RS from Tinybird
+        try:
+            print("Querying KOSPI top 5 from Tinybird")
+            kospi_res = tinybird.top_rs_stocks.query({"target_date": latest_date_result, "market_name": "KOSPI"})
+            if kospi_res.get("data"):
+                # find max by changes_ratio
+                best_kospi = max(kospi_res["data"], key=lambda x: x["changes_ratio"])
+                for row in kospi_res["data"]:
+                    kospi_rs_top5_list.append({
+                        "name": row["name"],
+                        "code": row["code"],
+                        "close": row["close"],
+                        "changes_ratio": row["changes_ratio"],
+                        "marcap_formatted": format_market_cap(row["marcap"]),
+                        "amount_formatted": format_market_cap(row["amount"]),
+                        "rs": row["rs"],
+                        "is_top_gainer": row == best_kospi
+                    })
+        except Exception as e:
+            print(f"Tinybird query failed for KOSPI top 5: {e}")
             
-        # KOSDAQ TOP 5 RS
-        kosdaq_rs_top5_list = []
-        statement_kq = (
-            select(KrxDailyStock, KrxDailyStockIndicator)
-            .join(KrxDailyStockIndicator, (KrxDailyStock.code == KrxDailyStockIndicator.code) & (KrxDailyStock.date == KrxDailyStockIndicator.date))
-            .where(KrxDailyStockIndicator.date == latest_date_result)
-            .where(KrxDailyStock.market.like('%KOSDAQ%'))
-            .where(KrxDailyStock.marcap >= 200_000_000_000)
-            .where(~KrxDailyStock.name.like('%스팩%'))
-            .where(~KrxDailyStock.code.regexp_match(r'.*[579KLMNO]$'))
-            .order_by(
-                KrxDailyStockIndicator.rs.desc(),
-                KrxDailyStockIndicator.rs_1m.desc(),
-                KrxDailyStockIndicator.rs_3m.desc(),
-                KrxDailyStockIndicator.rs_6m.desc(),
-                KrxDailyStockIndicator.rs_12m.desc()
-            )
-            .limit(5)
-        )
-        kosdaq_rs_top5 = session.exec(statement_kq).all()
-        if kosdaq_rs_top5:
-            best_kosdaq = max(kosdaq_rs_top5, key=lambda x: x[0].changes_ratio)
-            for row in kosdaq_rs_top5:
-                kosdaq_rs_top5_list.append({
-                    "name": row[0].name,
-                    "code": row[0].code,
-                    "close": row[0].close,
-                    "changes_ratio": row[0].changes_ratio,
-                    "marcap_formatted": format_market_cap(row[0].marcap),
-                    "amount_formatted": format_market_cap(row[0].amount),
-                    "rs": row[1].rs,
-                    "is_top_gainer": row == best_kosdaq
-                })
+        # KOSDAQ TOP 5 RS from Tinybird
+        try:
+            print("Querying KOSDAQ top 5 from Tinybird")
+            kosdaq_res = tinybird.top_rs_stocks.query({"target_date": latest_date_result, "market_name": "KOSDAQ"})
+            if kosdaq_res.get("data"):
+                best_kosdaq = max(kosdaq_res["data"], key=lambda x: x["changes_ratio"])
+                for row in kosdaq_res["data"]:
+                    kosdaq_rs_top5_list.append({
+                        "name": row["name"],
+                        "code": row["code"],
+                        "close": row["close"],
+                        "changes_ratio": row["changes_ratio"],
+                        "marcap_formatted": format_market_cap(row["marcap"]),
+                        "amount_formatted": format_market_cap(row["amount"]),
+                        "rs": row["rs"],
+                        "is_top_gainer": row == best_kosdaq
+                    })
+        except Exception as e:
+            print(f"Tinybird query failed for KOSDAQ top 5: {e}")
 
     if not latest_date_result:
         latest_date_result = "2026-06-28 (Mock Data)"

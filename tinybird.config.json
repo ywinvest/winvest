@@ -1,0 +1,9 @@
+{
+  "dev_mode": "branch",
+  "include": [
+    "tinybird/tinybird_resources.py",
+    "tinybird/pipes/top_rs_stocks.py",
+    "tinybird/pipes/latest_rs_date.py",
+    "tinybird/pipes/all_rs_stocks.py"
+  ]
+}
