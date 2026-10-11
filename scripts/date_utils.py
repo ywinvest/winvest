@@ -41,3 +41,40 @@ def parse_target_date(date_str: str | None) -> str:
     if len(cleaned) == 8 and cleaned.isdigit():
         return datetime.strptime(cleaned, "%Y%m%d").strftime("%Y-%m-%d")
     return datetime.strptime(date_str.strip(), "%Y-%m-%d").strftime("%Y-%m-%d")
+
+
+def parse_date_or_year(
+    val: str | int | None,
+    is_end: bool = False,
+    default_year: int | None = None,
+) -> str:
+    """
+    Parse a date or year value into a normalized 'YYYY-MM-DD' string.
+    - None/empty:
+        - If is_end=True, defaults to today's date.
+        - If is_end=False, defaults to '{default_year or current_year}-01-01'.
+    - 4-digit year (e.g. '2024' or 2024):
+        - If is_end=True, returns 'YYYY-12-31'.
+        - If is_end=False, returns 'YYYY-01-01'.
+    - 8-digit date string (e.g. '20240101'):
+        - Returns 'YYYY-MM-DD'.
+    - Standard date string (e.g. '2024-01-01'):
+        - Returns 'YYYY-MM-DD'.
+    """
+    today = datetime.today()
+    if val is None or str(val).strip() == "":
+        if is_end:
+            return today.strftime("%Y-%m-%d")
+        year = default_year or today.year
+        return f"{year}-01-01"
+
+    cleaned = str(val).strip()
+    digits_only = cleaned.replace("-", "")
+
+    if len(digits_only) == 4 and digits_only.isdigit():
+        return f"{digits_only}-12-31" if is_end else f"{digits_only}-01-01"
+
+    if len(digits_only) == 8 and digits_only.isdigit():
+        return datetime.strptime(digits_only, "%Y%m%d").strftime("%Y-%m-%d")
+
+    return datetime.strptime(cleaned, "%Y-%m-%d").strftime("%Y-%m-%d")
