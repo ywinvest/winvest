@@ -1,4 +1,4 @@
-name: Daily Stock Update & RS Calculation
+name: Daily Stock Ingestion & RS Calculation
 
 on:
   schedule:
@@ -7,14 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: 'Target date (YYYYMMDD) for RS calculation. Leave empty for today.'
+        description: 'Target date (YYYYMMDD or YYYY-MM-DD). Leave empty for latest trading date.'
         required: false
         type: string
 
 jobs:
   run-daily-scripts:
     runs-on: ubuntu-latest
-    
+    env:
+      TINYBIRD_TOKEN: ${{ secrets.TINYBIRD_TOKEN }}
+      TINYBIRD_API_URL: ${{ vars.TINYBIRD_API_URL }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -30,54 +33,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-scripts.txt
 
-      - name: 1. Run Daily Stock Update (sync_krx_daily_stocks.py)
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+      - name: Set Target Date Option
         run: |
-          if [ -z "${{ github.event.inputs.date }}" ]; then
-            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            echo "DATE_OPT=--date ${{ github.event.inputs.date }}" >> $GITHUB_ENV
           else
-            TODAY="${{ github.event.inputs.date }}"
+            echo "DATE_OPT=" >> $GITHUB_ENV
           fi
-          python scripts/sync_krx_daily_stocks.py --date $TODAY
-          
-      - name: 2. Run Adjusted Stock Update (sync_krx_daily_adjusted_stocks.py)
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-        run: |
-          if [ -z "${{ github.event.inputs.date }}" ]; then
-            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
-          else
-            TODAY="${{ github.event.inputs.date }}"
-          fi
-          python scripts/sync_krx_daily_adjusted_stocks.py --date $TODAY
-        
-      - name: 3. Run Market Indices Update (sync_krx_daily_indices.py)
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-        run: |
-          if [ -z "${{ github.event.inputs.date }}" ]; then
-            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
-          else
-            TODAY="${{ github.event.inputs.date }}"
-          fi
-          python scripts/sync_krx_daily_indices.py --date $TODAY
 
-      - name: 4. Run RS Calculation (calculate_krx_daily_stock_indicators.py)
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+      - name: 1. Ingest Market Indices (ingest_daily_krx_indices.py)
         run: |
-          if [ -z "${{ github.event.inputs.date }}" ]; then
-            TODAY=$(TZ=Asia/Seoul date +%Y%m%d)
-          else
-            TODAY="${{ github.event.inputs.date }}"
-          fi
-          python scripts/calculate_krx_daily_stock_indicators.py --date $TODAY
+          python scripts/ingest_daily_krx_indices.py $DATE_OPT
+
+      - name: 2. Ingest KRX Stock Listing (ingest_daily_krx_stocks.py)
+        run: |
+          python scripts/ingest_daily_krx_stocks.py $DATE_OPT
+
+      - name: 3. Ingest Adjusted Stocks & Compute RS (ingest_daily_krx_adjusted_stocks.py)
+        run: |
+          python scripts/ingest_daily_krx_adjusted_stocks.py $DATE_OPT
+
+      - name: 4. Backfill Discrepant Adjusted Stocks (backfill_krx_adjusted_stocks.py)
+        run: |
+          python scripts/backfill_krx_adjusted_stocks.py $DATE_OPT

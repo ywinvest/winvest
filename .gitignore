@@ -271,3 +271,5 @@ check_*.py
 test_*.py
 .env
 krx_data.db
+.vscode/
+.tinyb

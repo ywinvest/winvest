@@ -30,6 +30,6 @@ tinybird = Tinybird({
         "all_rs_stocks": all_rs_stocks,
         "latest_market_indices": latest_market_indices,
     },
-    "base_url": os.getenv("TINYBIRD_API_URL", "https://api.tinybird.co"),
+    "base_url": (os.getenv("TINYBIRD_API_URL") or "https://api.ap-east-1.aws.tinybird.co").rstrip("/"),
     "token": os.getenv("TINYBIRD_TOKEN"),
 })
