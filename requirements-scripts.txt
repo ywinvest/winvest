@@ -1,8 +1,6 @@
 fastapi[standard]
 jinja2
 sqlmodel
-pyturso
-sqlalchemy-libsql
 python-dotenv
 yfinance
 pandas_ta
@@ -14,3 +12,4 @@ slack_sdk
 openpyxl
 pyarrow
 psycopg2-binary
+tinybird-sdk

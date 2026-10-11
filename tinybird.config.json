@@ -1,0 +1,8 @@
+{
+  "include": [
+    "tinybird/client.py"
+  ],
+  "token": "${TINYBIRD_TOKEN}",
+  "base_url": "${TINYBIRD_API_URL}",
+  "dev_mode": "branch"
+}

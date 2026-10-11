@@ -5,21 +5,13 @@ import models  # 테이블 레지스트리 등록을 위해 반드시 임포트
 
 load_dotenv()
 
-# Supabase (PostgreSQL) 연결 URL 우선 사용
+# Supabase (PostgreSQL) 연결 URL 사용
 db_url = os.getenv("DATABASE_URL")
 if not db_url:
-    # 하위 호환성을 위해 Turso URL 지원
-    turso_url = os.getenv("TURSO_DATABASE_URL")
-    if turso_url:
-        db_url = f"sqlite+{turso_url}/?secure=true"
-    else:
-        raise ValueError("DATABASE_URL 환경 변수가 설정되지 않았습니다.")
+    raise ValueError("DATABASE_URL 환경 변수가 설정되지 않았습니다.")
 
 connect_args = {}
-if "sqlite" in db_url:
-    turso_token = os.getenv("TURSO_AUTH_TOKEN")
-    connect_args = {'check_same_thread': False, 'auth_token': turso_token}
-elif "postgres" in db_url:
+if "postgres" in db_url:
     # Supabase default statement_timeout is very short. Increase to 5 minutes for massive analytics queries.
     connect_args = {"options": "-c statement_timeout=300000"}
 
