@@ -65,6 +65,27 @@ def delete_existing_records(
         sys.exit(1)
 
 
+def truncate_datasource(datasource_name: str) -> bool:
+    """Truncate all records from a Tinybird datasource."""
+    print(f"🧹 Truncating datasource: {datasource_name}...", flush=True)
+    headers = {"Authorization": f"Bearer {TINYBIRD_TOKEN}"}
+    try:
+        res = requests.post(
+            f"{TINYBIRD_API_URL}/v0/datasources/{datasource_name}/truncate",
+            headers=headers,
+            timeout=30,
+        )
+        if res.ok:
+            print(f"✅ Successfully truncated {datasource_name}.", flush=True)
+            return True
+        else:
+            print(f"❌ Failed to truncate {datasource_name} ({res.status_code}): {res.text}", flush=True)
+            sys.exit(1)
+    except Exception as e:
+        print(f"❌ Failed to truncate {datasource_name}: {e}", flush=True)
+        sys.exit(1)
+
+
 def upload_parquet_to_tinybird(
     datasource_name: str, df: pd.DataFrame, session: requests.Session | None = None
 ) -> bool:

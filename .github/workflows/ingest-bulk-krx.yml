@@ -1,0 +1,79 @@
+name: Ingest Bulk KRX Market Data & RS Reconciliation
+
+on:
+  schedule:
+    # Runs at 18:00 UTC on Friday (03:00 KST / 3:00 AM KST on Saturday)
+    - cron: '0 18 * * 5'
+  workflow_dispatch:
+    inputs:
+      start:
+        description: 'Start date or year (leave empty for full historical reload)'
+        required: false
+        type: string
+      end:
+        description: 'End date or year (leave empty for today)'
+        required: false
+        type: string
+      include_indices:
+        description: 'Ingest KRX market indices (KOSPI/KOSDAQ)'
+        required: false
+        type: boolean
+        default: true
+      include_stocks:
+        description: 'Ingest KRX stock listing & price history (marcap)'
+        required: false
+        type: boolean
+        default: true
+      include_adjusted_stocks:
+        description: 'Ingest adjusted stocks & calculate RS percentiles'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  run-bulk-ingest:
+    runs-on: ubuntu-latest
+    env:
+      TINYBIRD_TOKEN: ${{ secrets.TINYBIRD_TOKEN }}
+      TINYBIRD_API_URL: ${{ vars.TINYBIRD_API_URL }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-scripts.txt
+
+      - name: Configure Bulk Ingestion Options
+        run: |
+          OPTS=""
+          if [ -n "${{ github.event.inputs.start }}" ]; then
+            OPTS="$OPTS --start ${{ github.event.inputs.start }}"
+          fi
+          if [ -n "${{ github.event.inputs.end }}" ]; then
+            OPTS="$OPTS --end ${{ github.event.inputs.end }}"
+          fi
+          echo "INGEST_OPTS=$OPTS" >> $GITHUB_ENV
+
+      - name: 1. Bulk Ingest Market Indices (ingest_bulk_krx_indices.py)
+        if: ${{ github.event_name == 'schedule' || (github.event.inputs.include_indices != false && github.event.inputs.include_indices != 'false') }}
+        run: |
+          python scripts/ingest_bulk_krx_indices.py $INGEST_OPTS
+
+      - name: 2. Bulk Ingest KRX Stock Listing (ingest_bulk_krx_stocks.py)
+        if: ${{ github.event_name == 'schedule' || (github.event.inputs.include_stocks != false && github.event.inputs.include_stocks != 'false') }}
+        run: |
+          python scripts/ingest_bulk_krx_stocks.py $INGEST_OPTS
+
+      - name: 3. Bulk Ingest Adjusted Stocks & Recalculate RS (ingest_bulk_krx_adjusted_stocks.py)
+        if: ${{ github.event_name == 'schedule' || (github.event.inputs.include_adjusted_stocks != false && github.event.inputs.include_adjusted_stocks != 'false') }}
+        run: |
+          python scripts/ingest_bulk_krx_adjusted_stocks.py $INGEST_OPTS
