@@ -1,4 +1,4 @@
-name: Initial Load - KRX Daily Stocks (Raw)
+name: Reload Tinybird - KRX Daily Stocks (Raw)
 
 on:
   workflow_dispatch:
@@ -32,13 +32,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-scripts.txt
 
-      - name: Migrate KRX Daily Stocks
+      - name: Reload Tinybird KRX Daily Stocks
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          TINYBIRD_TOKEN: ${{ secrets.TINYBIRD_TOKEN }}
+          TINYBIRD_API_URL: ${{ vars.TINYBIRD_API_URL }}
         run: |
-          CMD="python scripts/migrate_krx_daily_stocks.py --start-year ${{ github.event.inputs.start_year }}"
+          CMD="python scripts/reload_tinybird_krx_daily_stocks.py --start-year ${{ github.event.inputs.start_year }}"
           if [ -n "${{ github.event.inputs.end_year }}" ]; then
             CMD="$CMD --end-year ${{ github.event.inputs.end_year }}"
           fi

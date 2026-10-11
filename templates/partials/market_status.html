@@ -7,17 +7,17 @@
         <!-- Header Row: Market Info -->
         <div class="relative z-20 flex items-center justify-start gap-2 md:gap-3 mb-2 md:mb-4 px-1 w-full">
             <!-- Market Badge -->
-            <div class="badge badge-lg glass gap-1.5 font-black tracking-widest text-base-content shadow-sm">
-                <div class="w-1.5 h-1.5 rounded-full {% if kospi.signal == 'green' %}bg-success shadow-[0_0_4px_oklch(var(--su)/0.8)]{% elif kospi.signal == 'yellow' %}bg-warning shadow-[0_0_4px_oklch(var(--wa)/0.8)]{% else %}bg-error shadow-[0_0_4px_oklch(var(--er)/0.8)]{% endif %}"></div>
+            <div class="badge badge-lg bg-base-100/80 backdrop-blur border border-base-200/80 gap-2.5 font-black tracking-widest text-base-content shadow-xs">
+                <span class="status status-md w-2.5 h-2.5 {% if kospi.signal == 'green' %}status-success shadow-[0_0_8px_oklch(var(--su)/0.9)]{% elif kospi.signal == 'yellow' %}status-warning shadow-[0_0_8px_oklch(var(--wa)/0.9)]{% else %}status-error shadow-[0_0_8px_oklch(var(--er)/0.9)]{% endif %}"></span>
                 코스피
             </div>
             
             <!-- Index & Ratio -->
-            <div class="flex items-center gap-1.5 md:gap-2">
+            <div class="flex items-baseline gap-1.5 md:gap-2">
                 <div class="text-sm md:text-base font-black text-base-content tabular-nums tracking-tight leading-none">
                     {{ "{:,.2f}".format(kospi.close) }}
                 </div>
-                <div class="text-sm md:text-base font-bold tabular-nums leading-none
+                <div class="text-xs md:text-sm font-bold tabular-nums leading-none
                     {% if kospi.change > 0 %} text-error
                     {% elif kospi.change < 0 %} text-info
                     {% else %} text-base-content/60 {% endif %}">
@@ -145,17 +145,17 @@
         <!-- Header Row: Market Info -->
         <div class="relative z-20 flex items-center justify-start gap-2 md:gap-3 mb-2 md:mb-4 px-1 w-full">
             <!-- Market Badge -->
-            <div class="badge badge-lg glass gap-1.5 font-black tracking-widest text-base-content shadow-sm">
-                <div class="w-1.5 h-1.5 rounded-full {% if kosdaq.signal == 'green' %}bg-success shadow-[0_0_4px_oklch(var(--su)/0.8)]{% elif kosdaq.signal == 'yellow' %}bg-warning shadow-[0_0_4px_oklch(var(--wa)/0.8)]{% else %}bg-error shadow-[0_0_4px_oklch(var(--er)/0.8)]{% endif %}"></div>
+            <div class="badge badge-lg bg-base-100/80 backdrop-blur border border-base-200/80 gap-2.5 font-black tracking-widest text-base-content shadow-xs">
+                <span class="status status-md w-2.5 h-2.5 {% if kosdaq.signal == 'green' %}status-success shadow-[0_0_8px_oklch(var(--su)/0.9)]{% elif kosdaq.signal == 'yellow' %}status-warning shadow-[0_0_8px_oklch(var(--wa)/0.9)]{% else %}status-error shadow-[0_0_8px_oklch(var(--er)/0.9)]{% endif %}"></span>
                 코스닥
             </div>
             
             <!-- Index & Ratio -->
-            <div class="flex items-center gap-1.5 md:gap-2">
+            <div class="flex items-baseline gap-1.5 md:gap-2">
                 <div class="text-sm md:text-base font-black text-base-content tabular-nums tracking-tight leading-none">
                     {{ "{:,.2f}".format(kosdaq.close) }}
                 </div>
-                <div class="text-sm md:text-base font-bold tabular-nums leading-none
+                <div class="text-xs md:text-sm font-bold tabular-nums leading-none
                     {% if kosdaq.change > 0 %} text-error
                     {% elif kosdaq.change < 0 %} text-info
                     {% else %} text-base-content/60 {% endif %}">

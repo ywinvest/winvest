@@ -3,15 +3,14 @@
 {% block title %}시장 상황 - stockspace{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
     <!-- HTMX Target Container -->
     <div hx-get="/api/market-status" hx-trigger="load" hx-indicator="#market-loading">
         <!-- Spinner -->
-        <div id="market-loading" class="htmx-indicator flex flex-col items-center justify-center py-20">
+        <div id="market-loading" class="htmx-indicator flex items-center justify-center py-20">
             <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
     </div>
 </div>
 {% endblock %}
+
