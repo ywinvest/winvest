@@ -18,12 +18,12 @@ on:
         description: 'Ingest KRX market indices (KOSPI/KOSDAQ)'
         required: false
         type: boolean
-        default: true
+        default: false
       include_stocks:
         description: 'Ingest KRX stock listing & price history (marcap)'
         required: false
         type: boolean
-        default: true
+        default: false
       include_adjusted_stocks:
         description: 'Ingest adjusted stocks & calculate RS percentiles'
         required: false
@@ -64,16 +64,16 @@ jobs:
           echo "INGEST_OPTS=$OPTS" >> $GITHUB_ENV
 
       - name: 1. Bulk Ingest Market Indices (ingest_bulk_krx_indices.py)
-        if: ${{ github.event_name == 'schedule' || (github.event.inputs.include_indices != false && github.event.inputs.include_indices != 'false') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.include_indices == true || github.event.inputs.include_indices == 'true') }}
         run: |
           python scripts/ingest_bulk_krx_indices.py $INGEST_OPTS
 
       - name: 2. Bulk Ingest KRX Stock Listing (ingest_bulk_krx_stocks.py)
-        if: ${{ github.event_name == 'schedule' || (github.event.inputs.include_stocks != false && github.event.inputs.include_stocks != 'false') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.include_stocks == true || github.event.inputs.include_stocks == 'true') }}
         run: |
           python scripts/ingest_bulk_krx_stocks.py $INGEST_OPTS
 
       - name: 3. Bulk Ingest Adjusted Stocks & Recalculate RS (ingest_bulk_krx_adjusted_stocks.py)
-        if: ${{ github.event_name == 'schedule' || (github.event.inputs.include_adjusted_stocks != false && github.event.inputs.include_adjusted_stocks != 'false') }}
+        if: ${{ github.event_name == 'schedule' || (github.event.inputs.include_adjusted_stocks == true || github.event.inputs.include_adjusted_stocks == 'true') }}
         run: |
           python scripts/ingest_bulk_krx_adjusted_stocks.py $INGEST_OPTS
