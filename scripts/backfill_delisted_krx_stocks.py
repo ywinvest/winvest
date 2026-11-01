@@ -9,8 +9,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import time
 from sqlmodel import Session, select
-from db import engine
-from models import KrxDailyStock
+from app.core.db import engine
+from app.models import KrxDailyStock
 
 def backfill_delisted_stocks(start_date: str, end_date: str):
     print("=" * 60)

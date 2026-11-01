@@ -91,7 +91,7 @@
                         
                         <!-- Date Filter (HTMX) -->
                         <div class="shrink-0 w-[145px]">
-                            <input type="date" name="date" hx-get="/api/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" onclick="try{this.showPicker();}catch(e){}" class="input input-bordered w-full bg-base-200 shadow-sm text-sm tracking-tighter px-2 cursor-pointer relative">
+                            <input type="date" name="date" hx-get="/api/stock/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" onclick="try{this.showPicker();}catch(e){}" class="input input-bordered w-full bg-base-200 shadow-sm text-sm tracking-tighter px-2 cursor-pointer relative">
                         </div>
 
                         <!-- Market Filter Button -->
@@ -145,7 +145,7 @@
                     <span class="loading loading-spinner loading-lg text-primary"></span>
                 </div>
                 
-                <div class="w-full" id="rs-table-container" hx-get="/api/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load" hx-indicator="#loading">
+                <div class="w-full" id="rs-table-container" hx-get="/api/stock/rs-table{{ '?date=' + date if date else '' }}" hx-trigger="load" hx-indicator="#loading">
                     <!-- 테이블이 여기에 렌더링됩니다 -->
                 </div>
             </div>

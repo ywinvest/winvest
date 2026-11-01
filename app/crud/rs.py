@@ -1,17 +1,14 @@
-# No SQLAlchemy imports needed since we use Tinybird
+from tinybird.client import tinybird
 
-def get_rs_table_data(
-    date_str: str = None
-) -> list[dict]:
+
+def get_rs_table_data(date_str: str | None = None) -> list[dict]:
     """
-    RS 데이터를 DB에서 조회하고 템플릿 렌더링에 맞게 반환합니다.
+    RS 데이터를 Tinybird에서 조회하고 템플릿 렌더링에 맞게 반환합니다.
     """
-    # Tinybird에서 최신 날짜 가져오기
     if date_str:
         target_date = date_str
     else:
         try:
-            from tinybird.client import tinybird
             date_res = tinybird.latest_rs_date.query()
             if date_res.get("data") and len(date_res["data"]) > 0:
                 target_date = date_res["data"][0]["date"]
@@ -22,13 +19,11 @@ def get_rs_table_data(
             return []
 
     try:
-        from tinybird.client import tinybird
-        # Tinybird에서 전체 RS 데이터 가져오기
         res = tinybird.all_rs_stocks.query({"target_date": target_date})
-        
+
         if not res.get("data"):
             return []
-            
+
         stocks = []
         for idx, row in enumerate(res["data"], start=1):
             stocks.append({
@@ -52,3 +47,4 @@ def get_rs_table_data(
     except Exception as e:
         print(f"Tinybird query failed for all_rs_stocks: {e}")
         return []
+

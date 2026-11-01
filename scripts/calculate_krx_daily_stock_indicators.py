@@ -11,7 +11,7 @@ from psycopg2.extras import execute_values
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import rs
-from db import engine
+from app.core.db import engine
 
 def fetch_historical_prices(start_date_str: str, target_date_str: str) -> pd.DataFrame:
     """Fetch historical adjusted close prices from DB."""

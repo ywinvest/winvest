@@ -1,6 +1,6 @@
-from typing import Optional
 from sqlmodel import Field, SQLModel, Column
 from sqlalchemy import BigInteger
+
 
 class KrxDailyStock(SQLModel, table=True):
     __tablename__ = "krx_daily_stocks"
@@ -20,6 +20,7 @@ class KrxDailyStock(SQLModel, table=True):
     stocks: int = Field(sa_column=Column(BigInteger()))
     rank: int
 
+
 class KrxDailyAdjustedStock(SQLModel, table=True):
     __tablename__ = "krx_daily_adjusted_stocks"
     date: str = Field(primary_key=True)
@@ -31,6 +32,7 @@ class KrxDailyAdjustedStock(SQLModel, table=True):
     volume: int = Field(sa_column=Column(BigInteger()))
     change: float
 
+
 class KrxDailyStockIndicator(SQLModel, table=True):
     __tablename__ = "krx_daily_stock_indicators"
     date: str = Field(primary_key=True)
@@ -40,6 +42,7 @@ class KrxDailyStockIndicator(SQLModel, table=True):
     rs_3m: float
     rs_6m: float
     rs_12m: float
+
 
 class KrxDailyIndex(SQLModel, table=True):
     __tablename__ = "krx_daily_indices"
@@ -52,6 +55,7 @@ class KrxDailyIndex(SQLModel, table=True):
     volume: int = Field(sa_column=Column(BigInteger()))
     change: float
 
+
 class KrxDailyIndexIndicator(SQLModel, table=True):
     __tablename__ = "krx_daily_index_indicators"
     date: str = Field(primary_key=True)
@@ -63,3 +67,4 @@ class KrxDailyIndexIndicator(SQLModel, table=True):
     rsi: float
     adx: float
     di: bool
+
