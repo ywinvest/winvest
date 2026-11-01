@@ -7,3 +7,4 @@
 | [`tinybird-best-practices`](./tinybird-best-practices) | `tinybirdco/tinybird-agent-skills` | Downloaded | Tinybird file formats, SQL rules, optimization patterns, and best practices |
 | [`tinybird-python-sdk-guidelines`](./tinybird-python-sdk-guidelines) | `tinybirdco/tinybird-agent-skills` | Downloaded | Tinybird Python SDK guidelines for defining resources in Python |
 | [`clickhouse-best-practices`](./clickhouse-best-practices) | `ClickHouse/agent-skills` | Downloaded | Clickhouse official best practices for SQL and schema design |
+| [`create-agentsmd`](./create-agentsmd) | `github/awesome-copilot` | Curated repo (★ 40.6k) | Prompt and guidelines for generating a standardized, high-quality AGENTS.md file for the repository |

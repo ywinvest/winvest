@@ -11,8 +11,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlmodel import Session
 from sqlalchemy.dialects.postgresql import insert
-from db import engine
-from models import KrxDailyIndex, KrxDailyIndexIndicator
+from app.core.db import engine
+from app.models import KrxDailyIndex, KrxDailyIndexIndicator
 import market
 
 # SIGNAL_MAP is removed as it's now handled by the presentation layer

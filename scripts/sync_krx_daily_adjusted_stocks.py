@@ -15,8 +15,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlmodel import Session
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from db import engine
-from models import KrxDailyAdjustedStock
+from app.core.db import engine
+from app.models import KrxDailyAdjustedStock
 import FinanceDataReader as fdr
 
 db_semaphore = threading.Semaphore(10)

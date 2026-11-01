@@ -10,8 +10,8 @@ import FinanceDataReader as fdr
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import threading
-from db import engine
-from models import KrxDailyAdjustedStock
+from app.core.db import engine
+from app.models import KrxDailyAdjustedStock
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from psycopg2.extras import execute_values

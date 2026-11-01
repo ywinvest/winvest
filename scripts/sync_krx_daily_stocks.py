@@ -10,8 +10,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlmodel import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from db import engine
-from models import KrxDailyStock
+from app.core.db import engine
+from app.models import KrxDailyStock
 import FinanceDataReader as fdr
 
 def chunked_iterable(iterable, size):

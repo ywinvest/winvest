@@ -9,8 +9,8 @@ from sqlalchemy.dialects.postgresql import insert
 # Ensure parent directory is in sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from db import engine
-from models import KrxMarketStatus
+from app.core.db import engine
+from app.models import KrxMarketStatus
 import market
 
 SIGNAL_MAP = {

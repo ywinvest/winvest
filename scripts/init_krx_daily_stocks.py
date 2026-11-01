@@ -10,8 +10,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import time
 from sqlmodel import Session
 from sqlalchemy.dialects.sqlite import insert
-from db import engine
-from models import KrxDailyStock
+from app.core.db import engine
+from app.models import KrxDailyStock
 from constants import PRICE_LIMIT_EXPANSION_DATE
 
 def chunked_iterable(iterable, size):

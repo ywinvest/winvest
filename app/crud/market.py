@@ -1,19 +1,15 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 import market
 from tinybird.client import tinybird
 
-router = APIRouter()
-templates = Jinja2Templates(directory="templates")
-
 SIGNAL_MAP = {
-  "green": "양호🟢",
-  "yellow": "주의🟡",
-  "red": "경고🔴"
+    "green": "양호🟢",
+    "yellow": "주의🟡",
+    "red": "경고🔴",
 }
 
-def get_market_status(market_name: str):
+
+def get_market_status(market_name: str) -> dict:
+    """특정 시장(KOSPI/KOSDAQ)의 최신 지수 및 전일 대비 신호 변화를 계산합니다."""
     try:
         res = tinybird.latest_market_indices.query({"market_name": market_name, "limit": 2})
         data = res.get("data", [])
@@ -48,26 +44,49 @@ def get_market_status(market_name: str):
             "change": today_market["change"],
             "close": today_market["close"],
             "signal": today_signal_raw,
-            "signal_text": today_signal_text
+            "signal_text": today_signal_text,
         }
     except Exception as e:
         return {"status_msg": f"오류: {e}", "change": 0.0, "close": 0.0, "signal": "red", "signal_text": "실패"}
 
-def format_market_cap(marcap):
+
+def format_market_cap(marcap: int | float | None) -> str:
+    """시가총액/거래대금을 조·억 단위 문자열로 변환합니다."""
     if marcap is None or marcap == 0:
         return "정보없음"
     if marcap >= 1e12:
-        return f"{marcap/1e12:.1f}조"
-    else:
-        return f"{marcap/1e8:.0f}억"
+        return f"{marcap / 1e12:.1f}조"
+    return f"{marcap / 1e8:.0f}억"
 
-@router.get("/market-status", response_class=HTMLResponse)
-def market_status(request: Request):
-    # 1. KOSPI & KOSDAQ Status from Tinybird
+
+def _fetch_market_top5_rs(latest_date: str, market_name: str) -> list[dict]:
+    """특정 시장의 RS 상위 5개 종목을 조회하고 포맷팅합니다."""
+    items: list[dict] = []
+    try:
+        res = tinybird.top_rs_stocks.query({"target_date": latest_date, "market_name": market_name})
+        if res.get("data"):
+            best_row = max(res["data"], key=lambda x: x["changes_ratio"])
+            for row in res["data"]:
+                items.append({
+                    "name": row["name"],
+                    "code": row["code"],
+                    "close": row["close"],
+                    "changes_ratio": row["changes_ratio"],
+                    "marcap_formatted": format_market_cap(row["marcap"]),
+                    "amount_formatted": format_market_cap(row["amount"]),
+                    "rs": row["rs"],
+                    "is_top_gainer": row == best_row,
+                })
+    except Exception as e:
+        print(f"Tinybird query failed for {market_name} top 5: {e}")
+    return items
+
+
+def get_market_dashboard_data() -> dict:
+    """시장 대시보드(partials/market_status.html)에 필요한 전체 컨텍스트 데이터를 반환합니다."""
     kospi = get_market_status("KOSPI")
     kosdaq = get_market_status("KOSDAQ")
-    
-    # 2. Get the latest date from Tinybird
+
     latest_date_result = None
     try:
         date_res = tinybird.latest_rs_date.query()
@@ -75,53 +94,11 @@ def market_status(request: Request):
             latest_date_result = date_res["data"][0]["date"]
     except Exception as e:
         print(f"Tinybird query failed for latest date: {e}")
-    
-    kospi_rs_top5_list = []
-    kosdaq_rs_top5_list = []
-    
-    if latest_date_result:
-        # KOSPI TOP 5 RS from Tinybird
-        try:
-            print("Querying KOSPI top 5 from Tinybird")
-            kospi_res = tinybird.top_rs_stocks.query({"target_date": latest_date_result, "market_name": "KOSPI"})
-            if kospi_res.get("data"):
-                # find max by changes_ratio
-                best_kospi = max(kospi_res["data"], key=lambda x: x["changes_ratio"])
-                for row in kospi_res["data"]:
-                    kospi_rs_top5_list.append({
-                        "name": row["name"],
-                        "code": row["code"],
-                        "close": row["close"],
-                        "changes_ratio": row["changes_ratio"],
-                        "marcap_formatted": format_market_cap(row["marcap"]),
-                        "amount_formatted": format_market_cap(row["amount"]),
-                        "rs": row["rs"],
-                        "is_top_gainer": row == best_kospi
-                    })
-        except Exception as e:
-            print(f"Tinybird query failed for KOSPI top 5: {e}")
-            
-        # KOSDAQ TOP 5 RS from Tinybird
-        try:
-            print("Querying KOSDAQ top 5 from Tinybird")
-            kosdaq_res = tinybird.top_rs_stocks.query({"target_date": latest_date_result, "market_name": "KOSDAQ"})
-            if kosdaq_res.get("data"):
-                best_kosdaq = max(kosdaq_res["data"], key=lambda x: x["changes_ratio"])
-                for row in kosdaq_res["data"]:
-                    kosdaq_rs_top5_list.append({
-                        "name": row["name"],
-                        "code": row["code"],
-                        "close": row["close"],
-                        "changes_ratio": row["changes_ratio"],
-                        "marcap_formatted": format_market_cap(row["marcap"]),
-                        "amount_formatted": format_market_cap(row["amount"]),
-                        "rs": row["rs"],
-                        "is_top_gainer": row == best_kosdaq
-                    })
-        except Exception as e:
-            print(f"Tinybird query failed for KOSDAQ top 5: {e}")
 
-    if not latest_date_result:
+    if latest_date_result:
+        kospi_rs_top5_list = _fetch_market_top5_rs(latest_date_result, "KOSPI")
+        kosdaq_rs_top5_list = _fetch_market_top5_rs(latest_date_result, "KOSDAQ")
+    else:
         latest_date_result = "2026-06-28 (Mock Data)"
         kospi_rs_top5_list = [
             {"name": "삼성전자", "code": "005930", "close": 84500, "changes_ratio": 2.5, "marcap_formatted": "500조", "amount_formatted": "1.5조", "rs": 98.5, "is_top_gainer": False},
@@ -138,14 +115,11 @@ def market_status(request: Request):
             {"name": "엘앤에프", "code": "066970", "close": 150000, "changes_ratio": -0.5, "marcap_formatted": "8조", "amount_formatted": "1000억", "rs": 94.8, "is_top_gainer": False},
         ]
 
-    return templates.TemplateResponse(
-        request, 
-        "partials/market_status.html", 
-        {
-            "kospi": kospi, 
-            "kosdaq": kosdaq,
-            "kospi_rs_top5": kospi_rs_top5_list if 'kospi_rs_top5_list' in locals() else [],
-            "kosdaq_rs_top5": kosdaq_rs_top5_list if 'kosdaq_rs_top5_list' in locals() else [],
-            "latest_date": latest_date_result
-        }
-    )
+    return {
+        "kospi": kospi,
+        "kosdaq": kosdaq,
+        "kospi_rs_top5": kospi_rs_top5_list,
+        "kosdaq_rs_top5": kosdaq_rs_top5_list,
+        "latest_date": latest_date_result,
+    }
+
