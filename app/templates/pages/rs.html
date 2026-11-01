@@ -43,71 +43,79 @@
                     
 
                     
-                    <!-- 1. Active Chips Area & Stock Count -->
-                    <div class="flex justify-between items-end mb-3 min-h-[32px]">
-                        <div x-show="activeChips.length > 0" x-cloak class="flex flex-wrap gap-2">
-                            <template x-for="chip in activeChips" :key="chip.category + chip.value">
-                                <div class="badge badge-primary gap-1 p-3 cursor-pointer hover:badge-error transition-colors font-medium shadow-sm" @click="removeFilter(chip.category, chip.value)">
-                                    <span x-text="chip.label"></span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block h-4 w-4 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </div>
-                            </template>
-                        </div>
+                    <!-- Responsive Toolbar: Mobile 2 rows / Desktop 1 row -->
+                    <div class="flex flex-col md:flex-row md:items-center gap-2.5 w-full">
                         
-                        <div class="text-[13px] text-base-content/50 ml-auto pb-0.5 shrink-0 whitespace-nowrap pl-4">
-                            총 <span id="stockCount" class="font-bold text-base-content">-</span> 종목
-                        </div>
-                    </div>
+                        <!-- Row 1 (Mobile) / Left (Desktop): Tokenized Search Input with Selected Filter Chips Inside -->
+                        <div x-data="{ focused: false, val: '' }" class="w-full md:flex-1 min-w-0">
+                            <label class="input bg-base-200 w-full flex items-center gap-1.5 px-3 cursor-text shadow-sm overflow-x-auto scrollbar-hide transition-colors"
+                                   :class="focused ? 'border-primary' : 'hover:bg-base-300'">
+                                
+                                <!-- Search Icon -->
+                                <svg class="w-4 h-4 shrink-0 transition-colors"
+                                     :class="(focused || val.length > 0) ? 'text-primary' : 'text-base-content/50'"
+                                     aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                                </svg>
 
-                    <!-- 2. Horizontally scrollable wrapper -->
-                    <div class="flex flex-row items-center gap-3 overflow-x-auto pb-2 scrollbar-hide w-full whitespace-nowrap">
-                        
-                        <!-- Search Input (Client-side) -->
-                        <div x-data="{ focused: false, val: '' }" 
-                             class="shrink-0 transition-all duration-300 ease-out"
-                             :class="(focused || val.length > 0) ? 'w-56 sm:w-64' : 'w-12'">
-                            <label class="input input-bordered w-full bg-base-200 shadow-sm flex items-center p-0 cursor-text overflow-hidden transition-colors duration-300"
-                                   :class="(focused || val.length > 0) ? 'border-primary' : 'hover:bg-base-300'">
+                                <!-- Selected Filter Chips Inside Input -->
+                                <template x-for="chip in activeChips" :key="chip.category + chip.value">
+                                    <span class="badge badge-sm badge-primary gap-1 shrink-0 cursor-pointer hover:badge-error transition-colors font-medium select-none"
+                                          @click.prevent.stop="removeFilter(chip.category, chip.value)">
+                                        <span x-text="chip.label"></span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block h-3 w-3 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </span>
+                                </template>
                                 
-                                <div class="flex-none w-12 h-12 flex items-center justify-center cursor-pointer text-base-content/50 transition-colors"
-                                     :class="(focused || val.length > 0) ? 'text-primary' : ''"
-                                     @click="$refs.searchInput.focus()">
-                                    <svg class="w-5 h-5 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-                                    </svg>
-                                </div>
-                                
+                                <!-- Text Input -->
                                 <input x-ref="searchInput"
                                        type="text" 
                                        id="searchInput" 
                                        x-model="val"
                                        @focus="focused = true"
                                        @blur="focused = false"
-                                       placeholder="종목명/코드 검색..." 
-                                       class="grow outline-none bg-transparent h-full placeholder:text-base-content/40 transition-opacity duration-300"
-                                       :class="(focused || val.length > 0) ? 'opacity-100 pr-4' : 'opacity-0 w-0'">
+                                       @keydown.backspace="if (val === '' && activeChips.length > 0) { const last = activeChips[activeChips.length - 1]; removeFilter(last.category, last.value); }"
+                                       class="grow min-w-[60px] outline-none bg-transparent h-full text-sm">
+
+                                <!-- Clear Search Text Button -->
+                                <button type="button"
+                                        x-show="val.length > 0"
+                                        x-cloak
+                                        @click.prevent.stop="val = ''; $nextTick(() => { $refs.searchInput.dispatchEvent(new Event('input')); $refs.searchInput.focus(); })"
+                                        class="btn btn-ghost btn-xs btn-circle text-base-content/50 shrink-0">
+                                    ✕
+                                </button>
                             </label>
                         </div>
-                        
-                        <!-- Date Filter (HTMX) -->
-                        <div class="shrink-0 w-[145px]">
-                            <input type="date" name="date" hx-get="/api/stock/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" onclick="try{this.showPicker();}catch(e){}" class="input input-bordered w-full bg-base-200 shadow-sm text-sm tracking-tighter px-2 cursor-pointer relative">
-                        </div>
 
-                        <!-- Market Filter Button -->
-                        <div class="shrink-0">
-                            <button class="btn btn-outline bg-base-200 shadow-sm" :class="{ 'border-primary text-primary': openMenu === 'market' }" @click="toggleMenu('market')">
-                                시장
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': openMenu === 'market' }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </button>
-                        </div>
-                        
-                        <!-- Marcap Filter Button -->
-                        <div class="shrink-0">
-                            <button class="btn btn-outline bg-base-200 shadow-sm" :class="{ 'border-primary text-primary': openMenu === 'marcap' }" @click="toggleMenu('marcap')">
-                                시가총액
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': openMenu === 'marcap' }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </button>
+                        <!-- Row 2 (Mobile) / Right (Desktop): Date, Filter Buttons & Stock Count -->
+                        <div class="flex flex-row items-center gap-2 overflow-x-auto scrollbar-hide w-full md:w-auto shrink-0 whitespace-nowrap">
+                            
+                            <!-- Date Filter (HTMX) -->
+                            <div class="shrink-0 w-[138px] sm:w-[145px]">
+                                <input type="date" name="date" hx-get="/api/stock/rs-table" hx-target="#rs-table-container" hx-indicator="#loading" onclick="try{this.showPicker();}catch(e){}" class="input bg-base-200 w-full shadow-sm text-sm tracking-tighter px-2 cursor-pointer relative">
+                            </div>
+
+                            <!-- Market Filter Button -->
+                            <div class="shrink-0">
+                                <button type="button" class="btn bg-base-200 shadow-sm" :class="{ 'border-primary text-primary': openMenu === 'market' || filters.market.length > 0 }" @click="toggleMenu('market')">
+                                    시장
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': openMenu === 'market' }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                            </div>
+                            
+                            <!-- Marcap Filter Button -->
+                            <div class="shrink-0">
+                                <button type="button" class="btn bg-base-200 shadow-sm" :class="{ 'border-primary text-primary': openMenu === 'marcap' || filters.marcap.length > 0 }" @click="toggleMenu('marcap')">
+                                    시가총액
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': openMenu === 'marcap' }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                            </div>
+
+                            <!-- Stock Count -->
+                            <div class="text-[13px] text-base-content/50 ml-auto shrink-0 whitespace-nowrap pl-2">
+                                총 <span id="stockCount" class="font-bold text-base-content">-</span> 종목
+                            </div>
                         </div>
                     </div>
                     
@@ -116,7 +124,7 @@
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
-                         class="mt-1 p-3 bg-base-200/50 rounded-lg border border-base-200 flex flex-wrap gap-2">
+                         class="mt-2 p-3 bg-base-200/50 rounded-lg border border-base-200 flex flex-wrap gap-2">
                          
                         <template x-if="openMenu === 'market'">
                             <div class="flex flex-wrap gap-2">
