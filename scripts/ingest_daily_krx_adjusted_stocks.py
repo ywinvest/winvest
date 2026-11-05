@@ -42,11 +42,11 @@ def get_active_tickers() -> list[str]:
 
 
 def process_single_ticker(
-    code: str, fetch_start: str, target_date: str
+    code: str, target_date: str
 ) -> pd.DataFrame | None:
-    """Fetch price history for a ticker, calculate indicators, and return the target date row."""
+    """Fetch full price history for a ticker, calculate indicators, and return the target date row."""
     try:
-        df = fdr.DataReader(code, fetch_start)
+        df = fdr.DataReader(code)
         if df is None or df.empty:
             return None
 
@@ -60,6 +60,10 @@ def process_single_ticker(
         df["MA60"] = df["Close"].rolling(60).mean()
         df["MA120"] = df["Close"].rolling(120).mean()
         df["MA240"] = df["Close"].rolling(240).mean()
+
+        # 3. Calculate 52-Week High (364D) and All-Time High based on previous day's High
+        df["Prev_High_52W"] = df["High"].shift(1).rolling(window="364D", min_periods=1).max()
+        df["Prev_High_All_Time"] = df["High"].shift(1).cummax()
 
         df["Code"] = code
         df = df.reset_index()
@@ -81,13 +85,9 @@ def process_single_ticker(
 def fetch_and_calculate_all_adjusted_stocks(
     tickers: list[str], target_date: str, max_workers: int = 10
 ) -> pd.DataFrame:
-    """Fetch price histories in parallel, compute MAs and cross-sectional RS scores."""
-    # 400 calendar days covers ~270 trading days, sufficient for MA240 and Return_12M
-    target_dt = datetime.strptime(target_date, "%Y-%m-%d")
-    fetch_start = (target_dt - timedelta(days=400)).strftime("%Y-%m-%d")
-
+    """Fetch full price histories in parallel, compute MAs, highs, and cross-sectional RS scores."""
     print(
-        f"📥 Fetching prices & computing indicators for {len(tickers):,} tickers (from {fetch_start})...",
+        f"📥 Fetching full adjusted price histories & computing indicators for {len(tickers):,} tickers...",
         flush=True,
     )
     t0 = time.time()
@@ -98,7 +98,7 @@ def fetch_and_calculate_all_adjusted_stocks(
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_ticker = {
             executor.submit(
-                process_single_ticker, ticker, fetch_start, target_date
+                process_single_ticker, ticker, target_date
             ): ticker
             for ticker in tickers
         }
@@ -152,14 +152,16 @@ def format_for_tinybird(df: pd.DataFrame, target_date: str) -> pd.DataFrame:
             "MA60": "ma60",
             "MA120": "ma120",
             "MA240": "ma240",
+            "Prev_High_52W": "prev_high_52w",
+            "Prev_High_All_Time": "prev_high_all_time",
         }
     )
 
     df_formatted["date"] = target_date
-    df_formatted = df_formatted.fillna(0.0)
+    df_formatted = df_formatted.replace([float("inf"), float("-inf")], 0.0).fillna(0.0)
 
     # Cast integer columns (Int32, Int64)
-    int32_columns = ["open", "high", "low", "close"]
+    int32_columns = ["open", "high", "low", "close", "prev_high_52w", "prev_high_all_time"]
     for col in int32_columns:
         df_formatted[col] = df_formatted[col].astype("int32")
 
@@ -205,6 +207,8 @@ def format_for_tinybird(df: pd.DataFrame, target_date: str) -> pd.DataFrame:
         "ma60",
         "ma120",
         "ma240",
+        "prev_high_52w",
+        "prev_high_all_time",
     ]
     return df_formatted[final_cols]
 

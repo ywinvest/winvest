@@ -26,6 +26,17 @@ def get_rs_table_data(date_str: str | None = None) -> list[dict]:
 
         stocks = []
         for idx, row in enumerate(res["data"], start=1):
+            close = row.get("close") or 0
+            prev_high_52w = row.get("prev_high_52w") or 0
+            prev_high_all_time = row.get("prev_high_all_time") or 0
+
+            is_all_time_high = bool(prev_high_all_time > 0 and close > prev_high_all_time)
+            is_52w_high = bool(prev_high_52w > 0 and close > prev_high_52w)
+            pct_from_52w_high = ((close - prev_high_52w) / prev_high_52w * 100.0) if prev_high_52w > 0 else 0.0
+            pct_from_all_time_high = (
+                ((close - prev_high_all_time) / prev_high_all_time * 100.0) if prev_high_all_time > 0 else 0.0
+            )
+
             stocks.append({
                 "date": target_date,
                 "name": row.get("name"),
@@ -36,12 +47,18 @@ def get_rs_table_data(date_str: str | None = None) -> list[dict]:
                 "marcap": row.get("marcap"),
                 "amount": row.get("amount"),
                 "rs_rank": idx,
-                "close": row.get("close"),
+                "close": close,
                 "rs": row.get("rs"),
                 "rs_1m": row.get("rs_1m"),
                 "rs_3m": row.get("rs_3m"),
                 "rs_6m": row.get("rs_6m"),
                 "rs_12m": row.get("rs_12m"),
+                "prev_high_52w": prev_high_52w,
+                "prev_high_all_time": prev_high_all_time,
+                "is_52w_high": is_52w_high,
+                "is_all_time_high": is_all_time_high,
+                "pct_from_52w_high": pct_from_52w_high,
+                "pct_from_all_time_high": pct_from_all_time_high,
             })
         return stocks
     except Exception as e:

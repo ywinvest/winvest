@@ -23,7 +23,15 @@
         <!-- Header -->
         <div class="sticky top-0 z-20 flex justify-between items-center p-4 border-b border-base-200 bg-base-100/90 backdrop-blur-sm">
             <div>
-                <h2 class="text-xl font-bold tracking-tight" x-text="stockData.name || '-'"></h2>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="text-xl font-bold tracking-tight" x-text="stockData.name || '-'"></h2>
+                    <template x-if="stockData.is_all_time_high === 'true'">
+                        <span class="badge badge-sm badge-error badge-soft font-bold">역사적신고가</span>
+                    </template>
+                    <template x-if="stockData.is_all_time_high !== 'true' && stockData.is_52w_high === 'true'">
+                        <span class="badge badge-sm badge-warning badge-soft font-bold">52주신고가</span>
+                    </template>
+                </div>
                 <div class="text-xs font-mono text-base-content/60" x-text="(stockData.code || '-') + ' • ' + (stockData.market || '-')"></div>
             </div>
             <button class="btn btn-sm btn-circle btn-ghost" @click="isOpen = false">
@@ -79,6 +87,27 @@
                     </div>
                 </div>
                 
+                <div class="stat p-3 bg-base-200/50 rounded-xl border border-base-200 shadow-sm">
+                    <div class="stat-title text-xs font-semibold flex items-center justify-between">
+                        <span>52주 최고가</span>
+                        <span class="font-mono text-[11px]"
+                              :class="Number(stockData.pct_from_52w_high) > 0 ? 'text-error font-bold' : 'text-info'"
+                              x-text="Number(stockData.prev_high_52w) > 0 ? formatHighDiff(stockData.pct_from_52w_high) : '-'"></span>
+                    </div>
+                    <div class="stat-value text-sm font-mono mt-0.5"
+                         x-text="Number(stockData.prev_high_52w) > 0 ? formatNumber(stockData.prev_high_52w) : '-'"></div>
+                </div>
+                <div class="stat p-3 bg-base-200/50 rounded-xl border border-base-200 shadow-sm">
+                    <div class="stat-title text-xs font-semibold flex items-center justify-between">
+                        <span>역사적 최고가</span>
+                        <span class="font-mono text-[11px]"
+                              :class="Number(stockData.pct_from_all_time_high) > 0 ? 'text-error font-bold' : 'text-info'"
+                              x-text="Number(stockData.prev_high_all_time) > 0 ? formatHighDiff(stockData.pct_from_all_time_high) : '-'"></span>
+                    </div>
+                    <div class="stat-value text-sm font-mono mt-0.5"
+                         x-text="Number(stockData.prev_high_all_time) > 0 ? formatNumber(stockData.prev_high_all_time) : '-'"></div>
+                </div>
+
                 <div class="stat p-3 bg-base-200/50 rounded-xl border border-base-200 shadow-sm">
                     <div class="stat-title text-xs font-semibold">시가총액</div>
                     <div class="stat-value text-sm font-mono flex items-baseline gap-0.5">
