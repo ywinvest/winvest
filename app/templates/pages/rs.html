@@ -112,6 +112,14 @@
                                 </button>
                             </div>
 
+                            <!-- New High Filter Button -->
+                            <div class="shrink-0">
+                                <button type="button" class="btn bg-base-200 shadow-sm" :class="{ 'border-primary text-primary': openMenu === 'new_high' || filters.new_high.length > 0 }" @click="toggleMenu('new_high')">
+                                    신고가
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': openMenu === 'new_high' }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                            </div>
+
                             <!-- Stock Count -->
                             <div class="text-[13px] text-base-content/50 ml-auto shrink-0 whitespace-nowrap pl-2">
                                 총 <span id="stockCount" class="font-bold text-base-content">-</span> 종목
@@ -141,6 +149,14 @@
                                 </template>
                             </div>
                         </template>
+
+                        <template x-if="openMenu === 'new_high'">
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="opt in newHighOptions" :key="opt.value">
+                                    <button class="btn btn-sm rounded-full" :class="filters.new_high.includes(opt.value) ? 'btn-primary' : 'btn-ghost border border-base-300 bg-base-100'" @click="toggleFilter('new_high', opt.value)" x-text="opt.label"></button>
+                                </template>
+                            </div>
+                        </template>
                     </div>
                 </div>
                 
@@ -166,7 +182,7 @@
 
     <!-- Facet Filter & Drawer State (Alpine) -->
     <script>
-        window.alpineFilters = { market: [], marcap: [] };
+        window.alpineFilters = { market: [], marcap: [], new_high: [] };
         
         document.addEventListener('alpine:init', () => {
             Alpine.data('stockDrawer', () => ({
@@ -183,6 +199,13 @@
                 formatRatio(val) {
                     if (!val && val !== 0) return '0.00';
                     return Number(val).toFixed(2);
+                },
+                formatHighDiff(pct) {
+                    if (pct === undefined || pct === null || pct === '') return '-';
+                    const val = Number(pct);
+                    if (isNaN(val)) return '-';
+                    const sign = val > 0 ? '+' : '';
+                    return `${sign}${val.toFixed(2)}%`;
                 },
                 formatCap(val) {
                     if (!val && val !== 0) return '-';
@@ -210,7 +233,8 @@
                 openMenu: null,
                 filters: {
                     market: [],
-                    marcap: []
+                    marcap: [],
+                    new_high: []
                 },
                 marketOptions: [
                     { value: 'KOSPI', label: 'KOSPI' },
@@ -221,11 +245,16 @@
                     { value: '5000', label: '5천억 이상' },
                     { value: '10000', label: '1조 이상' }
                 ],
+                newHighOptions: [
+                    { value: '52w', label: '52주 신고가' },
+                    { value: 'all_time', label: '역사적 신고가' }
+                ],
                 init() {
                     // Set default selected for market (empty means all markets)
                     this.filters.market = [];
                     // 기본적으로 2천억 이상 필터 적용
                     this.filters.marcap = ['2000'];
+                    this.filters.new_high = [];
                     window.alpineFilters = this.filters;
                     
                     this.$watch('filters', (val) => {
@@ -258,6 +287,10 @@
                     this.filters.marcap.forEach(val => {
                         const opt = this.marcapOptions.find(o => o.value === val);
                         if(opt) chips.push({ category: 'marcap', value: val, label: opt.label });
+                    });
+                    this.filters.new_high.forEach(val => {
+                        const opt = this.newHighOptions.find(o => o.value === val);
+                        if(opt) chips.push({ category: 'new_high', value: val, label: opt.label });
                     });
                     return chips;
                 }
@@ -320,6 +353,7 @@
                 // Read from Alpine state
                 const activeMarkets = window.alpineFilters.market || [];
                 const activeMarcaps = window.alpineFilters.marcap || [];
+                const activeNewHighs = window.alpineFilters.new_high || [];
                 
                 // For market cap, we find the minimum selected threshold
                 let minMarcap = 0;
@@ -334,6 +368,8 @@
                     const rowCode = (row.dataset.code || "").toLowerCase();
                     const rowMarket = row.dataset.market || "";
                     const rowMarcap = parseFloat(row.dataset.marcap) || 0;
+                    const rowIs52wHigh = row.dataset.is_52w_high === "true";
+                    const rowIsAllTimeHigh = row.dataset.is_all_time_high === "true";
 
                     const matchSearch = rowName.includes(search) || rowCode.includes(search);
                     
@@ -343,7 +379,14 @@
                     // Match marcap
                     const matchMarcap = minMarcap === 0 || rowMarcap >= minMarcap;
 
-                    return matchSearch && matchMarket && matchMarcap;
+                    // Match new high ('52w' includes both 52w high and all-time high; 'all_time' requires all-time high)
+                    const matchNewHigh = activeNewHighs.length === 0 || activeNewHighs.some(h => {
+                        if (h === 'all_time') return rowIsAllTimeHigh;
+                        if (h === '52w') return rowIs52wHigh || rowIsAllTimeHigh;
+                        return true;
+                    });
+
+                    return matchSearch && matchMarket && matchMarcap && matchNewHigh;
                 });
 
                 // Sorting

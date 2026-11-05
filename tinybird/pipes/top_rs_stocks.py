@@ -22,7 +22,9 @@ top_rs_stocks = define_endpoint(
                             s.changes_ratio as changes_ratio, 
                             s.marcap as marcap, 
                             s.amount as amount, 
-                            i.rs as rs
+                            i.rs as rs,
+                            i.prev_high_52w as prev_high_52w,
+                            i.prev_high_all_time as prev_high_all_time
                         FROM krx_daily_stocks s
                         JOIN krx_daily_adjusted_stocks i 
                           ON s.code = i.code AND s.date = i.date
@@ -50,6 +52,8 @@ top_rs_stocks = define_endpoint(
             "marcap": t.int64(),
             "amount": t.int64(),
             "rs": t.float32(),
+            "prev_high_52w": t.int32(),
+            "prev_high_all_time": t.int32(),
         },
         "tokens": [{"token": app_token, "scope": "READ"}],
     },

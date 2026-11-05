@@ -25,6 +25,8 @@ krx_daily_adjusted_stocks = define_datasource(
             "ma60": t.float32(),
             "ma120": t.float32(),
             "ma240": t.float32(),
+            "prev_high_52w": t.int32(),
+            "prev_high_all_time": t.int32(),
         },
         "engine": engine.merge_tree({
             "sorting_key": ["date", "code"],

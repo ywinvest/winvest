@@ -138,8 +138,12 @@ python scripts/ingest_daily_krx_adjusted_stocks.py
 - **Responsive Mobile-First Design**: Support both desktop (`navbar` top navigation, wide data tables) and mobile (`dock` bottom navigation bar, horizontal chip scrolling, responsive slide-over drawer).
 - **High-Density Financial UI**: Use crisp typography (`Plus Jakarta Sans` & `JetBrains Mono`) and smooth micro-interactions (`x-transition`, `x-cloak`).
 
-### 5.4 Data Pipeline & Pandas Conventions (`scripts/`)
+### 5.4 Data Pipeline, Schema & Pandas Conventions (`scripts/`, `tinybird/`, `app/models.py`)
 - **Vectorized Operations Only**: Never use `df.iterrows()` when transforming KRX stock DataFrames. Use vectorized Pandas/NumPy operations and `df.to_dict(orient="records")` before bulk ingestion into Tinybird or PostgreSQL.
+- **Financial Indicator & Schema Field Naming Convention**:
+  - **Bar-Count Technical Indicators (`<indicator><bars>`, no underscore)**: Indicators based purely on candle/bar count omit underscores (e.g., `ma5`, `ma10`, `ma20`, `ma60`, `ma120`, `ma240`, `rsi14`, `atr22`, `adx14`). Do not append `d` on daily tables (`krx_daily_*`).
+  - **Calendar-Period / Horizon Metrics (`<metric>_<period>`, with underscore)**: Metrics qualified by a calendar horizon or multi-word scope use an underscore with the metric name first to avoid leading digits in Python/SQL/JS identifiers, and prefix prior-bar reference values with `prev_` (e.g., `rs_1m`, `rs_3m`, `rs_6m`, `rs_12m`, `prev_high_52w`, `prev_high_all_time`).
+  - **Condition / Breakout Flags (`is_<condition>`)**: Derived boolean flags in CRUD and templates start with `is_` (e.g., `is_52w_high`, `is_all_time_high`).
 
 ---
 

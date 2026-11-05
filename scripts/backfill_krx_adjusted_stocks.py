@@ -169,18 +169,20 @@ def format_for_tinybird(df: pd.DataFrame, code: str) -> pd.DataFrame:
             "MA60": "ma60",
             "MA120": "ma120",
             "MA240": "ma240",
+            "Prev_High_52W": "prev_high_52w",
+            "Prev_High_All_Time": "prev_high_all_time",
         }
     )
 
     df_formatted["code"] = code
-    df_formatted = df_formatted.fillna(0.0)
+    df_formatted = df_formatted.replace([float("inf"), float("-inf")], 0.0).fillna(0.0)
 
     # Convert date to string YYYY-MM-DD
     if pd.api.types.is_datetime64_any_dtype(df_formatted["date"]):
         df_formatted["date"] = df_formatted["date"].dt.strftime("%Y-%m-%d")
 
     # Cast integer columns (Int32, Int64)
-    int32_columns = ["open", "high", "low", "close"]
+    int32_columns = ["open", "high", "low", "close", "prev_high_52w", "prev_high_all_time"]
     for col in int32_columns:
         df_formatted[col] = df_formatted[col].astype("int32")
 
@@ -226,6 +228,8 @@ def format_for_tinybird(df: pd.DataFrame, code: str) -> pd.DataFrame:
         "ma60",
         "ma120",
         "ma240",
+        "prev_high_52w",
+        "prev_high_all_time",
     ]
     return df_formatted[final_cols]
 
@@ -249,12 +253,9 @@ def backfill_ticker_history(
     if not existing_rs_df.empty:
         print(f"  -> Retained {len(existing_rs_df):,} existing RS scores for [{code}].", flush=True)
 
-    # 3. Fetch from FDR starting 400 calendar days earlier to ensure MAs and 12M return are fully calculated
-    dt_start = datetime.strptime(effective_start, "%Y-%m-%d")
-    fetch_start = (dt_start - timedelta(days=400)).strftime("%Y-%m-%d")
-
+    # 3. Fetch full adjusted price history from FDR so Prev_High_All_Time, Prev_High_52W, MAs, and 12M return are fully calculated
     try:
-        df = fdr.DataReader(code, fetch_start)
+        df = fdr.DataReader(code)
     except Exception as e:
         print(f"❌ Failed to fetch FDR data for [{code}]: {e}", flush=True)
         return 0
@@ -263,7 +264,7 @@ def backfill_ticker_history(
         print(f"⚠️ No data returned from FDR for [{code}].", flush=True)
         return 0
 
-    # 4. Calculate return indicators & Moving Averages
+    # 4. Calculate return indicators, Moving Averages, and Highs
     df = rs.calculate_indicators(df)
     df["MA5"] = df["Close"].rolling(5).mean()
     df["MA10"] = df["Close"].rolling(10).mean()
@@ -271,6 +272,8 @@ def backfill_ticker_history(
     df["MA60"] = df["Close"].rolling(60).mean()
     df["MA120"] = df["Close"].rolling(120).mean()
     df["MA240"] = df["Close"].rolling(240).mean()
+    df["Prev_High_52W"] = df["High"].shift(1).rolling(window="364D", min_periods=1).max()
+    df["Prev_High_All_Time"] = df["High"].shift(1).cummax()
 
     df = df.reset_index()
     if "Date" not in df.columns and "index" in df.columns:
@@ -299,9 +302,9 @@ def backfill_ticker_history(
 
     if dry_run:
         print(f"🔍 [DRY RUN] [{code}] Would backfill {len(df_db):,} rows from {effective_start}.", flush=True)
-        print(df_db[["date", "code", "close", "change", "ma5", "rs"]].head(2), flush=True)
+        print(df_db[["date", "code", "close", "change", "ma5", "rs", "prev_high_52w", "prev_high_all_time"]].head(2), flush=True)
         print("  ...", flush=True)
-        print(df_db[["date", "code", "close", "change", "ma5", "rs"]].tail(2), flush=True)
+        print(df_db[["date", "code", "close", "change", "ma5", "rs", "prev_high_52w", "prev_high_all_time"]].tail(2), flush=True)
         return len(df_db)
 
     # 7. Delete outdated historical records in Tinybird

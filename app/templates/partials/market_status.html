@@ -76,8 +76,13 @@
                         <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500"></div>
                         
                         <!-- Name -->
-                        <div class="text-lg sm:text-2xl md:text-3xl font-bold text-base-content truncate w-full text-center tracking-tight leading-tight mb-0.5 px-1">
-                            {{ top_stock.name }}
+                        <div class="flex items-center justify-center gap-1.5 w-full mb-0.5 px-1 min-w-0">
+                            <span class="text-lg sm:text-2xl md:text-3xl font-bold text-base-content truncate tracking-tight leading-tight">{{ top_stock.name }}</span>
+                            {% if top_stock.is_all_time_high %}
+                            <span class="badge badge-xs badge-error badge-soft font-bold shrink-0">역사적신고가</span>
+                            {% elif top_stock.is_52w_high %}
+                            <span class="badge badge-xs badge-warning badge-soft font-bold shrink-0">52주신고가</span>
+                            {% endif %}
                         </div>
                         
                         <!-- Price and Ratio -->
@@ -116,8 +121,13 @@
                                 
                                 <!-- Name -->
                                 <div class="flex items-center min-w-0 flex-1 justify-between gap-1">
-                                    <div class="text-[11px] md:text-sm font-bold text-base-content flex items-center gap-1 min-w-0 leading-none">
+                                    <div class="text-[11px] md:text-sm font-bold text-base-content flex items-center gap-1.5 min-w-0 leading-none">
                                         <span class="truncate">{{ stock.name }}</span>
+                                        {% if stock.is_all_time_high %}
+                                        <span class="badge badge-xs badge-error badge-soft font-bold shrink-0">역사적신고가</span>
+                                        {% elif stock.is_52w_high %}
+                                        <span class="badge badge-xs badge-warning badge-soft font-bold shrink-0">52주신고가</span>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <!-- Change Ratio -->
@@ -214,8 +224,13 @@
                         <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500"></div>
                         
                         <!-- Name -->
-                        <div class="text-lg sm:text-2xl md:text-3xl font-bold text-base-content truncate w-full text-center tracking-tight leading-tight mb-0.5 px-1">
-                            {{ top_stock.name }}
+                        <div class="flex items-center justify-center gap-1.5 w-full mb-0.5 px-1 min-w-0">
+                            <span class="text-lg sm:text-2xl md:text-3xl font-bold text-base-content truncate tracking-tight leading-tight">{{ top_stock.name }}</span>
+                            {% if top_stock.is_all_time_high %}
+                            <span class="badge badge-xs badge-error badge-soft font-bold shrink-0">역사적신고가</span>
+                            {% elif top_stock.is_52w_high %}
+                            <span class="badge badge-xs badge-warning badge-soft font-bold shrink-0">52주신고가</span>
+                            {% endif %}
                         </div>
                         
                         <!-- Price and Ratio -->
@@ -254,8 +269,13 @@
                                 
                                 <!-- Name -->
                                 <div class="flex items-center min-w-0 flex-1 justify-between gap-1">
-                                    <div class="text-[11px] md:text-sm font-bold text-base-content flex items-center gap-1 min-w-0 leading-none">
+                                    <div class="text-[11px] md:text-sm font-bold text-base-content flex items-center gap-1.5 min-w-0 leading-none">
                                         <span class="truncate">{{ stock.name }}</span>
+                                        {% if stock.is_all_time_high %}
+                                        <span class="badge badge-xs badge-error badge-soft font-bold shrink-0">역사적신고가</span>
+                                        {% elif stock.is_52w_high %}
+                                        <span class="badge badge-xs badge-warning badge-soft font-bold shrink-0">52주신고가</span>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <!-- Change Ratio -->

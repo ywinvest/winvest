@@ -31,6 +31,8 @@ class KrxDailyAdjustedStock(SQLModel, table=True):
     close: int
     volume: int = Field(sa_column=Column(BigInteger()))
     change: float
+    prev_high_52w: int = Field(default=0)
+    prev_high_all_time: int = Field(default=0)
 
 
 class KrxDailyStockIndicator(SQLModel, table=True):

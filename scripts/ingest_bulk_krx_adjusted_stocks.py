@@ -101,13 +101,11 @@ def get_tickers_with_first_trading_date(start_date: str) -> pd.DataFrame:
 
 
 def process_single_stock(row, start_date: str, end_date: str | None = None) -> pd.DataFrame | None:
-    """Fetch prices for ticker, calculate moving averages and returns."""
+    """Fetch full price history for ticker, calculate moving averages, highs, and returns, then slice from start_date."""
     code = row["Code"]
-    first_trading_date = row.get("FirstTradingDate")
-    fetch_start = max(pd.Timestamp(start_date), first_trading_date)
 
     try:
-        df = fdr.DataReader(code, fetch_start, end_date) if end_date else fdr.DataReader(code, fetch_start)
+        df = fdr.DataReader(code, None, end_date) if end_date else fdr.DataReader(code)
         if df is None or df.empty:
             return None
 
@@ -118,6 +116,12 @@ def process_single_stock(row, start_date: str, end_date: str | None = None) -> p
         df["MA60"] = df["Close"].rolling(window=60).mean()
         df["MA120"] = df["Close"].rolling(window=120).mean()
         df["MA240"] = df["Close"].rolling(window=240).mean()
+        df["Prev_High_52W"] = df["High"].shift(1).rolling(window="364D", min_periods=1).max()
+        df["Prev_High_All_Time"] = df["High"].shift(1).cummax()
+
+        df = df[df.index >= pd.Timestamp(start_date)].copy()
+        if df.empty:
+            return None
 
         df["Code"] = code
         return df
@@ -180,13 +184,15 @@ def format_for_tinybird(df: pd.DataFrame) -> pd.DataFrame:
             "MA60": "ma60",
             "MA120": "ma120",
             "MA240": "ma240",
+            "Prev_High_52W": "prev_high_52w",
+            "Prev_High_All_Time": "prev_high_all_time",
         }
     )
 
-    df_formatted = df_formatted.fillna(0.0)
+    df_formatted = df_formatted.replace([float("inf"), float("-inf")], 0.0).fillna(0.0)
 
     # Cast integer columns (Int32, Int64)
-    int32_columns = ["open", "high", "low", "close"]
+    int32_columns = ["open", "high", "low", "close", "prev_high_52w", "prev_high_all_time"]
     for col in int32_columns:
         df_formatted[col] = df_formatted[col].astype("int32")
 
@@ -235,6 +241,8 @@ def format_for_tinybird(df: pd.DataFrame) -> pd.DataFrame:
         "ma60",
         "ma120",
         "ma240",
+        "prev_high_52w",
+        "prev_high_all_time",
     ]
     return df_formatted[final_cols]
 

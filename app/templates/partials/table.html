@@ -49,12 +49,24 @@
         data-name="{{ stock.name }}" data-code="{{ stock.code }}" data-market="{{ stock.market }}"
         data-changes_ratio="{{ stock.changes_ratio }}" data-marcap="{{ stock.marcap }}"
         data-amount="{{ stock.amount or 0 }}" data-rs="{{ stock.rs }}" data-rs_1m="{{ stock.rs_1m }}"
-        data-rs_3m="{{ stock.rs_3m }}" data-rs_6m="{{ stock.rs_6m }}" data-rs_12m="{{ stock.rs_12m }}">
+        data-rs_3m="{{ stock.rs_3m }}" data-rs_6m="{{ stock.rs_6m }}" data-rs_12m="{{ stock.rs_12m }}"
+        data-prev_high_52w="{{ stock.prev_high_52w or 0 }}" data-prev_high_all_time="{{ stock.prev_high_all_time or 0 }}"
+        data-is_52w_high="{{ 'true' if stock.is_52w_high else 'false' }}"
+        data-is_all_time_high="{{ 'true' if stock.is_all_time_high else 'false' }}"
+        data-pct_from_52w_high="{{ '%.2f'|format(stock.pct_from_52w_high or 0) }}"
+        data-pct_from_all_time_high="{{ '%.2f'|format(stock.pct_from_all_time_high or 0) }}">
         <td class="hidden md:table-cell text-center">
             <span class="font-mono text-[13px] font-semibold text-base-content/60">{{ stock.rs_rank }}</span>
         </td>
         <td>
-            <div class="font-bold text-base-content text-[15px] tracking-tight">{{ stock.name }}</div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-bold text-base-content text-[15px] tracking-tight">{{ stock.name }}</span>
+                {% if stock.is_all_time_high %}
+                <span class="badge badge-xs badge-error badge-soft font-bold tracking-tight">역사적신고가</span>
+                {% elif stock.is_52w_high %}
+                <span class="badge badge-xs badge-warning badge-soft font-bold tracking-tight">52주신고가</span>
+                {% endif %}
+            </div>
             <div class="text-xs text-base-content/60 font-mono mt-0.5">{{ stock.code }}</div>
         </td>
         <td class="hidden md:table-cell text-right">

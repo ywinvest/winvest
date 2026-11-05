@@ -26,7 +26,9 @@ all_rs_stocks = define_endpoint(
                             i.rs_1m as rs_1m,
                             i.rs_3m as rs_3m,
                             i.rs_6m as rs_6m,
-                            i.rs_12m as rs_12m
+                            i.rs_12m as rs_12m,
+                            i.prev_high_52w as prev_high_52w,
+                            i.prev_high_all_time as prev_high_all_time
                         FROM krx_daily_stocks s
                         JOIN krx_daily_adjusted_stocks i 
                           ON s.code = i.code AND s.date = i.date
@@ -59,6 +61,8 @@ all_rs_stocks = define_endpoint(
             "rs_3m": t.float32(),
             "rs_6m": t.float32(),
             "rs_12m": t.float32(),
+            "prev_high_52w": t.int32(),
+            "prev_high_all_time": t.int32(),
         },
         "tokens": [{"token": app_token, "scope": "READ"}],
     },
