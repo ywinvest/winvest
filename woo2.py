@@ -307,14 +307,22 @@ def buy_and_sell(df, kospi_df, kosdaq_df):
           # 2차 매도 (남은 물량 - Runner) 조건 탐색
           runner_data = trade_data.loc[sell_date:].copy()
           if len(runner_data) > 1:
-            # 1. 거래량 실린 장대 음봉 (오닐식 청산)
+            # 1. 거래량 실린 장대 음봉 또는 클라이맥스 음봉 (오닐식 청산)
             volume_spike_drop = (
                 (
                     (runner_data['Volume'] > runner_data['Volume'].shift(1) * 1.2) |
                     (runner_data['Volume'] > runner_data['Volume'].rolling(window=20).mean() * 1.5)
                 ) &
-                (runner_data['Change'] < -1 * BASE_RISK) & # -8%
-                (runner_data['Close'] / runner_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+                (
+                    (
+                        (runner_data['Change'] < -1 * BASE_RISK) & # -8%
+                        (runner_data['Close'] / runner_data['Open'] - 1 < -1 * BASE_RISK) # -8%
+                    ) |
+                    (
+                        ((runner_data['High'] / runner_data['Low'] - 1) > BASE_RISK * 3) & # 고저폭 > 3R (24%)
+                        (runner_data['Close'] < runner_data['Open']) # 음봉 마감
+                    )
+                )
             )
 
             # 2. 추세 붕괴 확정
