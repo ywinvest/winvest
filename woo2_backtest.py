@@ -108,8 +108,11 @@ if __name__ == "__main__":
     kospi['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kospi['MA5_Up'] = kospi['Close'] > kospi['Close'].rolling(window=5).mean()
     kospi['MA20_Up'] = kospi['Close'] > kospi['Close'].rolling(window=20).mean()
+    kospi['MA50_Up'] = kospi['Close'] > kospi['Close'].rolling(window=50).mean()
     kospi['MA60_Up'] = kospi['Close'] > kospi['Close'].rolling(window=60).mean()
     kospi['MA120_Up'] = kospi['Close'] > kospi['Close'].rolling(window=120).mean()
+    kospi['MA150_Up'] = kospi['Close'] > kospi['Close'].rolling(window=150).mean()
+    kospi['MA200_Up'] = kospi['Close'] > kospi['Close'].rolling(window=200).mean()
 
     kosdaq = fdr.DataReader('KQ11')
     kosdaq['RSI'] = ta.rsi(kosdaq['Close'], length=14)
@@ -118,8 +121,11 @@ if __name__ == "__main__":
     kosdaq['DI'] = adx_data['DMP_14'] > adx_data['DMN_14']
     kosdaq['MA5_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=5).mean()
     kosdaq['MA20_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=20).mean()
+    kosdaq['MA50_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=50).mean()
     kosdaq['MA60_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=60).mean()
     kosdaq['MA120_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=120).mean()
+    kosdaq['MA150_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=150).mean()
+    kosdaq['MA200_Up'] = kosdaq['Close'] > kosdaq['Close'].rolling(window=200).mean()
 
     result_file = "woo2_backtest_results.csv"
 
