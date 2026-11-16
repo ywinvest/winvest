@@ -69,9 +69,9 @@
   - `df["Prev_High_All_Time"] = df["High"].shift(1).cummax()`
 - FR-2: `ingest_daily_krx_adjusted_stocks.py`, `ingest_bulk_krx_adjusted_stocks.py`, `backfill_krx_adjusted_stocks.py`는 FDR 호출 시 시작일 제한 없이 전체 수정주가 이력을 조회하여 `prev_high_52w`와 `prev_high_all_time`을 산출한 뒤, 적재 대상 날짜 범위만 필터링하여 Tinybird에 업로드해야 한다.
 - FR-3: Tinybird `krx_daily_adjusted_stocks` 데이터소스 및 `app/models.py`(`KrxDailyAdjustedStock`)에 `prev_high_52w: int32`, `prev_high_all_time: int32` 필드를 추가하고, Tinybird Pipe(`all_rs_stocks`, `top_rs_stocks`) 출력 컬럼에 포함해야 한다.
-- FR-4: `app/crud/rs.py` 및 `app/crud/market.py`에서 각 종목에 대해 다음 파생 필드를 계산하여 템플릿에 전달해야 한다:
-  - `is_all_time_high`: `prev_high_all_time > 0 and close > prev_high_all_time`
-  - `is_52w_high`: `prev_high_52w > 0 and close > prev_high_52w`
+- FR-4: `app/crud/rs.py` 및 `app/crud/market.py`에서 각 종목에 대해 다음 파생 필드를 계산하여 템플릿에 전달해야 한다 (단, 거래정지 종목이 감자/병합 등으로 기준가만 변경되어 신고가로 오판정되는 것을 막기 위해 당일 거래대금 `amount > 0` 조건을 필수로 포함한다):
+  - `is_all_time_high`: `amount > 0 and prev_high_all_time > 0 and close > prev_high_all_time`
+  - `is_52w_high`: `amount > 0 and prev_high_52w > 0 and close > prev_high_52w`
   - `pct_from_52w_high`: `((close - prev_high_52w) / prev_high_52w * 100)` (`prev_high_52w > 0`일 때)
   - `pct_from_all_time_high`: `((close - prev_high_all_time) / prev_high_all_time * 100)` (`prev_high_all_time > 0`일 때)
 - FR-5: RS 테이블(`table.html`)과 시장 대시보드 Top 5(`market_status.html`)에서 종목명 옆에 신고가 배지를 표시해야 한다.
@@ -336,3 +336,4 @@ Complete in order:
 ## Change Log
 - 2026-11-05: Initial PRD created (`tasks/prd-new-high-indicator.md`).
 - 2026-11-05: Phase 1, 2, 3 구현 및 단위/템플릿 렌더링 검증 완료.
+- 2026-11-16: 거래정지 종목(`amount == 0`)이 거래정지 중 감자/병합 기준가 변경으로 인해 신고가로 오판정되는 문제를 방지하기 위해 `is_52w_high`, `is_all_time_high` 판정에 `amount > 0` 조건 추가 (`app/crud/rs.py`, `app/crud/market.py`).

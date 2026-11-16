@@ -68,6 +68,7 @@ def _fetch_market_top5_rs(latest_date: str, market_name: str) -> list[dict]:
             best_row = max(res["data"], key=lambda x: x["changes_ratio"])
             for row in res["data"]:
                 close = row.get("close") or 0
+                amount = row.get("amount") or 0
                 prev_high_52w = row.get("prev_high_52w") or 0
                 prev_high_all_time = row.get("prev_high_all_time") or 0
                 items.append({
@@ -80,8 +81,8 @@ def _fetch_market_top5_rs(latest_date: str, market_name: str) -> list[dict]:
                     "rs": row["rs"],
                     "prev_high_52w": prev_high_52w,
                     "prev_high_all_time": prev_high_all_time,
-                    "is_52w_high": bool(prev_high_52w > 0 and close > prev_high_52w),
-                    "is_all_time_high": bool(prev_high_all_time > 0 and close > prev_high_all_time),
+                    "is_52w_high": bool(amount > 0 and prev_high_52w > 0 and close > prev_high_52w),
+                    "is_all_time_high": bool(amount > 0 and prev_high_all_time > 0 and close > prev_high_all_time),
                     "is_top_gainer": row == best_row,
                 })
     except Exception as e:
