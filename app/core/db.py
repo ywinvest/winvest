@@ -1,6 +1,5 @@
 from sqlmodel import SQLModel, create_engine, Session
 from app.core.config import DATABASE_URL
-import app.models  # noqa: F401 — Register SQLModel table metadata
 
 _engine = None
 
@@ -32,6 +31,8 @@ def __getattr__(name: str):
 
 def create_db_and_tables():
     """앱 시작 시 원격 클라우드에 테이블이 없으면 생성"""
+    import app.models  # noqa: F401 — Register SQLModel table metadata
+
     SQLModel.metadata.create_all(get_engine())
 
 
