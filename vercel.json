@@ -1,4 +1,8 @@
 {
     "$schema": "https://openapi.vercel.sh/vercel.json",
-    "framework": "fastapi"
+    "framework": "fastapi",
+    "regions": ["icn1"],
+    "redirects": [
+        { "source": "/", "destination": "/market", "permanent": false }
+    ]
 }
