@@ -1,4 +1,4 @@
-fastapi[standard]
+fastapi
 jinja2
 sqlmodel
 python-dotenv

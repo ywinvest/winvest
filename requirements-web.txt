@@ -1,4 +1,0 @@
-fastapi[standard]
-jinja2
-sqlmodel
-python-dotenv
